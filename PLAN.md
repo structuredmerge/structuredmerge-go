@@ -117,9 +117,13 @@ Requirements:
 
 ## Open Questions
 
-1. One Go workspace or separate modules?
-2. Is comment-preservation support feasible enough for v1?
-3. Should Go prioritize library embedding or CLI tooling first?
+1. Is comment-preservation support feasible enough for v1?
+2. Should Go prioritize library embedding or CLI tooling first?
+
+## Decisions
+
+- Use one monorepo rooted at `structuredmerge-go`.
+- Start with one root Go module and multiple publishable packages.
 
 ## First Implementation Sequence
 
@@ -128,4 +132,3 @@ Requirements:
 3. implement fixture runner
 4. implement `text-merge-go`
 5. implement `json-merge-go`
-
