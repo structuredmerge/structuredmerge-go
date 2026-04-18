@@ -1,0 +1,131 @@
+# Go PLAN
+
+## Objective
+
+Build a Go module/package family for the merge stack with tree-sitter as the
+primary analysis backend for MVP releases, emphasizing straightforward
+deployment, readable APIs, and fixture-based conformance with the Ruby stack.
+
+## License
+
+Planned dual license for all new Go merge-stack modules:
+
+- `AGPL-3.0-only`
+- `PolyForm-Small-Business-1.0.0`
+
+Reference:
+
+- `LICENSE_TEMPLATE_PLAN.md`
+
+## Scope Boundary
+
+Initial focus:
+
+1. tree-sitter adapter package
+2. core merge model
+3. text merge MVP
+4. JSON and JSONC merge MVP
+5. shared-fixture conformance runner
+
+Deferred:
+
+- `kettle-jem`-style scaffolding
+- full merge-family parity beyond MVP
+- non-tree-sitter native parser experiments
+
+## Proposed Module Family
+
+Initial package/module candidates:
+
+- `tree-haver-go`
+- `ast-merge-go`
+- `text-merge-go`
+- `json-merge-go`
+
+Possible later modules:
+
+- `toml-merge-go`
+- `yaml-merge-go`
+- `markdown-merge-go`
+- `merge-ruleset-go`
+- `gomod-template-go`
+
+## Ruby Mapping
+
+Reference Ruby siblings to study first:
+
+- `tree_haver`
+- `ast-merge`
+- `json-merge`
+
+MVP parity target:
+
+- parser acquisition and diagnostics from `tree_haver`
+- merge contracts from `ast-merge`
+- strict JSON/JSONC behavior from `json-merge`
+
+## Tree-Sitter Strategy
+
+Primary backend:
+
+- Go tree-sitter bindings plus generated grammar packages
+
+Requirements:
+
+- clean parser lifecycle management
+- grammar selection abstraction
+- stable node wrappers or adapters
+- shared diagnostic shape for conformance runner
+
+## MVP Deliverables
+
+### 1. `tree-haver-go`
+
+- parser registry
+- grammar loading
+- parse result/diagnostic reporting
+
+### 2. `ast-merge-go`
+
+- merge result structs
+- diagnostic structs
+- matching/refinement interfaces
+- freeze region model
+
+### 3. `text-merge-go`
+
+- normalized text segmentation
+- block matching
+- threshold-based similarity API
+
+### 4. `json-merge-go`
+
+- strict JSON/JSONC merge support
+- comments support where grammar/runtime provides it
+- targeted recovery hook boundaries
+
+### 5. Fixture Runner
+
+- reads shared fixtures from workspace
+- compares expected output and diagnostics
+
+## Non-Goals For V1
+
+- direct feature parity with all Ruby merge gems
+- scaffolding/templating packages
+- broad ecosystem integration before fixture parity
+
+## Open Questions
+
+1. One Go workspace or separate modules?
+2. Is comment-preservation support feasible enough for v1?
+3. Should Go prioritize library embedding or CLI tooling first?
+
+## First Implementation Sequence
+
+1. define Go merge result and diagnostic types
+2. implement `tree-haver-go`
+3. implement fixture runner
+4. implement `text-merge-go`
+5. implement `json-merge-go`
+
