@@ -27,8 +27,46 @@ func readParserFixture(t *testing.T, parts ...string) map[string]any {
 	return fixture
 }
 
+func readParserFixtureFromPath(t *testing.T, path string) map[string]any {
+	t.Helper()
+
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	return fixture
+}
+
+func diagnosticsFixturePath(t *testing.T, role string) string {
+	t.Helper()
+
+	manifest := readParserFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	entries := manifest["diagnostics"].([]any)
+	for _, item := range entries {
+		entry := item.(map[string]any)
+		if entry["role"].(string) != role {
+			continue
+		}
+
+		parts := []string{"..", "..", "fixtures"}
+		for _, segment := range entry["path"].([]any) {
+			parts = append(parts, segment.(string))
+		}
+		return filepath.Join(parts...)
+	}
+
+	t.Fatalf("missing diagnostics fixture entry for %s", role)
+	return ""
+}
+
 func TestSharedFixtureParserRequest(t *testing.T) {
-	fixture := readParserFixture(t, "diagnostics", "slice-06-parser-adapters", "parser-request.json")
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "parser_request"))
 	requestFixture := fixture["request"].(map[string]any)
 	infoFixture := fixture["adapter_info"].(map[string]any)
 
@@ -56,7 +94,7 @@ func TestSharedFixtureParserRequest(t *testing.T) {
 }
 
 func TestSharedFixtureAdapterPolicySupport(t *testing.T) {
-	fixture := readParserFixture(t, "diagnostics", "slice-19-adapter-policy-support", "adapter-info.json")
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "adapter_policy_support"))
 	infoFixture := fixture["adapter_info"].(map[string]any)
 
 	info := AdapterInfo{
@@ -92,7 +130,7 @@ func TestSharedFixtureAdapterPolicySupport(t *testing.T) {
 }
 
 func TestSharedFixtureAdapterFeatureProfile(t *testing.T) {
-	fixture := readParserFixture(t, "diagnostics", "slice-20-adapter-feature-profile", "feature-profile.json")
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "adapter_feature_profile"))
 	profileFixture := fixture["feature_profile"].(map[string]any)
 
 	profile := FeatureProfile{
@@ -128,7 +166,7 @@ func TestSharedFixtureAdapterFeatureProfile(t *testing.T) {
 }
 
 func TestSharedFixtureBackendRegistry(t *testing.T) {
-	fixture := readParserFixture(t, "diagnostics", "slice-25-backend-registry", "backend-identities.json")
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "backend_registry"))
 
 	backends := []BackendReference{
 		{ID: "native", Family: "builtin"},

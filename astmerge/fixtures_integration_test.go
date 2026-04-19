@@ -25,8 +25,46 @@ func readDiagnosticFixture(t *testing.T, parts ...string) map[string]any {
 	return fixture
 }
 
+func readDiagnosticFixtureFromPath(t *testing.T, path string) map[string]any {
+	t.Helper()
+
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	return fixture
+}
+
+func diagnosticsFixturePath(t *testing.T, role string) string {
+	t.Helper()
+
+	manifest := readDiagnosticFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	entries := manifest["diagnostics"].([]any)
+	for _, item := range entries {
+		entry := item.(map[string]any)
+		if entry["role"].(string) != role {
+			continue
+		}
+
+		parts := []string{"..", "..", "fixtures"}
+		for _, segment := range entry["path"].([]any) {
+			parts = append(parts, segment.(string))
+		}
+		return filepath.Join(parts...)
+	}
+
+	t.Fatalf("missing diagnostics fixture entry for %s", role)
+	return ""
+}
+
 func TestSharedFixtureDiagnosticVocabulary(t *testing.T) {
-	fixture := readDiagnosticFixture(t, "diagnostics", "slice-02-core", "diagnostic-categories.json")
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "diagnostic_vocabulary"))
 
 	severities := []DiagnosticSeverity{
 		SeverityInfo,
@@ -63,7 +101,7 @@ func TestSharedFixtureDiagnosticVocabulary(t *testing.T) {
 }
 
 func TestSharedFixturePolicyVocabulary(t *testing.T) {
-	fixture := readDiagnosticFixture(t, "diagnostics", "slice-17-policy-vocabulary", "policy-references.json")
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "policy_vocabulary"))
 
 	surfaces := []PolicySurface{
 		PolicySurfaceFallback,
@@ -103,7 +141,7 @@ func TestSharedFixturePolicyVocabulary(t *testing.T) {
 }
 
 func TestSharedFixturePolicyReporting(t *testing.T) {
-	fixture := readDiagnosticFixture(t, "diagnostics", "slice-18-policy-reporting", "result-policies.json")
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "policy_reporting"))
 
 	policies := []PolicyReference{
 		{
@@ -129,7 +167,7 @@ func TestSharedFixturePolicyReporting(t *testing.T) {
 }
 
 func TestSharedFixtureFamilyFeatureProfile(t *testing.T) {
-	fixture := readDiagnosticFixture(t, "diagnostics", "slice-22-shared-family-feature-profile", "family-feature-profile.json")
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "shared_family_feature_profile"))
 
 	profile := FamilyFeatureProfile{
 		Family:            "example",
