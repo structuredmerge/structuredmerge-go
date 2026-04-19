@@ -18,6 +18,12 @@ type AdapterInfo struct {
 	SupportedPolicies []astmerge.PolicyReference
 }
 
+type FeatureProfile struct {
+	Backend           string
+	SupportsDialects  bool
+	SupportedPolicies []astmerge.PolicyReference
+}
+
 type ParserAdapter[T AnalysisHandle] interface {
 	Info() AdapterInfo
 	Parse(request ParserRequest) astmerge.ParseResult[T]

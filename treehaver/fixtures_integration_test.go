@@ -88,3 +88,38 @@ func TestSharedFixtureAdapterPolicySupport(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedFixtureAdapterFeatureProfile(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-20-adapter-feature-profile", "feature-profile.json")
+	profileFixture := fixture["feature_profile"].(map[string]any)
+
+	profile := FeatureProfile{
+		Backend:          profileFixture["backend"].(string),
+		SupportsDialects: profileFixture["supports_dialects"].(bool),
+		SupportedPolicies: []astmerge.PolicyReference{
+			{
+				Surface: astmerge.PolicySurfaceArray,
+				Name:    "destination_wins_array",
+			},
+			{
+				Surface: astmerge.PolicySurfaceFallback,
+				Name:    "trailing_comma_destination_fallback",
+			},
+		},
+	}
+
+	if profile.Backend != profileFixture["backend"].(string) ||
+		profile.SupportsDialects != profileFixture["supports_dialects"].(bool) {
+		t.Fatalf("unexpected feature profile: %+v", profile)
+	}
+	expectedPolicies := profileFixture["supported_policies"].([]any)
+	if len(profile.SupportedPolicies) != len(expectedPolicies) {
+		t.Fatalf("unexpected feature-profile policies: %+v", profile.SupportedPolicies)
+	}
+	for index, policy := range profile.SupportedPolicies {
+		expected := expectedPolicies[index].(map[string]any)
+		if string(policy.Surface) != expected["surface"].(string) || policy.Name != expected["name"].(string) {
+			t.Fatalf("unexpected feature-profile policy at %d: %+v", index, policy)
+		}
+	}
+}
