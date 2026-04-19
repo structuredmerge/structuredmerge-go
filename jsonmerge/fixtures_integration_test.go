@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readJSONFixture(t *testing.T, parts ...string) map[string]any {
@@ -153,5 +155,63 @@ func TestSharedFixtureJSONObjectMerge(t *testing.T) {
 	}
 	if *result.Output != expected["output"].(string) {
 		t.Fatalf("unexpected merged output: %q", *result.Output)
+	}
+}
+
+func TestSharedFixtureJSONInvalidMerges(t *testing.T) {
+	invalidTemplateFixture := readJSONFixture(t, "json", "slice-09-merge", "invalid-template.json")
+	invalidTemplateExpected := invalidTemplateFixture["expected"].(map[string]any)
+
+	invalidTemplateResult := MergeJSON(
+		invalidTemplateFixture["template"].(string),
+		invalidTemplateFixture["destination"].(string),
+		DialectJSON,
+	)
+	if invalidTemplateResult.OK {
+		t.Fatalf("expected template parse failure")
+	}
+	if invalidTemplateResult.Output != nil {
+		t.Fatalf("expected no output, got %q", *invalidTemplateResult.Output)
+	}
+	assertExpectedDiagnostics(t, invalidTemplateResult.Diagnostics, invalidTemplateExpected["diagnostics"].([]any))
+
+	invalidDestinationFixture := readJSONFixture(t, "json", "slice-09-merge", "invalid-destination.json")
+	invalidDestinationExpected := invalidDestinationFixture["expected"].(map[string]any)
+
+	invalidDestinationResult := MergeJSON(
+		invalidDestinationFixture["template"].(string),
+		invalidDestinationFixture["destination"].(string),
+		DialectJSON,
+	)
+	if invalidDestinationResult.OK {
+		t.Fatalf("expected destination parse failure")
+	}
+	if invalidDestinationResult.Output != nil {
+		t.Fatalf("expected no output, got %q", *invalidDestinationResult.Output)
+	}
+	assertExpectedDiagnostics(
+		t,
+		invalidDestinationResult.Diagnostics,
+		invalidDestinationExpected["diagnostics"].([]any),
+	)
+}
+
+func assertExpectedDiagnostics(t *testing.T, diagnostics []astmerge.Diagnostic, expected []any) {
+	t.Helper()
+
+	if len(diagnostics) != len(expected) {
+		t.Fatalf("unexpected diagnostics: %+v", diagnostics)
+	}
+
+	for index, item := range expected {
+		expectedDiagnostic := item.(map[string]any)
+		diagnostic := diagnostics[index]
+
+		if string(diagnostic.Severity) != expectedDiagnostic["severity"].(string) {
+			t.Fatalf("unexpected severity at %d: %+v", index, diagnostic)
+		}
+		if string(diagnostic.Category) != expectedDiagnostic["category"].(string) {
+			t.Fatalf("unexpected category at %d: %+v", index, diagnostic)
+		}
 	}
 }

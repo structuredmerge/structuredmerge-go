@@ -92,6 +92,14 @@ func parseError(message string) astmerge.Diagnostic {
 	}
 }
 
+func destinationParseError(message string) astmerge.Diagnostic {
+	return astmerge.Diagnostic{
+		Severity: astmerge.SeverityError,
+		Category: astmerge.CategoryDestinationParseError,
+		Message:  message,
+	}
+}
+
 func detectTrailingComma(source string) bool {
 	inString := false
 	inLineComment := false
@@ -376,18 +384,18 @@ func MatchJSONOwners(template JSONAnalysis, destination JSONAnalysis) JSONOwnerM
 	}
 }
 
-func parseNormalizedJSON(source string, dialect JSONDialect) (any, astmerge.Diagnostic, bool) {
+func parseNormalizedJSON(source string, dialect JSONDialect, diagnosticFactory func(string) astmerge.Diagnostic) (any, astmerge.Diagnostic, bool) {
 	result := ParseJSON(source, dialect)
 	if !result.OK || result.Analysis == nil {
 		if len(result.Diagnostics) > 0 {
-			return nil, result.Diagnostics[0], false
+			return nil, diagnosticFactory(result.Diagnostics[0].Message), false
 		}
-		return nil, parseError("JSON parse failed."), false
+		return nil, diagnosticFactory("JSON parse failed."), false
 	}
 
 	var decoded any
 	if err := json.Unmarshal([]byte(result.Analysis.NormalizedSource), &decoded); err != nil {
-		return nil, parseError("JSON parse failed."), false
+		return nil, diagnosticFactory("JSON parse failed."), false
 	}
 
 	return decoded, astmerge.Diagnostic{}, true
@@ -483,7 +491,7 @@ func canonicalJSON(value any) string {
 }
 
 func MergeJSON(templateSource string, destinationSource string, dialect JSONDialect) astmerge.MergeResult[string] {
-	template, diagnostic, ok := parseNormalizedJSON(templateSource, dialect)
+	template, diagnostic, ok := parseNormalizedJSON(templateSource, dialect, parseError)
 	if !ok {
 		return astmerge.MergeResult[string]{
 			OK:          false,
@@ -491,7 +499,7 @@ func MergeJSON(templateSource string, destinationSource string, dialect JSONDial
 		}
 	}
 
-	destination, diagnostic, ok := parseNormalizedJSON(destinationSource, dialect)
+	destination, diagnostic, ok := parseNormalizedJSON(destinationSource, dialect, destinationParseError)
 	if !ok {
 		return astmerge.MergeResult[string]{
 			OK:          false,

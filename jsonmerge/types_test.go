@@ -1,6 +1,10 @@
 package jsonmerge
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
+)
 
 func TestParseJSONCAcceptsComments(t *testing.T) {
 	source := "{\n  // package status\n  \"enabled\": true,\n  /* package name */\n  \"name\": \"structuredmerge\"\n}\n"
@@ -112,5 +116,16 @@ func TestMergeJSON(t *testing.T) {
 	expected := "{\"destination_only\":2,\"meta\":{\"enabled\":true,\"mode\":\"template\"},\"name\":\"structuredmerge\",\"tags\":[\"destination\"],\"template_only\":1}"
 	if *result.Output != expected {
 		t.Fatalf("unexpected merged output: %s", *result.Output)
+	}
+}
+
+func TestMergeJSONReportsDestinationParseError(t *testing.T) {
+	result := MergeJSON("{\"alpha\":1}", "{\"alpha\":", DialectJSON)
+
+	if result.OK {
+		t.Fatalf("expected merge failure")
+	}
+	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Category != astmerge.CategoryDestinationParseError {
+		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
 	}
 }
