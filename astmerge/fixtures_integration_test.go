@@ -61,3 +61,43 @@ func TestSharedFixtureDiagnosticVocabulary(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedFixturePolicyVocabulary(t *testing.T) {
+	fixture := readDiagnosticFixture(t, "diagnostics", "slice-17-policy-vocabulary", "policy-references.json")
+
+	surfaces := []PolicySurface{
+		PolicySurfaceFallback,
+		PolicySurfaceArray,
+	}
+	policies := []PolicyReference{
+		{
+			Surface: PolicySurfaceFallback,
+			Name:    "trailing_comma_destination_fallback",
+		},
+		{
+			Surface: PolicySurfaceArray,
+			Name:    "destination_wins_array",
+		},
+	}
+
+	expectedSurfaces := fixture["surfaces"].([]any)
+	if len(surfaces) != len(expectedSurfaces) {
+		t.Fatalf("unexpected surfaces: %+v", surfaces)
+	}
+	for index, surface := range surfaces {
+		if string(surface) != expectedSurfaces[index].(string) {
+			t.Fatalf("unexpected surface at %d: %s", index, surface)
+		}
+	}
+
+	expectedPolicies := fixture["policies"].([]any)
+	if len(policies) != len(expectedPolicies) {
+		t.Fatalf("unexpected policies: %+v", policies)
+	}
+	for index, policy := range policies {
+		expected := expectedPolicies[index].(map[string]any)
+		if string(policy.Surface) != expected["surface"].(string) || policy.Name != expected["name"].(string) {
+			t.Fatalf("unexpected policy at %d: %+v", index, policy)
+		}
+	}
+}

@@ -36,3 +36,15 @@ type MergeResult[T any] struct {
 	Diagnostics []Diagnostic
 	Output      *T
 }
+
+type PolicySurface string
+
+const (
+	PolicySurfaceFallback PolicySurface = "fallback"
+	PolicySurfaceArray    PolicySurface = "array"
+)
+
+type PolicyReference struct {
+	Surface PolicySurface
+	Name    string
+}
