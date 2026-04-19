@@ -65,8 +65,30 @@ func familyFeatureProfileFixturePath(t *testing.T, family string) string {
 	return ""
 }
 
+func jsonFixturePath(t *testing.T, role string) string {
+	t.Helper()
+
+	manifest := readJSONFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	entries := manifest["json"].([]any)
+	for _, item := range entries {
+		entry := item.(map[string]any)
+		if entry["role"].(string) != role {
+			continue
+		}
+
+		parts := []string{"..", "..", "fixtures"}
+		for _, segment := range entry["path"].([]any) {
+			parts = append(parts, segment.(string))
+		}
+		return filepath.Join(parts...)
+	}
+
+	t.Fatalf("missing json fixture entry for %s", role)
+	return ""
+}
+
 func TestSharedFixtureJSONCCommentsAccepted(t *testing.T) {
-	fixture := readJSONFixture(t, "jsonc", "slice-04-parse", "comments-accepted.json")
+	fixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "parse_comments"))
 	expected := fixture["expected"].(map[string]any)
 
 	result := ParseJSON(fixture["source"].(string), DialectJSONC)
@@ -82,7 +104,7 @@ func TestSharedFixtureJSONCCommentsAccepted(t *testing.T) {
 }
 
 func TestSharedFixtureJSONStructure(t *testing.T) {
-	objectFixture := readJSONFixture(t, "json", "slice-07-structure", "object-and-array.json")
+	objectFixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "structure_json"))
 	objectExpected := objectFixture["expected"].(map[string]any)
 
 	objectResult := ParseJSON(objectFixture["source"].(string), DialectJSON)
@@ -108,7 +130,7 @@ func TestSharedFixtureJSONStructure(t *testing.T) {
 		}
 	}
 
-	jsoncFixture := readJSONFixture(t, "jsonc", "slice-07-structure", "commented-object.json")
+	jsoncFixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "structure_jsonc"))
 	jsoncExpected := jsoncFixture["expected"].(map[string]any)
 
 	jsoncResult := ParseJSON(jsoncFixture["source"].(string), DialectJSONC)
@@ -136,7 +158,7 @@ func TestSharedFixtureJSONStructure(t *testing.T) {
 }
 
 func TestSharedFixtureJSONOwnerMatching(t *testing.T) {
-	fixture := readJSONFixture(t, "json", "slice-08-matching", "path-equality.json")
+	fixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "matching"))
 	expected := fixture["expected"].(map[string]any)
 
 	template := ParseJSON(fixture["template"].(string), DialectJSON)
@@ -180,7 +202,7 @@ func TestSharedFixtureJSONOwnerMatching(t *testing.T) {
 }
 
 func TestSharedFixtureJSONObjectMerge(t *testing.T) {
-	fixture := readJSONFixture(t, "json", "slice-09-merge", "object-merge.json")
+	fixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "merge_object"))
 	expected := fixture["expected"].(map[string]any)
 
 	result := MergeJSON(
@@ -197,7 +219,7 @@ func TestSharedFixtureJSONObjectMerge(t *testing.T) {
 }
 
 func TestSharedFixtureJSONInvalidMerges(t *testing.T) {
-	invalidTemplateFixture := readJSONFixture(t, "json", "slice-09-merge", "invalid-template.json")
+	invalidTemplateFixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "merge_invalid_template"))
 	invalidTemplateExpected := invalidTemplateFixture["expected"].(map[string]any)
 
 	invalidTemplateResult := MergeJSON(
@@ -213,7 +235,7 @@ func TestSharedFixtureJSONInvalidMerges(t *testing.T) {
 	}
 	assertExpectedDiagnostics(t, invalidTemplateResult.Diagnostics, invalidTemplateExpected["diagnostics"].([]any))
 
-	invalidDestinationFixture := readJSONFixture(t, "json", "slice-09-merge", "invalid-destination.json")
+	invalidDestinationFixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "merge_invalid_destination"))
 	invalidDestinationExpected := invalidDestinationFixture["expected"].(map[string]any)
 
 	invalidDestinationResult := MergeJSON(
@@ -235,7 +257,7 @@ func TestSharedFixtureJSONInvalidMerges(t *testing.T) {
 }
 
 func TestSharedFixtureJSONFallbackMerge(t *testing.T) {
-	fixture := readJSONFixture(t, "json", "slice-14-fallback", "trailing-comma-destination.json")
+	fixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "fallback"))
 	expected := fixture["expected"].(map[string]any)
 
 	result := MergeJSON(
@@ -257,7 +279,7 @@ func TestSharedFixtureJSONFallbackMerge(t *testing.T) {
 }
 
 func TestSharedFixtureJSONFallbackBoundaries(t *testing.T) {
-	templateFixture := readJSONFixture(t, "json", "slice-15-fallback-boundaries", "template-trailing-comma-not-recovered.json")
+	templateFixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "fallback_boundary_template"))
 	templateExpected := templateFixture["expected"].(map[string]any)
 
 	templateResult := MergeJSON(
@@ -273,7 +295,7 @@ func TestSharedFixtureJSONFallbackBoundaries(t *testing.T) {
 		t.Fatalf("expected no output: %+v", templateResult.Output)
 	}
 
-	commentsFixture := readJSONFixture(t, "json", "slice-15-fallback-boundaries", "strict-json-comments-not-recovered.json")
+	commentsFixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "fallback_boundary_comments"))
 	commentsExpected := commentsFixture["expected"].(map[string]any)
 
 	commentsResult := MergeJSON(
@@ -291,7 +313,7 @@ func TestSharedFixtureJSONFallbackBoundaries(t *testing.T) {
 }
 
 func TestSharedFixtureJSONArrayPolicy(t *testing.T) {
-	fixture := readJSONFixture(t, "json", "slice-16-array-policy", "destination-wins-array.json")
+	fixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "array_policy"))
 	expected := fixture["expected"].(map[string]any)
 
 	result := MergeJSON(

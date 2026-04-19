@@ -65,6 +65,28 @@ func familyFeatureProfileFixturePath(t *testing.T, family string) string {
 	return ""
 }
 
+func textFixturePath(t *testing.T, role string) string {
+	t.Helper()
+
+	manifest := readTextFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	entries := manifest["text"].([]any)
+	for _, item := range entries {
+		entry := item.(map[string]any)
+		if entry["role"].(string) != role {
+			continue
+		}
+
+		parts := []string{"..", "..", "fixtures"}
+		for _, segment := range entry["path"].([]any) {
+			parts = append(parts, segment.(string))
+		}
+		return filepath.Join(parts...)
+	}
+
+	t.Fatalf("missing text fixture entry for %s", role)
+	return ""
+}
+
 func asMapList(value any) []map[string]any {
 	raw := value.([]any)
 	result := make([]map[string]any, 0, len(raw))
@@ -84,7 +106,7 @@ func asIntList(value any) []int {
 }
 
 func TestSharedFixtureAnalyzeText(t *testing.T) {
-	fixture := readTextFixture(t, "text", "slice-03-analysis", "whitespace-and-blocks.json")
+	fixture := readTextFixtureFromPath(t, textFixturePath(t, "analysis"))
 	source := fixture["source"].(string)
 	expected := fixture["expected"].(map[string]any)
 
@@ -109,7 +131,7 @@ func TestSharedFixtureAnalyzeText(t *testing.T) {
 }
 
 func TestSharedFixtureExactMatching(t *testing.T) {
-	fixture := readTextFixture(t, "text", "slice-11-matching", "exact-content.json")
+	fixture := readTextFixtureFromPath(t, textFixturePath(t, "matching_exact"))
 	expected := fixture["expected"].(map[string]any)
 
 	result := MatchTextBlocks(fixture["template"].(string), fixture["destination"].(string))
@@ -148,7 +170,7 @@ func TestSharedFixtureExactMatching(t *testing.T) {
 }
 
 func TestSharedFixtureSimilarity(t *testing.T) {
-	fixture := readTextFixture(t, "text", "slice-05-similarity", "similarity-cases.json")
+	fixture := readTextFixtureFromPath(t, textFixturePath(t, "similarity"))
 	cases := fixture["cases"].([]any)
 
 	for _, item := range cases {
@@ -171,7 +193,7 @@ func TestSharedFixtureSimilarity(t *testing.T) {
 }
 
 func TestSharedFixtureRefinedMatching(t *testing.T) {
-	fixture := readTextFixture(t, "text", "slice-13-refined-matching", "content-refined-merge.json")
+	fixture := readTextFixtureFromPath(t, textFixturePath(t, "merge_refined"))
 	expected := fixture["expected"].(map[string]any)
 
 	result := MatchTextBlocks(fixture["template"].(string), fixture["destination"].(string))
