@@ -56,3 +56,23 @@ type FamilyFeatureProfile struct {
 	SupportedDialects []string
 	SupportedPolicies []PolicyReference
 }
+
+type ConformanceOutcome string
+
+const (
+	ConformancePassed  ConformanceOutcome = "passed"
+	ConformanceFailed  ConformanceOutcome = "failed"
+	ConformanceSkipped ConformanceOutcome = "skipped"
+)
+
+type ConformanceCaseRef struct {
+	Family string
+	Role   string
+	Case   string
+}
+
+type ConformanceCaseResult struct {
+	Ref      ConformanceCaseRef
+	Outcome  ConformanceOutcome
+	Messages []string
+}

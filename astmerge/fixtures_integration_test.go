@@ -196,6 +196,40 @@ func TestSharedFixtureFamilyFeatureProfile(t *testing.T) {
 	assertExpectedPolicies(t, profile.SupportedPolicies, expected["supported_policies"].([]any))
 }
 
+func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_shape"))
+
+	caseRef := ConformanceCaseRef{
+		Family: "json",
+		Role:   "tree_sitter_adapter",
+		Case:   "valid_strict_json",
+	}
+	result := ConformanceCaseResult{
+		Ref:      caseRef,
+		Outcome:  ConformancePassed,
+		Messages: []string{},
+	}
+
+	expectedRef := fixture["case_ref"].(map[string]any)
+	if caseRef.Family != expectedRef["family"].(string) ||
+		caseRef.Role != expectedRef["role"].(string) ||
+		caseRef.Case != expectedRef["case"].(string) {
+		t.Fatalf("unexpected case ref: %+v", caseRef)
+	}
+
+	expectedResult := fixture["result"].(map[string]any)
+	expectedResultRef := expectedResult["ref"].(map[string]any)
+	if result.Ref.Family != expectedResultRef["family"].(string) ||
+		result.Ref.Role != expectedResultRef["role"].(string) ||
+		result.Ref.Case != expectedResultRef["case"].(string) ||
+		string(result.Outcome) != expectedResult["outcome"].(string) {
+		t.Fatalf("unexpected runner result: %+v", result)
+	}
+	if len(result.Messages) != len(expectedResult["messages"].([]any)) {
+		t.Fatalf("unexpected runner messages: %+v", result.Messages)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
