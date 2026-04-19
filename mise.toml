@@ -1,0 +1,21 @@
+[tools]
+go = "1.25"
+golangci-lint = "latest"
+
+[tasks.format]
+run = "gofmt -w $(find . -name '*.go' -type f)"
+
+[tasks.format-check]
+run = "test -z \"$(gofmt -l $(find . -name '*.go' -type f))\""
+
+[tasks.lint]
+run = "golangci-lint run ./..."
+
+[tasks.typecheck]
+run = "go test ./... -run '^$'"
+
+[tasks.test]
+run = "go test ./..."
+
+[tasks.check]
+run = "test -z \"$(gofmt -l $(find . -name '*.go' -type f))\" && golangci-lint run ./... && go test ./..."
