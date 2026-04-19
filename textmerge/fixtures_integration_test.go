@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 )
 
@@ -44,24 +43,13 @@ func asIntList(value any) []int {
 	return result
 }
 
-func decodeFixtureString(t *testing.T, value string) string {
-	t.Helper()
-
-	decoded, err := strconv.Unquote(`"` + value + `"`)
-	if err != nil {
-		t.Fatalf("decode fixture string: %v", err)
-	}
-
-	return decoded
-}
-
 func TestSharedFixtureAnalyzeText(t *testing.T) {
 	fixture := readTextFixture(t, "text", "slice-03-analysis", "whitespace-and-blocks.json")
-	source := decodeFixtureString(t, fixture["source"].(string))
+	source := fixture["source"].(string)
 	expected := fixture["expected"].(map[string]any)
 
 	analysis := AnalyzeText(source)
-	if analysis.NormalizedSource != decodeFixtureString(t, expected["normalized_source"].(string)) {
+	if analysis.NormalizedSource != expected["normalized_source"].(string) {
 		t.Fatalf("unexpected normalized source: %q", analysis.NormalizedSource)
 	}
 
