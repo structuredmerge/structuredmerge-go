@@ -41,6 +41,104 @@ func TestSharedFixtureJSONCCommentsAccepted(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureJSONStructure(t *testing.T) {
+	objectFixture := readJSONFixture(t, "json", "slice-07-structure", "object-and-array.json")
+	objectExpected := objectFixture["expected"].(map[string]any)
+
+	objectResult := ParseJSON(objectFixture["source"].(string), DialectJSON)
+	if !objectResult.OK || objectResult.Analysis == nil {
+		t.Fatalf("expected parse success, got %+v", objectResult)
+	}
+	if string(objectResult.Analysis.RootKind) != objectExpected["root_kind"].(string) {
+		t.Fatalf("unexpected root kind: %s", objectResult.Analysis.RootKind)
+	}
+
+	expectedOwners := objectExpected["owners"].([]any)
+	if len(objectResult.Analysis.Owners) != len(expectedOwners) {
+		t.Fatalf("unexpected owners: %+v", objectResult.Analysis.Owners)
+	}
+	for index, item := range expectedOwners {
+		expected := item.(map[string]any)
+		owner := objectResult.Analysis.Owners[index]
+		if owner.Path != expected["path"].(string) || string(owner.OwnerKind) != expected["owner_kind"].(string) {
+			t.Fatalf("unexpected owner at %d: %+v", index, owner)
+		}
+		if expectedMatchKey, ok := expected["match_key"]; ok && owner.MatchKey != expectedMatchKey.(string) {
+			t.Fatalf("unexpected match_key at %d: %+v", index, owner)
+		}
+	}
+
+	jsoncFixture := readJSONFixture(t, "jsonc", "slice-07-structure", "commented-object.json")
+	jsoncExpected := jsoncFixture["expected"].(map[string]any)
+
+	jsoncResult := ParseJSON(jsoncFixture["source"].(string), DialectJSONC)
+	if !jsoncResult.OK || jsoncResult.Analysis == nil {
+		t.Fatalf("expected parse success, got %+v", jsoncResult)
+	}
+	if string(jsoncResult.Analysis.RootKind) != jsoncExpected["root_kind"].(string) {
+		t.Fatalf("unexpected root kind: %s", jsoncResult.Analysis.RootKind)
+	}
+
+	expectedJSONCOwners := jsoncExpected["owners"].([]any)
+	if len(jsoncResult.Analysis.Owners) != len(expectedJSONCOwners) {
+		t.Fatalf("unexpected owners: %+v", jsoncResult.Analysis.Owners)
+	}
+	for index, item := range expectedJSONCOwners {
+		expected := item.(map[string]any)
+		owner := jsoncResult.Analysis.Owners[index]
+		if owner.Path != expected["path"].(string) || string(owner.OwnerKind) != expected["owner_kind"].(string) {
+			t.Fatalf("unexpected owner at %d: %+v", index, owner)
+		}
+		if expectedMatchKey, ok := expected["match_key"]; ok && owner.MatchKey != expectedMatchKey.(string) {
+			t.Fatalf("unexpected match_key at %d: %+v", index, owner)
+		}
+	}
+}
+
+func TestSharedFixtureJSONOwnerMatching(t *testing.T) {
+	fixture := readJSONFixture(t, "json", "slice-08-matching", "path-equality.json")
+	expected := fixture["expected"].(map[string]any)
+
+	template := ParseJSON(fixture["template"].(string), DialectJSON)
+	destination := ParseJSON(fixture["destination"].(string), DialectJSON)
+	if template.Analysis == nil || destination.Analysis == nil {
+		t.Fatalf("expected parse success for both documents")
+	}
+
+	result := MatchJSONOwners(*template.Analysis, *destination.Analysis)
+	expectedMatched := expected["matched"].([]any)
+	if len(result.Matched) != len(expectedMatched) {
+		t.Fatalf("unexpected matched owners: %+v", result.Matched)
+	}
+	for index, item := range expectedMatched {
+		pair := item.([]any)
+		if result.Matched[index].TemplatePath != pair[0].(string) ||
+			result.Matched[index].DestinationPath != pair[1].(string) {
+			t.Fatalf("unexpected matched owner at %d: %+v", index, result.Matched[index])
+		}
+	}
+
+	unmatchedTemplate := expected["unmatched_template"].([]any)
+	if len(result.UnmatchedTemplate) != len(unmatchedTemplate) {
+		t.Fatalf("unexpected unmatched template owners: %+v", result.UnmatchedTemplate)
+	}
+	for index, item := range unmatchedTemplate {
+		if result.UnmatchedTemplate[index] != item.(string) {
+			t.Fatalf("unexpected unmatched template owners: %+v", result.UnmatchedTemplate)
+		}
+	}
+
+	unmatchedDestination := expected["unmatched_destination"].([]any)
+	if len(result.UnmatchedDestination) != len(unmatchedDestination) {
+		t.Fatalf("unexpected unmatched destination owners: %+v", result.UnmatchedDestination)
+	}
+	for index, item := range unmatchedDestination {
+		if result.UnmatchedDestination[index] != item.(string) {
+			t.Fatalf("unexpected unmatched destination owners: %+v", result.UnmatchedDestination)
+		}
+	}
+}
+
 func TestSharedFixtureJSONObjectMerge(t *testing.T) {
 	fixture := readJSONFixture(t, "json", "slice-09-merge", "object-merge.json")
 	expected := fixture["expected"].(map[string]any)

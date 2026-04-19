@@ -107,6 +107,29 @@ func TestSharedFixtureExactMatching(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSimilarity(t *testing.T) {
+	fixture := readTextFixture(t, "text", "slice-05-similarity", "similarity-cases.json")
+	cases := fixture["cases"].([]any)
+
+	for _, item := range cases {
+		testCase := item.(map[string]any)
+		left := testCase["left"].(string)
+		right := testCase["right"].(string)
+		expectedScore := testCase["expected_score"].(float64)
+		threshold := testCase["threshold"].(float64)
+		expectedMatch := testCase["expected_match"].(bool)
+
+		if score := SimilarityScore(left, right); score != expectedScore {
+			t.Fatalf("unexpected similarity score for %s: %v", testCase["name"].(string), score)
+		}
+
+		result := IsSimilar(left, right, threshold)
+		if result.Score != expectedScore || result.Threshold != threshold || result.Matched != expectedMatch {
+			t.Fatalf("unexpected similarity result for %s: %+v", testCase["name"].(string), result)
+		}
+	}
+}
+
 func TestSharedFixtureRefinedMatching(t *testing.T) {
 	fixture := readTextFixture(t, "text", "slice-13-refined-matching", "content-refined-merge.json")
 	expected := fixture["expected"].(map[string]any)
