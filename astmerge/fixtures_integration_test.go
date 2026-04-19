@@ -127,3 +127,47 @@ func TestSharedFixturePolicyReporting(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedFixtureFamilyFeatureProfile(t *testing.T) {
+	fixture := readDiagnosticFixture(t, "diagnostics", "slice-22-shared-family-feature-profile", "family-feature-profile.json")
+
+	profile := FamilyFeatureProfile{
+		Family:            "example",
+		SupportedDialects: []string{"alpha", "beta"},
+		SupportedPolicies: []PolicyReference{
+			{
+				Surface: PolicySurfaceArray,
+				Name:    "destination_wins_array",
+			},
+		},
+	}
+
+	expected := fixture["feature_profile"].(map[string]any)
+	if profile.Family != expected["family"].(string) {
+		t.Fatalf("unexpected family: %+v", profile)
+	}
+	expectedDialects := expected["supported_dialects"].([]any)
+	if len(profile.SupportedDialects) != len(expectedDialects) {
+		t.Fatalf("unexpected supported dialects: %+v", profile.SupportedDialects)
+	}
+	for index, dialect := range profile.SupportedDialects {
+		if dialect != expectedDialects[index].(string) {
+			t.Fatalf("unexpected dialect at %d: %s", index, dialect)
+		}
+	}
+	assertExpectedPolicies(t, profile.SupportedPolicies, expected["supported_policies"].([]any))
+}
+
+func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
+	t.Helper()
+
+	if len(policies) != len(expected) {
+		t.Fatalf("unexpected policies: %+v", policies)
+	}
+	for index, policy := range policies {
+		expectedPolicy := expected[index].(map[string]any)
+		if string(policy.Surface) != expectedPolicy["surface"].(string) || policy.Name != expectedPolicy["name"].(string) {
+			t.Fatalf("unexpected policy at %d: %+v", index, policy)
+		}
+	}
+}

@@ -27,6 +27,44 @@ func readJSONFixture(t *testing.T, parts ...string) map[string]any {
 	return fixture
 }
 
+func readJSONFixtureFromPath(t *testing.T, path string) map[string]any {
+	t.Helper()
+
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	return fixture
+}
+
+func familyFeatureProfileFixturePath(t *testing.T, family string) string {
+	t.Helper()
+
+	manifest := readJSONFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	entries := manifest["family_feature_profiles"].([]any)
+	for _, item := range entries {
+		entry := item.(map[string]any)
+		if entry["family"].(string) != family {
+			continue
+		}
+
+		parts := []string{"..", "..", "fixtures"}
+		for _, segment := range entry["path"].([]any) {
+			parts = append(parts, segment.(string))
+		}
+		return filepath.Join(parts...)
+	}
+
+	t.Fatalf("missing family feature profile entry for %s", family)
+	return ""
+}
+
 func TestSharedFixtureJSONCCommentsAccepted(t *testing.T) {
 	fixture := readJSONFixture(t, "jsonc", "slice-04-parse", "comments-accepted.json")
 	expected := fixture["expected"].(map[string]any)
@@ -276,7 +314,7 @@ func TestSharedFixtureJSONArrayPolicy(t *testing.T) {
 }
 
 func TestSharedFixtureJSONFamilyFeatureProfile(t *testing.T) {
-	fixture := readJSONFixture(t, "diagnostics", "slice-21-family-feature-profile", "json-feature-profile.json")
+	fixture := readJSONFixtureFromPath(t, familyFeatureProfileFixturePath(t, "json"))
 	expected := fixture["feature_profile"].(map[string]any)
 
 	profile := JSONFeatureProfileInfo()

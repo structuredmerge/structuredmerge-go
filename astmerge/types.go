@@ -50,3 +50,9 @@ type PolicyReference struct {
 	Surface PolicySurface
 	Name    string
 }
+
+type FamilyFeatureProfile struct {
+	Family            string
+	SupportedDialects []string
+	SupportedPolicies []PolicyReference
+}

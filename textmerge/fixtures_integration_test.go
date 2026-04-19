@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readTextFixture(t *testing.T, parts ...string) map[string]any {
@@ -23,6 +25,44 @@ func readTextFixture(t *testing.T, parts ...string) map[string]any {
 	}
 
 	return fixture
+}
+
+func readTextFixtureFromPath(t *testing.T, path string) map[string]any {
+	t.Helper()
+
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	return fixture
+}
+
+func familyFeatureProfileFixturePath(t *testing.T, family string) string {
+	t.Helper()
+
+	manifest := readTextFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	entries := manifest["family_feature_profiles"].([]any)
+	for _, item := range entries {
+		entry := item.(map[string]any)
+		if entry["family"].(string) != family {
+			continue
+		}
+
+		parts := []string{"..", "..", "fixtures"}
+		for _, segment := range entry["path"].([]any) {
+			parts = append(parts, segment.(string))
+		}
+		return filepath.Join(parts...)
+	}
+
+	t.Fatalf("missing family feature profile entry for %s", family)
+	return ""
 }
 
 func asMapList(value any) []map[string]any {
@@ -158,5 +198,32 @@ func TestSharedFixtureRefinedMatching(t *testing.T) {
 	}
 	if *merged.Output != expected["output"].(string) {
 		t.Fatalf("unexpected merged output: %q", *merged.Output)
+	}
+}
+
+func TestSharedFixtureTextFamilyFeatureProfile(t *testing.T) {
+	fixture := readTextFixtureFromPath(t, familyFeatureProfileFixturePath(t, "text"))
+	expected := fixture["feature_profile"].(map[string]any)
+
+	profile := TextFeatureProfileInfo()
+	if profile.Family != expected["family"].(string) {
+		t.Fatalf("unexpected family: %+v", profile)
+	}
+	if len(profile.SupportedDialects) != 0 {
+		t.Fatalf("unexpected supported dialects: %+v", profile.SupportedDialects)
+	}
+	assertExpectedPolicies(t, profile.SupportedPolicies, []astmerge.PolicyReference{})
+}
+
+func assertExpectedPolicies(t *testing.T, policies []astmerge.PolicyReference, expected []astmerge.PolicyReference) {
+	t.Helper()
+
+	if len(policies) != len(expected) {
+		t.Fatalf("unexpected policies: %+v", policies)
+	}
+	for index, policy := range policies {
+		if policy.Surface != expected[index].Surface || policy.Name != expected[index].Name {
+			t.Fatalf("unexpected policy at %d: %+v", index, policy)
+		}
 	}
 }

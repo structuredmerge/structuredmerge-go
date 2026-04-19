@@ -129,13 +129,29 @@ func trailingCommaFallbackPolicy() astmerge.PolicyReference {
 }
 
 func JSONFeatureProfileInfo() JSONFeatureProfile {
-	return JSONFeatureProfile{
+	shared := astmerge.FamilyFeatureProfile{
 		Family:            "json",
-		SupportedDialects: []JSONDialect{DialectJSON, DialectJSONC},
+		SupportedDialects: []string{"json", "jsonc"},
 		SupportedPolicies: []astmerge.PolicyReference{
 			destinationWinsArrayPolicy(),
 			trailingCommaFallbackPolicy(),
 		},
+	}
+
+	dialects := make([]JSONDialect, 0, len(shared.SupportedDialects))
+	for _, dialect := range shared.SupportedDialects {
+		switch dialect {
+		case "jsonc":
+			dialects = append(dialects, DialectJSONC)
+		default:
+			dialects = append(dialects, DialectJSON)
+		}
+	}
+
+	return JSONFeatureProfile{
+		Family:            shared.Family,
+		SupportedDialects: dialects,
+		SupportedPolicies: shared.SupportedPolicies,
 	}
 }
 

@@ -86,8 +86,28 @@ type TextMergeResolution struct {
 	Output string
 }
 
+type TextFeatureProfile struct {
+	Family            string
+	SupportedDialects []string
+	SupportedPolicies []astmerge.PolicyReference
+}
+
 type TextBlockMatcher interface {
 	MatchBlocks(template TextAnalysis, destination TextAnalysis) TextBlockMatchResult
+}
+
+func TextFeatureProfileInfo() TextFeatureProfile {
+	shared := astmerge.FamilyFeatureProfile{
+		Family:            "text",
+		SupportedDialects: []string{},
+		SupportedPolicies: []astmerge.PolicyReference{},
+	}
+
+	return TextFeatureProfile{
+		Family:            shared.Family,
+		SupportedDialects: shared.SupportedDialects,
+		SupportedPolicies: shared.SupportedPolicies,
+	}
 }
 
 type TextMerger interface {
