@@ -214,6 +214,40 @@ func TestSharedFixtureJSONFallbackMerge(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureJSONFallbackBoundaries(t *testing.T) {
+	templateFixture := readJSONFixture(t, "json", "slice-15-fallback-boundaries", "template-trailing-comma-not-recovered.json")
+	templateExpected := templateFixture["expected"].(map[string]any)
+
+	templateResult := MergeJSON(
+		templateFixture["template"].(string),
+		templateFixture["destination"].(string),
+		DialectJSON,
+	)
+	if templateResult.OK != templateExpected["ok"].(bool) {
+		t.Fatalf("unexpected merge status: %+v", templateResult)
+	}
+	assertExpectedDiagnostics(t, templateResult.Diagnostics, templateExpected["diagnostics"].([]any))
+	if templateResult.Output != nil {
+		t.Fatalf("expected no output: %+v", templateResult.Output)
+	}
+
+	commentsFixture := readJSONFixture(t, "json", "slice-15-fallback-boundaries", "strict-json-comments-not-recovered.json")
+	commentsExpected := commentsFixture["expected"].(map[string]any)
+
+	commentsResult := MergeJSON(
+		commentsFixture["template"].(string),
+		commentsFixture["destination"].(string),
+		DialectJSON,
+	)
+	if commentsResult.OK != commentsExpected["ok"].(bool) {
+		t.Fatalf("unexpected merge status: %+v", commentsResult)
+	}
+	assertExpectedDiagnostics(t, commentsResult.Diagnostics, commentsExpected["diagnostics"].([]any))
+	if commentsResult.Output != nil {
+		t.Fatalf("expected no output: %+v", commentsResult.Output)
+	}
+}
+
 func assertExpectedDiagnostics(t *testing.T, diagnostics []astmerge.Diagnostic, expected []any) {
 	t.Helper()
 

@@ -143,3 +143,25 @@ func TestMergeJSONAppliesTrailingCommaFallback(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
 	}
 }
+
+func TestMergeJSONDoesNotApplyFallbackToTemplateTrailingCommaInput(t *testing.T) {
+	result := MergeJSON("{\"alpha\":1,}", "{\"beta\":2}", DialectJSON)
+
+	if result.OK {
+		t.Fatalf("expected merge failure")
+	}
+	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Category != astmerge.CategoryParseError {
+		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
+	}
+}
+
+func TestMergeJSONDoesNotApplyFallbackToStrictJSONCommentViolations(t *testing.T) {
+	result := MergeJSON("{\"alpha\":1}", "{\n  // note\n  \"beta\":2\n}", DialectJSON)
+
+	if result.OK {
+		t.Fatalf("expected merge failure")
+	}
+	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Category != astmerge.CategoryDestinationParseError {
+		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
+	}
+}
