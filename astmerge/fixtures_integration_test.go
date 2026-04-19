@@ -1256,6 +1256,59 @@ func TestSharedFixtureReviewReplayRejection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewRequestIDs(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_request_ids"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expectedRaw := fixture["expected_request_ids"].([]any)
+	expected := make([]string, 0, len(expectedRaw))
+	for _, item := range expectedRaw {
+		expected = append(expected, item.(string))
+	}
+
+	if requestIDs := ConformanceManifestReviewRequestIDs(manifest, options); !reflect.DeepEqual(requestIDs, expected) {
+		t.Fatalf("unexpected review request ids: %+v", requestIDs)
+	}
+}
+
+func TestSharedFixtureStaleReviewDecision(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "stale_review_decision"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+
+	state := ReviewConformanceManifest(
+		manifest,
+		options,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected stale review decision state: %+v", state)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 

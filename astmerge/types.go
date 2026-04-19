@@ -382,6 +382,33 @@ func ReviewReplayContextCompatible(
 		slices.Equal(current.Families, candidate.Families)
 }
 
+func ConformanceManifestReviewRequestIDs(
+	manifest ConformanceManifest,
+	options ConformanceManifestReviewOptions,
+) []string {
+	if !options.RequireExplicitContexts {
+		return []string{}
+	}
+
+	requestIDs := make([]string, 0, len(manifest.Suites))
+	seen := make(map[string]bool)
+	for _, suiteName := range ConformanceSuiteNames(manifest) {
+		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+		if definition == nil || seen[definition.Family] {
+			continue
+		}
+		seen[definition.Family] = true
+		if _, ok := options.Contexts[definition.Family]; ok {
+			continue
+		}
+		if _, ok := options.FamilyProfiles[definition.Family]; ok {
+			requestIDs = append(requestIDs, ReviewRequestIDForFamilyContext(definition.Family))
+		}
+	}
+
+	return requestIDs
+}
+
 func ResolveConformanceFamilyContext(
 	family string,
 	options ConformanceManifestPlanningOptions,
@@ -792,6 +819,24 @@ func ReviewConformanceManifest(
 				Message:  "review replay context does not match the current conformance manifest state.",
 			})
 			effectiveOptions.ReviewDecisions = nil
+		} else {
+			allowedRequestIDs := make(map[string]bool)
+			for _, requestID := range ConformanceManifestReviewRequestIDs(manifest, options) {
+				allowedRequestIDs[requestID] = true
+			}
+			acceptedDecisions := make([]ReviewDecision, 0, len(options.ReviewDecisions))
+			for _, decision := range options.ReviewDecisions {
+				if allowedRequestIDs[decision.RequestID] {
+					acceptedDecisions = append(acceptedDecisions, decision)
+				} else {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Category: CategoryReplayRejected,
+						Message:  "review decision " + decision.RequestID + " does not match any current review request.",
+					})
+				}
+			}
+			effectiveOptions.ReviewDecisions = acceptedDecisions
 		}
 	}
 	resolvedContexts := make(map[string]*ConformanceFamilyPlanContext)
