@@ -76,6 +76,10 @@ type JSONOwnerMatcher interface {
 	MatchOwners(template JSONAnalysis, destination JSONAnalysis) JSONOwnerMatchResult
 }
 
+type JSONMergeResolution struct {
+	Output string
+}
+
 type JSONMerger interface {
 	Merge(template JSONAnalysis, destination JSONAnalysis) astmerge.MergeResult[string]
 }
@@ -369,5 +373,137 @@ func MatchJSONOwners(template JSONAnalysis, destination JSONAnalysis) JSONOwnerM
 		Matched:              matched,
 		UnmatchedTemplate:    unmatchedTemplate,
 		UnmatchedDestination: unmatchedDestination,
+	}
+}
+
+func parseNormalizedJSON(source string, dialect JSONDialect) (any, astmerge.Diagnostic, bool) {
+	result := ParseJSON(source, dialect)
+	if !result.OK || result.Analysis == nil {
+		if len(result.Diagnostics) > 0 {
+			return nil, result.Diagnostics[0], false
+		}
+		return nil, parseError("JSON parse failed."), false
+	}
+
+	var decoded any
+	if err := json.Unmarshal([]byte(result.Analysis.NormalizedSource), &decoded); err != nil {
+		return nil, parseError("JSON parse failed."), false
+	}
+
+	return decoded, astmerge.Diagnostic{}, true
+}
+
+func mergeValues(template any, destination any) any {
+	switch templateTyped := template.(type) {
+	case map[string]any:
+		destinationTyped, ok := destination.(map[string]any)
+		if !ok {
+			return destination
+		}
+
+		keys := make([]string, 0)
+		keySet := map[string]struct{}{}
+		for key := range templateTyped {
+			keySet[key] = struct{}{}
+		}
+		for key := range destinationTyped {
+			keySet[key] = struct{}{}
+		}
+		for key := range keySet {
+			keys = append(keys, key)
+		}
+		slices.Sort(keys)
+
+		merged := map[string]any{}
+		for _, key := range keys {
+			templateValue, hasTemplate := templateTyped[key]
+			destinationValue, hasDestination := destinationTyped[key]
+			switch {
+			case hasTemplate && hasDestination:
+				merged[key] = mergeValues(templateValue, destinationValue)
+			case hasDestination:
+				merged[key] = destinationValue
+			case hasTemplate:
+				merged[key] = templateValue
+			}
+		}
+		return merged
+	case []any:
+		if destinationArray, ok := destination.([]any); ok {
+			return destinationArray
+		}
+		return destination
+	default:
+		return destination
+	}
+}
+
+func canonicalJSON(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return "null"
+	case bool:
+		if typed {
+			return "true"
+		}
+		return "false"
+	case float64, string, []any, map[string]any:
+		switch inner := typed.(type) {
+		case float64:
+			bytes, _ := json.Marshal(inner)
+			return string(bytes)
+		case string:
+			bytes, _ := json.Marshal(inner)
+			return string(bytes)
+		case []any:
+			parts := make([]string, 0, len(inner))
+			for _, item := range inner {
+				parts = append(parts, canonicalJSON(item))
+			}
+			return "[" + strings.Join(parts, ",") + "]"
+		case map[string]any:
+			keys := make([]string, 0, len(inner))
+			for key := range inner {
+				keys = append(keys, key)
+			}
+			slices.Sort(keys)
+			parts := make([]string, 0, len(keys))
+			for _, key := range keys {
+				keyBytes, _ := json.Marshal(key)
+				parts = append(parts, string(keyBytes)+":"+canonicalJSON(inner[key]))
+			}
+			return "{" + strings.Join(parts, ",") + "}"
+		default:
+			return ""
+		}
+	default:
+		bytes, _ := json.Marshal(typed)
+		return string(bytes)
+	}
+}
+
+func MergeJSON(templateSource string, destinationSource string, dialect JSONDialect) astmerge.MergeResult[string] {
+	template, diagnostic, ok := parseNormalizedJSON(templateSource, dialect)
+	if !ok {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{diagnostic},
+		}
+	}
+
+	destination, diagnostic, ok := parseNormalizedJSON(destinationSource, dialect)
+	if !ok {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{diagnostic},
+		}
+	}
+
+	merged := mergeValues(template, destination)
+	output := canonicalJSON(merged)
+	return astmerge.MergeResult[string]{
+		OK:          true,
+		Diagnostics: []astmerge.Diagnostic{},
+		Output:      &output,
 	}
 }

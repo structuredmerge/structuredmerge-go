@@ -97,3 +97,20 @@ func TestMatchJSONOwners(t *testing.T) {
 		t.Fatalf("unexpected unmatched destination owners: %+v", result.UnmatchedDestination)
 	}
 }
+
+func TestMergeJSON(t *testing.T) {
+	result := MergeJSON(
+		"{\n  \"name\": \"structuredmerge\",\n  \"meta\": {\"enabled\": false, \"mode\": \"template\"},\n  \"tags\": [\"template\"],\n  \"template_only\": 1\n}\n",
+		"{\n  \"meta\": {\"enabled\": true},\n  \"tags\": [\"destination\"],\n  \"destination_only\": 2\n}\n",
+		DialectJSON,
+	)
+
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected merge success, got diagnostics: %+v", result.Diagnostics)
+	}
+
+	expected := "{\"destination_only\":2,\"meta\":{\"enabled\":true,\"mode\":\"template\"},\"name\":\"structuredmerge\",\"tags\":[\"destination\"],\"template_only\":1}"
+	if *result.Output != expected {
+		t.Fatalf("unexpected merged output: %s", *result.Output)
+	}
+}
