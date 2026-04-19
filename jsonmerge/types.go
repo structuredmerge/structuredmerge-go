@@ -80,6 +80,12 @@ type JSONMergeResolution struct {
 	Output string
 }
 
+type JSONFeatureProfile struct {
+	Family            string
+	SupportedDialects []JSONDialect
+	SupportedPolicies []astmerge.PolicyReference
+}
+
 type JSONMerger interface {
 	Merge(template JSONAnalysis, destination JSONAnalysis) astmerge.MergeResult[string]
 }
@@ -119,6 +125,17 @@ func trailingCommaFallbackPolicy() astmerge.PolicyReference {
 	return astmerge.PolicyReference{
 		Surface: astmerge.PolicySurfaceFallback,
 		Name:    "trailing_comma_destination_fallback",
+	}
+}
+
+func JSONFeatureProfileInfo() JSONFeatureProfile {
+	return JSONFeatureProfile{
+		Family:            "json",
+		SupportedDialects: []JSONDialect{DialectJSON, DialectJSONC},
+		SupportedPolicies: []astmerge.PolicyReference{
+			destinationWinsArrayPolicy(),
+			trailingCommaFallbackPolicy(),
+		},
 	}
 }
 

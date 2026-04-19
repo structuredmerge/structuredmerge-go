@@ -275,6 +275,30 @@ func TestSharedFixtureJSONArrayPolicy(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureJSONFamilyFeatureProfile(t *testing.T) {
+	fixture := readJSONFixture(t, "diagnostics", "slice-21-family-feature-profile", "json-feature-profile.json")
+	expected := fixture["feature_profile"].(map[string]any)
+
+	profile := JSONFeatureProfileInfo()
+
+	if profile.Family != expected["family"].(string) {
+		t.Fatalf("unexpected family: %+v", profile)
+	}
+	expectedDialects := expected["supported_dialects"].([]any)
+	if len(profile.SupportedDialects) != len(expectedDialects) {
+		t.Fatalf("unexpected supported dialects: %+v", profile.SupportedDialects)
+	}
+	for index, dialect := range profile.SupportedDialects {
+		if string(dialect) != expectedDialects[index].(string) {
+			t.Fatalf("unexpected dialect at %d: %s", index, dialect)
+		}
+	}
+	assertExpectedPolicies(t, profile.SupportedPolicies, []astmerge.PolicyReference{
+		{Surface: astmerge.PolicySurfaceArray, Name: "destination_wins_array"},
+		{Surface: astmerge.PolicySurfaceFallback, Name: "trailing_comma_destination_fallback"},
+	})
+}
+
 func assertExpectedDiagnostics(t *testing.T, diagnostics []astmerge.Diagnostic, expected []any) {
 	t.Helper()
 
