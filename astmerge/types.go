@@ -98,8 +98,9 @@ type ConformanceCaseSelection struct {
 }
 
 type ConformanceManifestEntry struct {
-	Role string   `json:"role"`
-	Path []string `json:"path"`
+	Role         string                       `json:"role"`
+	Path         []string                     `json:"path"`
+	Requirements *ConformanceCaseRequirements `json:"requirements,omitempty"`
 }
 
 type ConformanceFamilyFeatureProfileEntry struct {
@@ -326,8 +327,14 @@ func PlanConformanceSuite(
 	missingRoles := make([]string, 0)
 
 	for _, role := range roles {
-		path := ConformanceFixturePath(manifest, family, role)
-		if path == nil {
+		var entry *ConformanceManifestEntry
+		for _, candidate := range ConformanceFamilyEntries(manifest, family) {
+			if candidate.Role == role {
+				entry = &candidate
+				break
+			}
+		}
+		if entry == nil {
 			missingRoles = append(missingRoles, role)
 			continue
 		}
@@ -340,10 +347,10 @@ func PlanConformanceSuite(
 
 		entries = append(entries, ConformanceSuitePlanEntry{
 			Ref:  ref,
-			Path: slices.Clone(path),
+			Path: slices.Clone(entry.Path),
 			Run: ConformanceCaseRun{
 				Ref:            ref,
-				Requirements:   ConformanceCaseRequirements{},
+				Requirements:   derefRequirements(entry.Requirements),
 				FamilyProfile:  familyProfile,
 				FeatureProfile: featureProfile,
 			},
@@ -355,4 +362,12 @@ func PlanConformanceSuite(
 		Entries:      entries,
 		MissingRoles: missingRoles,
 	}
+}
+
+func derefRequirements(requirements *ConformanceCaseRequirements) ConformanceCaseRequirements {
+	if requirements == nil {
+		return ConformanceCaseRequirements{}
+	}
+
+	return *requirements
 }

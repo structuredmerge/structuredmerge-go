@@ -527,6 +527,40 @@ func TestSharedFixturePlannedConformanceSuiteReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureManifestCaseRequirements(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "manifest_requirements"))
+	manifest := readManifest(t)
+	rolesRaw := fixture["roles"].([]any)
+	roles := make([]string, 0, len(rolesRaw))
+	for _, item := range rolesRaw {
+		roles = append(roles, item.(string))
+	}
+
+	plan := PlanConformanceSuite(
+		manifest,
+		fixture["family"].(string),
+		roles,
+		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
+		nil,
+	)
+
+	expectedRaw := fixture["expected_requirements"].(map[string]any)
+	actual := make(map[string]ConformanceCaseRequirements, len(plan.Entries))
+	for _, entry := range plan.Entries {
+		actual[entry.Ref.Role] = entry.Run.Requirements
+	}
+
+	if len(actual) != len(expectedRaw) {
+		t.Fatalf("unexpected manifest requirements entries: %+v", actual)
+	}
+	for role, raw := range expectedRaw {
+		expected := parseConformanceCaseRequirements(raw.(map[string]any))
+		if !reflect.DeepEqual(actual[role], expected) {
+			t.Fatalf("unexpected requirements for %s: %+v", role, actual[role])
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
