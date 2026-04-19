@@ -44,15 +44,15 @@ func TestSimilarityScore(t *testing.T) {
 
 func TestMergeText(t *testing.T) {
 	result := MergeText(
-		"Alpha\n\nBeta\n\nTemplate tail",
-		"Alpha revised\n\nBeta\n\nDestination tail\n\nDestination extra",
+		"Alpha\n\nBeta\n\nAlpha\n\nTemplate only",
+		"Beta\n\nAlpha revised\n\nAlpha\n\nDestination only",
 	)
 
 	if !result.OK || result.Output == nil {
 		t.Fatalf("expected merge success, got diagnostics: %+v", result.Diagnostics)
 	}
 
-	expected := "Alpha revised\n\nBeta\n\nDestination tail\n\nDestination extra"
+	expected := "Beta\n\nAlpha revised\n\nAlpha\n\nDestination only\n\nAlpha\n\nTemplate only"
 	if *result.Output != expected {
 		t.Fatalf("unexpected merged output: %q", *result.Output)
 	}

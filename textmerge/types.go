@@ -202,14 +202,19 @@ func IsSimilar(leftSource string, rightSource string, threshold float64) TextSim
 func MergeText(templateSource string, destinationSource string) astmerge.MergeResult[string] {
 	template := AnalyzeText(templateSource)
 	destination := AnalyzeText(destinationSource)
-	total := max(len(template.Blocks), len(destination.Blocks))
-	mergedBlocks := make([]string, 0, total)
+	matches := MatchTextBlocks(templateSource, destinationSource)
+	matchedTemplate := map[int]struct{}{}
+	for _, match := range matches.Matched {
+		matchedTemplate[match.TemplateIndex] = struct{}{}
+	}
+	mergedBlocks := make([]string, 0, len(template.Blocks)+len(destination.Blocks))
 
-	for index := 0; index < total; index++ {
-		if index < len(destination.Blocks) {
-			mergedBlocks = append(mergedBlocks, destination.Blocks[index].Normalized)
-		} else if index < len(template.Blocks) {
-			mergedBlocks = append(mergedBlocks, template.Blocks[index].Normalized)
+	for _, block := range destination.Blocks {
+		mergedBlocks = append(mergedBlocks, block.Normalized)
+	}
+	for index, block := range template.Blocks {
+		if _, ok := matchedTemplate[index]; !ok {
+			mergedBlocks = append(mergedBlocks, block.Normalized)
 		}
 	}
 
