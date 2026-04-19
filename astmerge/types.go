@@ -1,5 +1,7 @@
 package astmerge
 
+import "slices"
+
 type DiagnosticSeverity string
 
 const (
@@ -77,6 +79,24 @@ type ConformanceCaseResult struct {
 	Messages []string
 }
 
+type ConformanceCaseRequirements struct {
+	Dialect  string            `json:"dialect,omitempty"`
+	Policies []PolicyReference `json:"policies,omitempty"`
+}
+
+type ConformanceSelectionStatus string
+
+const (
+	ConformanceSelected         ConformanceSelectionStatus = "selected"
+	ConformanceSelectionSkipped ConformanceSelectionStatus = "skipped"
+)
+
+type ConformanceCaseSelection struct {
+	Ref      ConformanceCaseRef         `json:"ref"`
+	Status   ConformanceSelectionStatus `json:"status"`
+	Messages []string                   `json:"messages"`
+}
+
 type ConformanceManifestEntry struct {
 	Role string   `json:"role"`
 	Path []string `json:"path"`
@@ -98,6 +118,26 @@ type ConformanceSuiteSummary struct {
 	Passed  int `json:"passed"`
 	Failed  int `json:"failed"`
 	Skipped int `json:"skipped"`
+}
+
+type ConformanceFeatureProfileView struct {
+	Backend           string
+	SupportsDialects  bool
+	SupportedPolicies []PolicyReference
+}
+
+func includesPolicy(supportedPolicies []PolicyReference, policy PolicyReference) bool {
+	for _, supportedPolicy := range supportedPolicies {
+		if supportedPolicy == policy {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isDefaultDialect(familyProfile FamilyFeatureProfile, dialect string) bool {
+	return dialect == familyProfile.Family
 }
 
 func ConformanceFamilyEntries(manifest ConformanceManifest, family string) []ConformanceManifestEntry {
@@ -143,4 +183,46 @@ func SummarizeConformanceResults(results []ConformanceCaseResult) ConformanceSui
 	}
 
 	return summary
+}
+
+func SelectConformanceCase(
+	ref ConformanceCaseRef,
+	requirements ConformanceCaseRequirements,
+	familyProfile FamilyFeatureProfile,
+	featureProfile *ConformanceFeatureProfileView,
+) ConformanceCaseSelection {
+	messages := []string{}
+
+	if requirements.Dialect != "" {
+		if !slices.Contains(familyProfile.SupportedDialects, requirements.Dialect) {
+			messages = append(messages, "family "+familyProfile.Family+" does not support dialect "+requirements.Dialect+".")
+		} else if featureProfile != nil && !featureProfile.SupportsDialects && !isDefaultDialect(familyProfile, requirements.Dialect) {
+			messages = append(
+				messages,
+				"backend "+featureProfile.Backend+" does not support dialect "+requirements.Dialect+" for family "+familyProfile.Family+".",
+			)
+		}
+	}
+
+	for _, policy := range requirements.Policies {
+		if !includesPolicy(familyProfile.SupportedPolicies, policy) {
+			messages = append(messages, "family "+familyProfile.Family+" does not support policy "+policy.Name+".")
+			continue
+		}
+
+		if featureProfile != nil && !includesPolicy(featureProfile.SupportedPolicies, policy) {
+			messages = append(messages, "backend "+featureProfile.Backend+" does not support policy "+policy.Name+".")
+		}
+	}
+
+	status := ConformanceSelected
+	if len(messages) > 0 {
+		status = ConformanceSelectionSkipped
+	}
+
+	return ConformanceCaseSelection{
+		Ref:      ref,
+		Status:   status,
+		Messages: messages,
+	}
 }

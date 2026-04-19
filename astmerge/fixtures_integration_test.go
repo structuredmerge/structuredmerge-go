@@ -273,6 +273,82 @@ func TestSharedFixtureConformanceSuiteSummary(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureCapabilityAwareSelection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "capability_selection"))
+
+	for _, item := range fixture["cases"].([]any) {
+		testCase := item.(map[string]any)
+		rawRef := testCase["ref"].(map[string]any)
+		ref := ConformanceCaseRef{
+			Family: rawRef["family"].(string),
+			Role:   rawRef["role"].(string),
+			Case:   rawRef["case"].(string),
+		}
+
+		rawRequirements := testCase["requirements"].(map[string]any)
+		requirements := ConformanceCaseRequirements{}
+		if dialect, ok := rawRequirements["dialect"]; ok {
+			requirements.Dialect = dialect.(string)
+		}
+		if rawPolicies, ok := rawRequirements["policies"]; ok {
+			requirements.Policies = make([]PolicyReference, 0, len(rawPolicies.([]any)))
+			for _, item := range rawPolicies.([]any) {
+				policy := item.(map[string]any)
+				requirements.Policies = append(requirements.Policies, PolicyReference{
+					Surface: PolicySurface(policy["surface"].(string)),
+					Name:    policy["name"].(string),
+				})
+			}
+		}
+
+		rawFamilyProfile := testCase["family_profile"].(map[string]any)
+		familyProfile := FamilyFeatureProfile{
+			Family:            rawFamilyProfile["family"].(string),
+			SupportedDialects: make([]string, 0, len(rawFamilyProfile["supported_dialects"].([]any))),
+			SupportedPolicies: make([]PolicyReference, 0, len(rawFamilyProfile["supported_policies"].([]any))),
+		}
+		for _, dialect := range rawFamilyProfile["supported_dialects"].([]any) {
+			familyProfile.SupportedDialects = append(familyProfile.SupportedDialects, dialect.(string))
+		}
+		for _, item := range rawFamilyProfile["supported_policies"].([]any) {
+			policy := item.(map[string]any)
+			familyProfile.SupportedPolicies = append(familyProfile.SupportedPolicies, PolicyReference{
+				Surface: PolicySurface(policy["surface"].(string)),
+				Name:    policy["name"].(string),
+			})
+		}
+
+		rawFeatureProfile := testCase["feature_profile"].(map[string]any)
+		featureProfile := &ConformanceFeatureProfileView{
+			Backend:           rawFeatureProfile["backend"].(string),
+			SupportsDialects:  rawFeatureProfile["supports_dialects"].(bool),
+			SupportedPolicies: []PolicyReference{},
+		}
+		for _, item := range rawFeatureProfile["supported_policies"].([]any) {
+			policy := item.(map[string]any)
+			featureProfile.SupportedPolicies = append(featureProfile.SupportedPolicies, PolicyReference{
+				Surface: PolicySurface(policy["surface"].(string)),
+				Name:    policy["name"].(string),
+			})
+		}
+
+		selection := SelectConformanceCase(ref, requirements, familyProfile, featureProfile)
+		expected := testCase["expected"].(map[string]any)
+		if string(selection.Status) != expected["status"].(string) {
+			t.Fatalf("unexpected selection status for %+v: %+v", ref, selection)
+		}
+		expectedMessages := expected["messages"].([]any)
+		if len(selection.Messages) != len(expectedMessages) {
+			t.Fatalf("unexpected selection messages for %+v: %+v", ref, selection.Messages)
+		}
+		for index, message := range expectedMessages {
+			if selection.Messages[index] != message.(string) {
+				t.Fatalf("unexpected selection message at %d for %+v: %+v", index, ref, selection.Messages)
+			}
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 

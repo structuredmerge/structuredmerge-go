@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 func readJSONFixture(t *testing.T, parts ...string) map[string]any {
@@ -141,6 +142,61 @@ func TestSharedFixtureTreeSitterAdapter(t *testing.T) {
 		} else if result.Analysis != nil {
 			t.Fatalf("expected no analysis for %s: %+v", testCase["name"].(string), result.Analysis)
 		}
+	}
+}
+
+func TestCapabilityAwareSelectionForTreeSitterAdapterCases(t *testing.T) {
+	profile := JSONFeatureProfileInfo()
+	familyProfile := astmerge.FamilyFeatureProfile{
+		Family:            profile.Family,
+		SupportedDialects: []string{},
+		SupportedPolicies: profile.SupportedPolicies,
+	}
+	for _, dialect := range profile.SupportedDialects {
+		familyProfile.SupportedDialects = append(familyProfile.SupportedDialects, string(dialect))
+	}
+
+	adapterInfo := treehaver.LanguagePackAdapterInfo()
+	featureProfile := &astmerge.ConformanceFeatureProfileView{
+		Backend:           adapterInfo.Backend,
+		SupportsDialects:  adapterInfo.SupportsDialects,
+		SupportedPolicies: adapterInfo.SupportedPolicies,
+	}
+
+	selected := astmerge.SelectConformanceCase(
+		astmerge.ConformanceCaseRef{
+			Family: "json",
+			Role:   "tree_sitter_adapter",
+			Case:   "valid_strict_json",
+		},
+		astmerge.ConformanceCaseRequirements{
+			Dialect: "json",
+		},
+		familyProfile,
+		featureProfile,
+	)
+	if selected.Status != astmerge.ConformanceSelected || len(selected.Messages) != 0 {
+		t.Fatalf("unexpected selected case: %+v", selected)
+	}
+
+	skipped := astmerge.SelectConformanceCase(
+		astmerge.ConformanceCaseRef{
+			Family: "json",
+			Role:   "tree_sitter_adapter",
+			Case:   "jsonc_unsupported",
+		},
+		astmerge.ConformanceCaseRequirements{
+			Dialect: "jsonc",
+		},
+		familyProfile,
+		featureProfile,
+	)
+	if skipped.Status != astmerge.ConformanceSelectionSkipped {
+		t.Fatalf("expected skipped case: %+v", skipped)
+	}
+	expectedMessage := "backend kreuzberg-language-pack does not support dialect jsonc for family json."
+	if len(skipped.Messages) != 1 || skipped.Messages[0] != expectedMessage {
+		t.Fatalf("unexpected skipped messages: %+v", skipped.Messages)
 	}
 }
 
