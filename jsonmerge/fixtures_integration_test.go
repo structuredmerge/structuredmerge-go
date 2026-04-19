@@ -87,6 +87,67 @@ func jsonFixturePath(t *testing.T, role string) string {
 	return ""
 }
 
+func TestSharedFixtureTreeSitterAdapter(t *testing.T) {
+	fixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "tree_sitter_adapter"))
+	cases := fixture["cases"].([]any)
+
+	for _, item := range cases {
+		testCase := item.(map[string]any)
+		expected := testCase["expected"].(map[string]any)
+		var dialect JSONDialect
+		if testCase["dialect"].(string) == "jsonc" {
+			dialect = DialectJSONC
+		} else {
+			dialect = DialectJSON
+		}
+
+		result := ParseJSONWithLanguagePack(testCase["source"].(string), dialect)
+		if result.OK != expected["ok"].(bool) {
+			t.Fatalf("unexpected parse status for %s: %+v", testCase["name"].(string), result)
+		}
+
+		expectedDiagnostics := expected["diagnostics"].([]any)
+		if len(result.Diagnostics) != len(expectedDiagnostics) {
+			t.Fatalf("unexpected diagnostics for %s: %+v", testCase["name"].(string), result.Diagnostics)
+		}
+		for index, item := range expectedDiagnostics {
+			expectedDiagnostic := item.(map[string]any)
+			diagnostic := result.Diagnostics[index]
+			if string(diagnostic.Severity) != expectedDiagnostic["severity"].(string) ||
+				string(diagnostic.Category) != expectedDiagnostic["category"].(string) ||
+				diagnostic.Message != expectedDiagnostic["message"].(string) {
+				t.Fatalf("unexpected diagnostic at %d for %s: %+v", index, testCase["name"].(string), diagnostic)
+			}
+		}
+
+		if result.OK {
+			if result.Analysis == nil {
+				t.Fatalf("expected analysis for %s", testCase["name"].(string))
+			}
+			if string(result.Analysis.RootKind) != expected["root_kind"].(string) {
+				t.Fatalf("unexpected root kind for %s: %s", testCase["name"].(string), result.Analysis.RootKind)
+			}
+			expectedOwners := expected["owners"].([]any)
+			if len(result.Analysis.Owners) != len(expectedOwners) {
+				t.Fatalf("unexpected owners for %s: %+v", testCase["name"].(string), result.Analysis.Owners)
+			}
+			for index, item := range expectedOwners {
+				expectedOwner := item.(map[string]any)
+				owner := result.Analysis.Owners[index]
+				if owner.Path != expectedOwner["path"].(string) ||
+					string(owner.OwnerKind) != expectedOwner["owner_kind"].(string) {
+					t.Fatalf("unexpected owner at %d for %s: %+v", index, testCase["name"].(string), owner)
+				}
+				if expectedMatchKey, ok := expectedOwner["match_key"]; ok && owner.MatchKey != expectedMatchKey.(string) {
+					t.Fatalf("unexpected match key at %d for %s: %+v", index, testCase["name"].(string), owner)
+				}
+			}
+		} else if result.Analysis != nil {
+			t.Fatalf("expected no analysis for %s: %+v", testCase["name"].(string), result.Analysis)
+		}
+	}
+}
+
 func TestSharedFixtureJSONCCommentsAccepted(t *testing.T) {
 	fixture := readJSONFixtureFromPath(t, jsonFixturePath(t, "parse_comments"))
 	expected := fixture["expected"].(map[string]any)
