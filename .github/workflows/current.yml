@@ -26,15 +26,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Checkout language-pack fork
+      - name: Checkout fixtures
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: pboling/tree-sitter-language-pack
+          repository: structuredmerge/structuredmerge-fixtures
+          path: fixtures
+      - name: Checkout language-pack backend
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: structuredmerge/tree-sitter-language-pack
+          ref: d3b31d6d1356382a9164bc71a1758dd611293a90
           path: tree-sitter-language-pack
-      - name: Link sibling language-pack path
+      - name: Link sibling workspace paths
         shell: bash
         run: |
           set -euo pipefail
+          ln -s "$GITHUB_WORKSPACE/fixtures" ../fixtures
           ln -s "$GITHUB_WORKSPACE/tree-sitter-language-pack" ../tree-sitter-language-pack
       - name: Setup mise
         uses: jdx/mise-action@v4
