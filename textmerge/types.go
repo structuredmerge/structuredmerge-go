@@ -3,6 +3,7 @@ package textmerge
 import (
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
+	"slices"
 	"strings"
 )
 
@@ -32,6 +33,12 @@ type TextParserAdapter interface {
 
 type TextAnalyzer interface {
 	Analyze(source string) TextAnalysis
+}
+
+type TextSimilarity struct {
+	Score     float64
+	Threshold float64
+	Matched   bool
 }
 
 type TextMerger interface {
@@ -88,5 +95,80 @@ func AnalyzeText(source string) TextAnalysis {
 	return TextAnalysis{
 		NormalizedSource: normalizedSource,
 		Blocks:           blocks,
+	}
+}
+
+func tokenSet(normalized string) []string {
+	seen := map[string]struct{}{}
+	tokens := make([]string, 0)
+	for _, token := range strings.Fields(normalized) {
+		if _, ok := seen[token]; ok {
+			continue
+		}
+		seen[token] = struct{}{}
+		tokens = append(tokens, token)
+	}
+	slices.Sort(tokens)
+	return tokens
+}
+
+func jaccard(left string, right string) float64 {
+	leftTokens := tokenSet(left)
+	rightTokens := tokenSet(right)
+
+	if len(leftTokens) == 0 && len(rightTokens) == 0 {
+		return 1
+	}
+
+	rightSet := map[string]struct{}{}
+	for _, token := range rightTokens {
+		rightSet[token] = struct{}{}
+	}
+
+	intersection := 0
+	unionSet := map[string]struct{}{}
+	for _, token := range leftTokens {
+		unionSet[token] = struct{}{}
+		if _, ok := rightSet[token]; ok {
+			intersection++
+		}
+	}
+	for _, token := range rightTokens {
+		unionSet[token] = struct{}{}
+	}
+
+	if len(unionSet) == 0 {
+		return 1
+	}
+
+	return float64(intersection) / float64(len(unionSet))
+}
+
+func SimilarityScore(leftSource string, rightSource string) float64 {
+	left := AnalyzeText(leftSource)
+	right := AnalyzeText(rightSource)
+	total := max(len(left.Blocks), len(right.Blocks))
+
+	if total == 0 {
+		return 1
+	}
+
+	sum := 0.0
+	for index := 0; index < total; index++ {
+		if index >= len(left.Blocks) || index >= len(right.Blocks) {
+			continue
+		}
+		sum += jaccard(left.Blocks[index].Normalized, right.Blocks[index].Normalized)
+	}
+
+	return sum / float64(total)
+}
+
+func IsSimilar(leftSource string, rightSource string, threshold float64) TextSimilarity {
+	score := SimilarityScore(leftSource, rightSource)
+	return TextSimilarity{
+		Score:     score,
+		Threshold: threshold,
+		Matched:   score >= threshold,
 	}
 }

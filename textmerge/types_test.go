@@ -23,3 +23,21 @@ func TestAnalyzeText(t *testing.T) {
 		t.Fatalf("unexpected second block span: %+v", analysis.Blocks[1].Span)
 	}
 }
+
+func TestSimilarityScore(t *testing.T) {
+	if score := SimilarityScore("Alpha   beta\n\nGamma", "  Alpha beta  \r\n\r\nGamma  "); score != 1 {
+		t.Fatalf("unexpected equivalent score: %v", score)
+	}
+
+	if score := SimilarityScore("Alpha beta\n\nGamma delta", "Alpha beta\n\nGamma epsilon"); score != 0.6666666666666666 {
+		t.Fatalf("unexpected near-match score: %v", score)
+	}
+
+	if score := SimilarityScore("Alpha beta", "Zeta theta"); score != 0 {
+		t.Fatalf("unexpected mismatch score: %v", score)
+	}
+
+	if similarity := IsSimilar("Alpha beta\n\nGamma delta", "Alpha beta\n\nGamma epsilon", 0.6); !similarity.Matched {
+		t.Fatalf("expected near-match to satisfy threshold")
+	}
+}
