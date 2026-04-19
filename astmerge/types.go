@@ -120,6 +120,11 @@ type ConformanceSuiteDefinition struct {
 	Roles  []string `json:"roles"`
 }
 
+type NamedConformanceSuiteReport struct {
+	Suite  string                 `json:"suite"`
+	Report ConformanceSuiteReport `json:"report"`
+}
+
 type ConformanceSuiteSummary struct {
 	Total   int `json:"total"`
 	Passed  int `json:"passed"`
@@ -217,6 +222,15 @@ func ConformanceSuiteDefinitionByName(
 	}
 
 	return nil
+}
+
+func ConformanceSuiteNames(manifest ConformanceManifest) []string {
+	names := make([]string, 0, len(manifest.Suites))
+	for name := range manifest.Suites {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	return names
 }
 
 func SummarizeConformanceResults(results []ConformanceCaseResult) ConformanceSuiteSummary {
@@ -323,6 +337,26 @@ func RunPlannedConformanceSuite(
 	return results
 }
 
+func RunNamedConformanceSuite(
+	manifest ConformanceManifest,
+	suiteName string,
+	familyProfile FamilyFeatureProfile,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+	featureProfile *ConformanceFeatureProfileView,
+) []ConformanceCaseResult {
+	plan := PlanNamedConformanceSuite(
+		manifest,
+		suiteName,
+		familyProfile,
+		featureProfile,
+	)
+	if plan == nil {
+		return nil
+	}
+
+	return RunPlannedConformanceSuite(*plan, execute)
+}
+
 func ReportPlannedConformanceSuite(
 	plan ConformanceSuitePlan,
 	execute func(ConformanceCaseRun) ConformanceCaseExecution,
@@ -349,6 +383,30 @@ func ReportNamedConformanceSuite(
 
 	report := ReportPlannedConformanceSuite(*plan, execute)
 	return &report
+}
+
+func ReportNamedConformanceSuiteEntry(
+	manifest ConformanceManifest,
+	suiteName string,
+	familyProfile FamilyFeatureProfile,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+	featureProfile *ConformanceFeatureProfileView,
+) *NamedConformanceSuiteReport {
+	report := ReportNamedConformanceSuite(
+		manifest,
+		suiteName,
+		familyProfile,
+		execute,
+		featureProfile,
+	)
+	if report == nil {
+		return nil
+	}
+
+	return &NamedConformanceSuiteReport{
+		Suite:  suiteName,
+		Report: *report,
+	}
 }
 
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
