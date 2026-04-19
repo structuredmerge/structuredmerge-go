@@ -234,3 +234,11 @@ func ParseJSON(source string, dialect JSONDialect) astmerge.ParseResult[JSONAnal
 		Analysis:    &analysis,
 	}
 }
+
+func JSONParseRequest(source string, dialect JSONDialect) treehaver.ParserRequest {
+	return treehaver.ParserRequest{
+		Source:   source,
+		Language: "json",
+		Dialect:  string(dialect),
+	}
+}

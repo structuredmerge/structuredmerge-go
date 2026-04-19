@@ -6,10 +6,23 @@ type AnalysisHandle interface {
 	Kind() string
 }
 
+type ParserRequest struct {
+	Source   string
+	Language string
+	Dialect  string
+}
+
+type AdapterInfo struct {
+	Backend          string
+	SupportsDialects bool
+}
+
 type ParserAdapter[T AnalysisHandle] interface {
-	Parse(source string) astmerge.ParseResult[T]
+	Info() AdapterInfo
+	Parse(request ParserRequest) astmerge.ParseResult[T]
 }
 
 type ParserDiagnostics struct {
+	Backend     string
 	Diagnostics []astmerge.Diagnostic
 }

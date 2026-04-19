@@ -31,6 +31,13 @@ type TextParserAdapter interface {
 	treehaver.ParserAdapter[TextAnalysis]
 }
 
+func TextParseRequest(source string) treehaver.ParserRequest {
+	return treehaver.ParserRequest{
+		Source:   source,
+		Language: "text",
+	}
+}
+
 type TextAnalyzer interface {
 	Analyze(source string) TextAnalysis
 }
