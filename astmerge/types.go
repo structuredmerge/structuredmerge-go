@@ -125,6 +125,16 @@ type NamedConformanceSuiteReport struct {
 	Report ConformanceSuiteReport `json:"report"`
 }
 
+type ConformanceFamilyPlanContext struct {
+	FamilyProfile  FamilyFeatureProfile           `json:"family_profile"`
+	FeatureProfile *ConformanceFeatureProfileView `json:"feature_profile,omitempty"`
+}
+
+type NamedConformanceSuitePlan struct {
+	Suite string               `json:"suite"`
+	Plan  ConformanceSuitePlan `json:"plan"`
+}
+
 type ConformanceSuiteSummary struct {
 	Total   int `json:"total"`
 	Passed  int `json:"passed"`
@@ -483,6 +493,52 @@ func PlanNamedConformanceSuite(
 		featureProfile,
 	)
 	return &plan
+}
+
+func PlanNamedConformanceSuiteEntry(
+	manifest ConformanceManifest,
+	suiteName string,
+	context ConformanceFamilyPlanContext,
+) *NamedConformanceSuitePlan {
+	plan := PlanNamedConformanceSuite(
+		manifest,
+		suiteName,
+		context.FamilyProfile,
+		context.FeatureProfile,
+	)
+	if plan == nil {
+		return nil
+	}
+
+	return &NamedConformanceSuitePlan{
+		Suite: suiteName,
+		Plan:  *plan,
+	}
+}
+
+func PlanNamedConformanceSuites(
+	manifest ConformanceManifest,
+	contexts map[string]ConformanceFamilyPlanContext,
+) []NamedConformanceSuitePlan {
+	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.Suites))
+	for _, suiteName := range ConformanceSuiteNames(manifest) {
+		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+		if definition == nil {
+			continue
+		}
+
+		context, ok := contexts[definition.Family]
+		if !ok {
+			continue
+		}
+
+		entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, context)
+		if entry != nil {
+			entries = append(entries, *entry)
+		}
+	}
+
+	return entries
 }
 
 func derefRequirements(requirements *ConformanceCaseRequirements) ConformanceCaseRequirements {

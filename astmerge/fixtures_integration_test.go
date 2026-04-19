@@ -776,6 +776,68 @@ func TestSharedFixtureNamedConformanceSuiteEntry(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNamedConformanceSuitePlanEntry(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_plan_entry"))
+	manifest := readManifest(t)
+	suiteName := fixture["suite_name"].(string)
+
+	context := parseConformanceFamilyPlanContext(fixture["context"].(map[string]any))
+	entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, context)
+	if entry == nil {
+		t.Fatalf("expected named suite plan entry")
+	}
+
+	expected := parseNamedConformanceSuitePlan(t, fixture["expected_entry"].(map[string]any))
+	if !reflect.DeepEqual(*entry, expected) {
+		t.Fatalf("unexpected named suite plan entry: %+v", entry)
+	}
+}
+
+func TestSharedFixtureConformanceFamilyPlanContext(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "family_plan_context"))
+	context := parseConformanceFamilyPlanContext(fixture["context"].(map[string]any))
+
+	expected := ConformanceFamilyPlanContext{
+		FamilyProfile: FamilyFeatureProfile{
+			Family:            "json",
+			SupportedDialects: []string{"json", "jsonc"},
+			SupportedPolicies: []PolicyReference{
+				{Surface: PolicySurfaceArray, Name: "destination_wins_array"},
+				{Surface: PolicySurfaceFallback, Name: "trailing_comma_destination_fallback"},
+			},
+		},
+		FeatureProfile: &ConformanceFeatureProfileView{
+			Backend:           "kreuzberg-language-pack",
+			SupportsDialects:  false,
+			SupportedPolicies: []PolicyReference{{Surface: PolicySurfaceArray, Name: "destination_wins_array"}},
+		},
+	}
+
+	if !reflect.DeepEqual(context, expected) {
+		t.Fatalf("unexpected family plan context: %+v", context)
+	}
+}
+
+func TestSharedFixtureNamedConformanceSuitePlans(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_plans"))
+	manifest := readManifest(t)
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuitePlan, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("unexpected named suite plans: %+v", plans)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -813,6 +875,37 @@ func parseConformanceCaseRun(t *testing.T, raw map[string]any) ConformanceCaseRu
 	}
 
 	return run
+}
+
+func parseConformanceFamilyPlanContext(raw map[string]any) ConformanceFamilyPlanContext {
+	context := ConformanceFamilyPlanContext{
+		FamilyProfile: parseFamilyFeatureProfile(raw["family_profile"].(map[string]any)),
+	}
+
+	if rawFeatureProfile, ok := raw["feature_profile"]; ok {
+		featureProfile := rawFeatureProfile.(map[string]any)
+		context.FeatureProfile = &ConformanceFeatureProfileView{
+			Backend:           featureProfile["backend"].(string),
+			SupportsDialects:  featureProfile["supports_dialects"].(bool),
+			SupportedPolicies: make([]PolicyReference, 0, len(featureProfile["supported_policies"].([]any))),
+		}
+		for _, item := range featureProfile["supported_policies"].([]any) {
+			policy := item.(map[string]any)
+			context.FeatureProfile.SupportedPolicies = append(context.FeatureProfile.SupportedPolicies, PolicyReference{
+				Surface: PolicySurface(policy["surface"].(string)),
+				Name:    policy["name"].(string),
+			})
+		}
+	}
+
+	return context
+}
+
+func parseNamedConformanceSuitePlan(t *testing.T, raw map[string]any) NamedConformanceSuitePlan {
+	return NamedConformanceSuitePlan{
+		Suite: raw["suite"].(string),
+		Plan:  parseConformanceSuitePlan(t, raw["plan"].(map[string]any)),
+	}
 }
 
 func parseConformanceCaseRequirements(raw map[string]any) ConformanceCaseRequirements {
