@@ -39,6 +39,7 @@ func TestSharedFixtureParserRequest(t *testing.T) {
 	}
 	info := AdapterInfo{
 		Backend:           infoFixture["backend"].(string),
+		BackendRef:        nil,
 		SupportsDialects:  infoFixture["supports_dialects"].(bool),
 		SupportedPolicies: []astmerge.PolicyReference{},
 	}
@@ -60,6 +61,7 @@ func TestSharedFixtureAdapterPolicySupport(t *testing.T) {
 
 	info := AdapterInfo{
 		Backend:          infoFixture["backend"].(string),
+		BackendRef:       nil,
 		SupportsDialects: infoFixture["supports_dialects"].(bool),
 		SupportedPolicies: []astmerge.PolicyReference{
 			{
@@ -95,6 +97,7 @@ func TestSharedFixtureAdapterFeatureProfile(t *testing.T) {
 
 	profile := FeatureProfile{
 		Backend:          profileFixture["backend"].(string),
+		BackendRef:       nil,
 		SupportsDialects: profileFixture["supports_dialects"].(bool),
 		SupportedPolicies: []astmerge.PolicyReference{
 			{
@@ -121,5 +124,34 @@ func TestSharedFixtureAdapterFeatureProfile(t *testing.T) {
 		if string(policy.Surface) != expected["surface"].(string) || policy.Name != expected["name"].(string) {
 			t.Fatalf("unexpected feature-profile policy at %d: %+v", index, policy)
 		}
+	}
+}
+
+func TestSharedFixtureBackendRegistry(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-25-backend-registry", "backend-identities.json")
+
+	backends := []BackendReference{
+		{ID: "native", Family: "builtin"},
+		{ID: "tree-sitter", Family: "tree-sitter"},
+	}
+	profile := FeatureProfile{
+		Backend:           "tree-sitter",
+		BackendRef:        &backends[1],
+		SupportsDialects:  true,
+		SupportedPolicies: []astmerge.PolicyReference{},
+	}
+
+	expectedBackends := fixture["backends"].([]any)
+	if len(backends) != len(expectedBackends) {
+		t.Fatalf("unexpected backends: %+v", backends)
+	}
+	for index, backend := range backends {
+		expected := expectedBackends[index].(map[string]any)
+		if backend.ID != expected["id"].(string) || backend.Family != expected["family"].(string) {
+			t.Fatalf("unexpected backend at %d: %+v", index, backend)
+		}
+	}
+	if profile.BackendRef == nil || profile.BackendRef.ID != "tree-sitter" || profile.BackendRef.Family != "tree-sitter" {
+		t.Fatalf("unexpected backend reference on feature profile: %+v", profile)
 	}
 }

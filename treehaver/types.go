@@ -12,14 +12,21 @@ type ParserRequest struct {
 	Dialect  string
 }
 
+type BackendReference struct {
+	ID     string
+	Family string
+}
+
 type AdapterInfo struct {
 	Backend           string
+	BackendRef        *BackendReference
 	SupportsDialects  bool
 	SupportedPolicies []astmerge.PolicyReference
 }
 
 type FeatureProfile struct {
 	Backend           string
+	BackendRef        *BackendReference
 	SupportsDialects  bool
 	SupportedPolicies []astmerge.PolicyReference
 }
@@ -31,5 +38,6 @@ type ParserAdapter[T AnalysisHandle] interface {
 
 type ParserDiagnostics struct {
 	Backend     string
+	BackendRef  *BackendReference
 	Diagnostics []astmerge.Diagnostic
 }
