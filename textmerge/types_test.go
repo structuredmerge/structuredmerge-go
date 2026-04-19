@@ -65,9 +65,9 @@ func TestMatchTextBlocks(t *testing.T) {
 	)
 
 	expectedMatched := []TextBlockMatch{
-		{TemplateIndex: 1, DestinationIndex: 0},
-		{TemplateIndex: 0, DestinationIndex: 1},
-		{TemplateIndex: 2, DestinationIndex: 2},
+		{TemplateIndex: 1, DestinationIndex: 0, Phase: TextMatchPhaseExact, Score: 1},
+		{TemplateIndex: 0, DestinationIndex: 1, Phase: TextMatchPhaseExact, Score: 1},
+		{TemplateIndex: 2, DestinationIndex: 2, Phase: TextMatchPhaseExact, Score: 1},
 	}
 
 	if len(result.Matched) != len(expectedMatched) {
@@ -84,5 +84,64 @@ func TestMatchTextBlocks(t *testing.T) {
 	}
 	if len(result.UnmatchedDestination) != 1 || result.UnmatchedDestination[0] != 3 {
 		t.Fatalf("unexpected unmatched destination blocks: %+v", result.UnmatchedDestination)
+	}
+}
+
+func TestRefinedTextSimilarity(t *testing.T) {
+	template := AnalyzeText("Alpha beta gamma")
+	destination := AnalyzeText("Alpha beta delta")
+
+	score := RefinedTextSimilarity(
+		template.Blocks[0],
+		destination.Blocks[0],
+		len(template.Blocks),
+		len(destination.Blocks),
+		DefaultTextRefinementWeights,
+	)
+
+	if score != 0.825 {
+		t.Fatalf("unexpected refined similarity score: %v", score)
+	}
+}
+
+func TestMatchTextBlocksWithRefinement(t *testing.T) {
+	result := MatchTextBlocks(
+		"Alpha beta gamma\n\nDelta anchor\n\nClosing line",
+		"Alpha beta delta\n\nDelta anchor\n\nClosing line",
+	)
+
+	expectedMatched := []TextBlockMatch{
+		{TemplateIndex: 0, DestinationIndex: 0, Phase: TextMatchPhaseRefined, Score: 0.825},
+		{TemplateIndex: 1, DestinationIndex: 1, Phase: TextMatchPhaseExact, Score: 1},
+		{TemplateIndex: 2, DestinationIndex: 2, Phase: TextMatchPhaseExact, Score: 1},
+	}
+
+	if len(result.Matched) != len(expectedMatched) {
+		t.Fatalf("unexpected matched blocks: %+v", result.Matched)
+	}
+	for index := range expectedMatched {
+		if result.Matched[index] != expectedMatched[index] {
+			t.Fatalf("unexpected matched block at %d: %+v", index, result.Matched[index])
+		}
+	}
+
+	if len(result.UnmatchedTemplate) != 0 {
+		t.Fatalf("unexpected unmatched template blocks: %+v", result.UnmatchedTemplate)
+	}
+	if len(result.UnmatchedDestination) != 0 {
+		t.Fatalf("unexpected unmatched destination blocks: %+v", result.UnmatchedDestination)
+	}
+
+	merged := MergeText(
+		"Alpha beta gamma\n\nDelta anchor\n\nClosing line",
+		"Alpha beta delta\n\nDelta anchor\n\nClosing line",
+	)
+	if !merged.OK || merged.Output == nil {
+		t.Fatalf("expected merge success, got diagnostics: %+v", merged.Diagnostics)
+	}
+
+	expectedOutput := "Alpha beta delta\n\nDelta anchor\n\nClosing line"
+	if *merged.Output != expectedOutput {
+		t.Fatalf("unexpected merged output: %q", *merged.Output)
 	}
 }

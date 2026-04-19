@@ -7,6 +7,27 @@ import (
 	"strings"
 )
 
+const DefaultTextRefinementThreshold = 0.7
+
+type TextMatchPhase string
+
+const (
+	TextMatchPhaseExact   TextMatchPhase = "exact"
+	TextMatchPhaseRefined TextMatchPhase = "refined"
+)
+
+type TextRefinementWeights struct {
+	Content  float64
+	Length   float64
+	Position float64
+}
+
+var DefaultTextRefinementWeights = TextRefinementWeights{
+	Content:  0.7,
+	Length:   0.15,
+	Position: 0.15,
+}
+
 type TextSpan struct {
 	Start int
 	End   int
@@ -51,6 +72,8 @@ type TextSimilarity struct {
 type TextBlockMatch struct {
 	TemplateIndex    int
 	DestinationIndex int
+	Phase            TextMatchPhase
+	Score            float64
 }
 
 type TextBlockMatchResult struct {
@@ -170,6 +193,83 @@ func jaccard(left string, right string) float64 {
 	return float64(intersection) / float64(len(unionSet))
 }
 
+func levenshteinDistance(left string, right string) int {
+	if left == right {
+		return 0
+	}
+
+	leftRunes := []rune(left)
+	rightRunes := []rune(right)
+
+	if len(leftRunes) == 0 {
+		return len(rightRunes)
+	}
+	if len(rightRunes) == 0 {
+		return len(leftRunes)
+	}
+
+	previous := make([]int, len(leftRunes)+1)
+	current := make([]int, len(leftRunes)+1)
+	for index := range previous {
+		previous[index] = index
+	}
+
+	for rightIndex, rightRune := range rightRunes {
+		current[0] = rightIndex + 1
+		for leftIndex, leftRune := range leftRunes {
+			cost := 0
+			if leftRune != rightRune {
+				cost = 1
+			}
+			current[leftIndex+1] = min(
+				current[leftIndex]+1,
+				previous[leftIndex+1]+1,
+				previous[leftIndex]+cost,
+			)
+		}
+		copy(previous, current)
+	}
+
+	return previous[len(leftRunes)]
+}
+
+func stringSimilarity(left string, right string) float64 {
+	if left == right {
+		return 1
+	}
+	if left == "" || right == "" {
+		return 0
+	}
+
+	distance := levenshteinDistance(left, right)
+	maxLength := max(len([]rune(left)), len([]rune(right)))
+	return 1 - float64(distance)/float64(maxLength)
+}
+
+func lengthSimilarity(left string, right string) float64 {
+	if len(left) == len(right) {
+		return 1
+	}
+
+	maxLength := max(len(left), len(right))
+	if maxLength == 0 {
+		return 1
+	}
+
+	return float64(min(len(left), len(right))) / float64(maxLength)
+}
+
+func relativePosition(index int, total int) float64 {
+	if total > 1 {
+		return float64(index) / float64(total-1)
+	}
+	return 0.5
+}
+
+func positionSimilarity(templateIndex int, destinationIndex int, templateTotal int, destinationTotal int) float64 {
+	return 1 - abs(relativePosition(templateIndex, templateTotal)-relativePosition(destinationIndex, destinationTotal))
+}
+
 func SimilarityScore(leftSource string, rightSource string) float64 {
 	left := AnalyzeText(leftSource)
 	right := AnalyzeText(rightSource)
@@ -188,6 +288,25 @@ func SimilarityScore(leftSource string, rightSource string) float64 {
 	}
 
 	return sum / float64(total)
+}
+
+func RefinedTextSimilarity(
+	templateBlock TextBlock,
+	destinationBlock TextBlock,
+	templateTotal int,
+	destinationTotal int,
+	weights TextRefinementWeights,
+) float64 {
+	content := stringSimilarity(templateBlock.Normalized, destinationBlock.Normalized)
+	length := lengthSimilarity(templateBlock.Normalized, destinationBlock.Normalized)
+	position := positionSimilarity(
+		templateBlock.Index,
+		destinationBlock.Index,
+		templateTotal,
+		destinationTotal,
+	)
+
+	return weights.Content*content + weights.Length*length + weights.Position*position
 }
 
 func IsSimilar(leftSource string, rightSource string, threshold float64) TextSimilarity {
@@ -251,9 +370,53 @@ func MatchTextBlocks(templateSource string, destinationSource string) TextBlockM
 			matched = append(matched, TextBlockMatch{
 				TemplateIndex:    templateIndex,
 				DestinationIndex: destinationIndex,
+				Phase:            TextMatchPhaseExact,
+				Score:            1,
 			})
 		}
 	}
+
+	for destinationIndex, destinationBlock := range destination.Blocks {
+		if _, ok := matchedDestination[destinationIndex]; ok {
+			continue
+		}
+
+		bestTemplateIndex := -1
+		bestScore := 0.0
+		for templateIndex, templateBlock := range template.Blocks {
+			if _, ok := matchedTemplate[templateIndex]; ok {
+				continue
+			}
+
+			score := RefinedTextSimilarity(
+				templateBlock,
+				destinationBlock,
+				len(template.Blocks),
+				len(destination.Blocks),
+				DefaultTextRefinementWeights,
+			)
+
+			if score >= DefaultTextRefinementThreshold && score > bestScore {
+				bestTemplateIndex = templateIndex
+				bestScore = score
+			}
+		}
+
+		if bestTemplateIndex >= 0 {
+			matchedTemplate[bestTemplateIndex] = struct{}{}
+			matchedDestination[destinationIndex] = struct{}{}
+			matched = append(matched, TextBlockMatch{
+				TemplateIndex:    bestTemplateIndex,
+				DestinationIndex: destinationIndex,
+				Phase:            TextMatchPhaseRefined,
+				Score:            bestScore,
+			})
+		}
+	}
+
+	slices.SortFunc(matched, func(left TextBlockMatch, right TextBlockMatch) int {
+		return left.DestinationIndex - right.DestinationIndex
+	})
 
 	unmatchedTemplate := make([]int, 0)
 	unmatchedDestination := make([]int, 0)
@@ -273,4 +436,11 @@ func MatchTextBlocks(templateSource string, destinationSource string) TextBlockM
 		UnmatchedTemplate:    unmatchedTemplate,
 		UnmatchedDestination: unmatchedDestination,
 	}
+}
+
+func abs(value float64) float64 {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
