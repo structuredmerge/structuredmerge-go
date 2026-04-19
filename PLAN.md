@@ -70,6 +70,13 @@ Primary backend:
 
 - Go tree-sitter bindings plus generated grammar packages
 
+Current host constraint:
+
+- the published `github.com/kreuzberg-dev/tree-sitter-language-pack/packages/go`
+  module is not yet usable as a drop-in backend in this workspace because it
+  requires Go `1.26` and its published module payload omits the `include/` and
+  `lib/` artifacts referenced by its own CGO bindings
+
 Requirements:
 
 - clean parser lifecycle management
