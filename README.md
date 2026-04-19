@@ -26,3 +26,6 @@ The Go monorepo uses:
 - `golangci-lint` for linting
 - `go test ./... -run '^$'` for type-checking/compilation
 - `go test ./...` for unit and integration tests
+
+Integration tests consume the shared fixture corpus from the sibling
+`../fixtures` repository instead of copying fixture data into this monorepo.
