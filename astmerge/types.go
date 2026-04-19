@@ -111,7 +111,13 @@ type ConformanceFamilyFeatureProfileEntry struct {
 
 type ConformanceManifest struct {
 	FamilyFeatureProfiles []ConformanceFamilyFeatureProfileEntry `json:"family_feature_profiles"`
+	Suites                map[string]ConformanceSuiteDefinition  `json:"suites,omitempty"`
 	Families              map[string][]ConformanceManifestEntry  `json:"families"`
+}
+
+type ConformanceSuiteDefinition struct {
+	Family string   `json:"family"`
+	Roles  []string `json:"roles"`
 }
 
 type ConformanceSuiteSummary struct {
@@ -193,6 +199,21 @@ func ConformanceFamilyFeatureProfilePath(manifest ConformanceManifest, family st
 		if entry.Family == family {
 			return entry.Path
 		}
+	}
+
+	return nil
+}
+
+func ConformanceSuiteDefinitionByName(
+	manifest ConformanceManifest,
+	suiteName string,
+) *ConformanceSuiteDefinition {
+	if manifest.Suites == nil {
+		return nil
+	}
+
+	if definition, ok := manifest.Suites[suiteName]; ok {
+		return &definition
 	}
 
 	return nil
@@ -362,6 +383,27 @@ func PlanConformanceSuite(
 		Entries:      entries,
 		MissingRoles: missingRoles,
 	}
+}
+
+func PlanNamedConformanceSuite(
+	manifest ConformanceManifest,
+	suiteName string,
+	familyProfile FamilyFeatureProfile,
+	featureProfile *ConformanceFeatureProfileView,
+) *ConformanceSuitePlan {
+	definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+	if definition == nil {
+		return nil
+	}
+
+	plan := PlanConformanceSuite(
+		manifest,
+		definition.Family,
+		definition.Roles,
+		familyProfile,
+		featureProfile,
+	)
+	return &plan
 }
 
 func derefRequirements(requirements *ConformanceCaseRequirements) ConformanceCaseRequirements {

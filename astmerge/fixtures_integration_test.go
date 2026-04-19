@@ -561,6 +561,56 @@ func TestSharedFixtureManifestCaseRequirements(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureConformanceSuiteDefinitions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "suite_definitions"))
+	manifest := readManifest(t)
+	suiteName := fixture["suite_name"].(string)
+	expectedRaw := fixture["expected"].(map[string]any)
+	expected := ConformanceSuiteDefinition{
+		Family: expectedRaw["family"].(string),
+		Roles:  make([]string, 0, len(expectedRaw["roles"].([]any))),
+	}
+	for _, role := range expectedRaw["roles"].([]any) {
+		expected.Roles = append(expected.Roles, role.(string))
+	}
+
+	definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+	if definition == nil || !reflect.DeepEqual(*definition, expected) {
+		t.Fatalf("unexpected suite definition: %+v", definition)
+	}
+
+	planned := PlanNamedConformanceSuite(
+		manifest,
+		suiteName,
+		FamilyFeatureProfile{
+			Family:            "json",
+			SupportedDialects: []string{"json", "jsonc"},
+			SupportedPolicies: []PolicyReference{
+				{Surface: PolicySurfaceArray, Name: "destination_wins_array"},
+				{Surface: PolicySurfaceFallback, Name: "trailing_comma_destination_fallback"},
+			},
+		},
+		nil,
+	)
+	explicit := PlanConformanceSuite(
+		manifest,
+		expected.Family,
+		expected.Roles,
+		FamilyFeatureProfile{
+			Family:            "json",
+			SupportedDialects: []string{"json", "jsonc"},
+			SupportedPolicies: []PolicyReference{
+				{Surface: PolicySurfaceArray, Name: "destination_wins_array"},
+				{Surface: PolicySurfaceFallback, Name: "trailing_comma_destination_fallback"},
+			},
+		},
+		nil,
+	)
+	if planned == nil || !reflect.DeepEqual(*planned, explicit) {
+		t.Fatalf("unexpected planned suite from definition: %+v", planned)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
