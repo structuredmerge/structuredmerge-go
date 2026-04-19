@@ -41,3 +41,19 @@ func TestSimilarityScore(t *testing.T) {
 		t.Fatalf("expected near-match to satisfy threshold")
 	}
 }
+
+func TestMergeText(t *testing.T) {
+	result := MergeText(
+		"Alpha\n\nBeta\n\nTemplate tail",
+		"Alpha revised\n\nBeta\n\nDestination tail\n\nDestination extra",
+	)
+
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected merge success, got diagnostics: %+v", result.Diagnostics)
+	}
+
+	expected := "Alpha revised\n\nBeta\n\nDestination tail\n\nDestination extra"
+	if *result.Output != expected {
+		t.Fatalf("unexpected merged output: %q", *result.Output)
+	}
+}

@@ -48,6 +48,10 @@ type TextSimilarity struct {
 	Matched   bool
 }
 
+type TextMergeResolution struct {
+	Output string
+}
+
 type TextMerger interface {
 	Merge(template TextAnalysis, destination TextAnalysis) astmerge.MergeResult[string]
 }
@@ -177,5 +181,27 @@ func IsSimilar(leftSource string, rightSource string, threshold float64) TextSim
 		Score:     score,
 		Threshold: threshold,
 		Matched:   score >= threshold,
+	}
+}
+
+func MergeText(templateSource string, destinationSource string) astmerge.MergeResult[string] {
+	template := AnalyzeText(templateSource)
+	destination := AnalyzeText(destinationSource)
+	total := max(len(template.Blocks), len(destination.Blocks))
+	mergedBlocks := make([]string, 0, total)
+
+	for index := 0; index < total; index++ {
+		if index < len(destination.Blocks) {
+			mergedBlocks = append(mergedBlocks, destination.Blocks[index].Normalized)
+		} else if index < len(template.Blocks) {
+			mergedBlocks = append(mergedBlocks, template.Blocks[index].Normalized)
+		}
+	}
+
+	output := strings.Join(mergedBlocks, "\n\n")
+	return astmerge.MergeResult[string]{
+		OK:          true,
+		Diagnostics: []astmerge.Diagnostic{},
+		Output:      &output,
 	}
 }
