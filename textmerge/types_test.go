@@ -57,3 +57,32 @@ func TestMergeText(t *testing.T) {
 		t.Fatalf("unexpected merged output: %q", *result.Output)
 	}
 }
+
+func TestMatchTextBlocks(t *testing.T) {
+	result := MatchTextBlocks(
+		"Alpha\n\nBeta\n\nAlpha\n\nTemplate only",
+		"Beta\n\nAlpha\n\nAlpha\n\nDestination only",
+	)
+
+	expectedMatched := []TextBlockMatch{
+		{TemplateIndex: 1, DestinationIndex: 0},
+		{TemplateIndex: 0, DestinationIndex: 1},
+		{TemplateIndex: 2, DestinationIndex: 2},
+	}
+
+	if len(result.Matched) != len(expectedMatched) {
+		t.Fatalf("unexpected matched blocks: %+v", result.Matched)
+	}
+	for index := range expectedMatched {
+		if result.Matched[index] != expectedMatched[index] {
+			t.Fatalf("unexpected matched block at %d: %+v", index, result.Matched[index])
+		}
+	}
+
+	if len(result.UnmatchedTemplate) != 1 || result.UnmatchedTemplate[0] != 3 {
+		t.Fatalf("unexpected unmatched template blocks: %+v", result.UnmatchedTemplate)
+	}
+	if len(result.UnmatchedDestination) != 1 || result.UnmatchedDestination[0] != 3 {
+		t.Fatalf("unexpected unmatched destination blocks: %+v", result.UnmatchedDestination)
+	}
+}

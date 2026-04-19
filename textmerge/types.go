@@ -48,8 +48,23 @@ type TextSimilarity struct {
 	Matched   bool
 }
 
+type TextBlockMatch struct {
+	TemplateIndex    int
+	DestinationIndex int
+}
+
+type TextBlockMatchResult struct {
+	Matched              []TextBlockMatch
+	UnmatchedTemplate    []int
+	UnmatchedDestination []int
+}
+
 type TextMergeResolution struct {
 	Output string
+}
+
+type TextBlockMatcher interface {
+	MatchBlocks(template TextAnalysis, destination TextAnalysis) TextBlockMatchResult
 }
 
 type TextMerger interface {
@@ -203,5 +218,54 @@ func MergeText(templateSource string, destinationSource string) astmerge.MergeRe
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},
 		Output:      &output,
+	}
+}
+
+func MatchTextBlocks(templateSource string, destinationSource string) TextBlockMatchResult {
+	template := AnalyzeText(templateSource)
+	destination := AnalyzeText(destinationSource)
+	matchedTemplate := map[int]struct{}{}
+	matchedDestination := map[int]struct{}{}
+	matched := make([]TextBlockMatch, 0)
+
+	for destinationIndex, destinationBlock := range destination.Blocks {
+		templateIndex := -1
+		for candidateIndex, templateBlock := range template.Blocks {
+			if _, ok := matchedTemplate[candidateIndex]; ok {
+				continue
+			}
+			if templateBlock.Normalized == destinationBlock.Normalized {
+				templateIndex = candidateIndex
+				break
+			}
+		}
+
+		if templateIndex >= 0 {
+			matchedTemplate[templateIndex] = struct{}{}
+			matchedDestination[destinationIndex] = struct{}{}
+			matched = append(matched, TextBlockMatch{
+				TemplateIndex:    templateIndex,
+				DestinationIndex: destinationIndex,
+			})
+		}
+	}
+
+	unmatchedTemplate := make([]int, 0)
+	unmatchedDestination := make([]int, 0)
+	for index := range template.Blocks {
+		if _, ok := matchedTemplate[index]; !ok {
+			unmatchedTemplate = append(unmatchedTemplate, index)
+		}
+	}
+	for index := range destination.Blocks {
+		if _, ok := matchedDestination[index]; !ok {
+			unmatchedDestination = append(unmatchedDestination, index)
+		}
+	}
+
+	return TextBlockMatchResult{
+		Matched:              matched,
+		UnmatchedTemplate:    unmatchedTemplate,
+		UnmatchedDestination: unmatchedDestination,
 	}
 }
