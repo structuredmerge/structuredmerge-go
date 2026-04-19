@@ -129,3 +129,17 @@ func TestMergeJSONReportsDestinationParseError(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
 	}
 }
+
+func TestMergeJSONAppliesTrailingCommaFallback(t *testing.T) {
+	result := MergeJSON("{\"alpha\":1}", "{\"beta\":[1,2,],}", DialectJSON)
+
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected merge success, got diagnostics: %+v", result.Diagnostics)
+	}
+	if *result.Output != "{\"alpha\":1,\"beta\":[1,2]}" {
+		t.Fatalf("unexpected output: %q", *result.Output)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Category != astmerge.CategoryFallbackApplied {
+		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
+	}
+}

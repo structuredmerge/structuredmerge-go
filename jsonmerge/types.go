@@ -100,6 +100,14 @@ func destinationParseError(message string) astmerge.Diagnostic {
 	}
 }
 
+func fallbackApplied(message string) astmerge.Diagnostic {
+	return astmerge.Diagnostic{
+		Severity: astmerge.SeverityWarning,
+		Category: astmerge.CategoryFallbackApplied,
+		Message:  message,
+	}
+}
+
 func detectTrailingComma(source string) bool {
 	inString := false
 	inLineComment := false
@@ -242,6 +250,96 @@ func stripJSONComments(source string) string {
 			inBlockComment = true
 			index++
 			continue
+		}
+
+		result = append(result, char)
+	}
+
+	return string(result)
+}
+
+func stripTrailingCommas(source string) string {
+	result := make([]byte, 0, len(source))
+	inString := false
+	inLineComment := false
+	inBlockComment := false
+	escaped := false
+
+	for index := 0; index < len(source); index++ {
+		char := source[index]
+		var next byte
+		if index+1 < len(source) {
+			next = source[index+1]
+		}
+
+		if inLineComment {
+			result = append(result, char)
+			if char == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+
+		if inBlockComment {
+			result = append(result, char)
+			if char == '*' && next == '/' {
+				result = append(result, next)
+				inBlockComment = false
+				index++
+			}
+			continue
+		}
+
+		if inString {
+			result = append(result, char)
+			if escaped {
+				escaped = false
+				continue
+			}
+			if char == '\\' {
+				escaped = true
+				continue
+			}
+			if char == '"' {
+				inString = false
+			}
+			continue
+		}
+
+		if char == '"' {
+			inString = true
+			result = append(result, char)
+			continue
+		}
+
+		if char == '/' && next == '/' {
+			inLineComment = true
+			result = append(result, char, next)
+			index++
+			continue
+		}
+
+		if char == '/' && next == '*' {
+			inBlockComment = true
+			result = append(result, char, next)
+			index++
+			continue
+		}
+
+		if char == ',' {
+			lookahead := index + 1
+			for lookahead < len(source) {
+				switch source[lookahead] {
+				case ' ', '\n', '\r', '\t':
+					lookahead++
+				default:
+					goto done
+				}
+			}
+		done:
+			if lookahead < len(source) && (source[lookahead] == ']' || source[lookahead] == '}') {
+				continue
+			}
 		}
 
 		result = append(result, char)
@@ -499,11 +597,30 @@ func MergeJSON(templateSource string, destinationSource string, dialect JSONDial
 		}
 	}
 
+	diagnostics := []astmerge.Diagnostic{}
 	destination, diagnostic, ok := parseNormalizedJSON(destinationSource, dialect, destinationParseError)
 	if !ok {
-		return astmerge.MergeResult[string]{
-			OK:          false,
-			Diagnostics: []astmerge.Diagnostic{diagnostic},
+		if diagnostic.Category == astmerge.CategoryDestinationParseError && detectTrailingComma(destinationSource) {
+			sanitizedDestination := stripTrailingCommas(destinationSource)
+			if sanitizedDestination == destinationSource {
+				return astmerge.MergeResult[string]{
+					OK:          false,
+					Diagnostics: []astmerge.Diagnostic{diagnostic},
+				}
+			}
+			destination, diagnostic, ok = parseNormalizedJSON(sanitizedDestination, dialect, destinationParseError)
+			if !ok {
+				return astmerge.MergeResult[string]{
+					OK:          false,
+					Diagnostics: []astmerge.Diagnostic{diagnostic},
+				}
+			}
+			diagnostics = append(diagnostics, fallbackApplied("Applied destination trailing-comma fallback during merge."))
+		} else {
+			return astmerge.MergeResult[string]{
+				OK:          false,
+				Diagnostics: []astmerge.Diagnostic{diagnostic},
+			}
 		}
 	}
 
@@ -511,7 +628,7 @@ func MergeJSON(templateSource string, destinationSource string, dialect JSONDial
 	output := canonicalJSON(merged)
 	return astmerge.MergeResult[string]{
 		OK:          true,
-		Diagnostics: []astmerge.Diagnostic{},
+		Diagnostics: diagnostics,
 		Output:      &output,
 	}
 }

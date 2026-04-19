@@ -196,6 +196,24 @@ func TestSharedFixtureJSONInvalidMerges(t *testing.T) {
 	)
 }
 
+func TestSharedFixtureJSONFallbackMerge(t *testing.T) {
+	fixture := readJSONFixture(t, "json", "slice-14-fallback", "trailing-comma-destination.json")
+	expected := fixture["expected"].(map[string]any)
+
+	result := MergeJSON(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		DialectJSON,
+	)
+	if result.OK != expected["ok"].(bool) {
+		t.Fatalf("unexpected merge status: %+v", result)
+	}
+	assertExpectedDiagnostics(t, result.Diagnostics, expected["diagnostics"].([]any))
+	if result.Output == nil || *result.Output != expected["output"].(string) {
+		t.Fatalf("unexpected output: %+v", result.Output)
+	}
+}
+
 func assertExpectedDiagnostics(t *testing.T, diagnostics []astmerge.Diagnostic, expected []any) {
 	t.Helper()
 
