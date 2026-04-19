@@ -838,6 +838,116 @@ func TestSharedFixtureNamedConformanceSuitePlans(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNamedConformanceSuiteResults(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_results"))
+	manifest := readManifest(t)
+	suiteName := fixture["suite_name"].(string)
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	entry := RunNamedConformanceSuiteEntry(
+		manifest,
+		suiteName,
+		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+		&ConformanceFeatureProfileView{
+			Backend:           "kreuzberg-language-pack",
+			SupportsDialects:  false,
+			SupportedPolicies: []PolicyReference{{Surface: PolicySurfaceArray, Name: "destination_wins_array"}},
+		},
+	)
+
+	if entry == nil {
+		t.Fatalf("expected named suite results entry")
+	}
+
+	expected := parseNamedConformanceSuiteResults(fixture["expected_entry"].(map[string]any))
+	if !reflect.DeepEqual(*entry, expected) {
+		t.Fatalf("unexpected named suite results entry: %+v", entry)
+	}
+}
+
+func TestSharedFixturePlannedNamedConformanceSuiteRunner(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_runner_entries"))
+	manifest := readManifest(t)
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuiteResults, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuiteResults(raw.(map[string]any)))
+	}
+
+	entries := RunPlannedNamedConformanceSuites(
+		PlanNamedConformanceSuites(manifest, contexts),
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(entries, expected) {
+		t.Fatalf("unexpected planned named suite runner entries: %+v", entries)
+	}
+}
+
+func TestSharedFixturePlannedNamedConformanceSuiteReports(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_report_entries"))
+	manifest := readManifest(t)
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuiteReport, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuiteReport(raw.(map[string]any)))
+	}
+
+	entries := ReportPlannedNamedConformanceSuites(
+		PlanNamedConformanceSuites(manifest, contexts),
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(entries, expected) {
+		t.Fatalf("unexpected planned named suite report entries: %+v", entries)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -905,6 +1015,45 @@ func parseNamedConformanceSuitePlan(t *testing.T, raw map[string]any) NamedConfo
 	return NamedConformanceSuitePlan{
 		Suite: raw["suite"].(string),
 		Plan:  parseConformanceSuitePlan(t, raw["plan"].(map[string]any)),
+	}
+}
+
+func parseNamedConformanceSuiteResults(raw map[string]any) NamedConformanceSuiteResults {
+	resultsRaw := raw["results"].([]any)
+	results := make([]ConformanceCaseResult, 0, len(resultsRaw))
+	for _, item := range resultsRaw {
+		results = append(results, parseConformanceCaseResult(item.(map[string]any)))
+	}
+
+	return NamedConformanceSuiteResults{
+		Suite:   raw["suite"].(string),
+		Results: results,
+	}
+}
+
+func parseNamedConformanceSuiteReport(raw map[string]any) NamedConformanceSuiteReport {
+	return NamedConformanceSuiteReport{
+		Suite:  raw["suite"].(string),
+		Report: parseConformanceSuiteReport(raw["report"].(map[string]any)),
+	}
+}
+
+func parseConformanceSuiteReport(raw map[string]any) ConformanceSuiteReport {
+	resultsRaw := raw["results"].([]any)
+	results := make([]ConformanceCaseResult, 0, len(resultsRaw))
+	for _, item := range resultsRaw {
+		results = append(results, parseConformanceCaseResult(item.(map[string]any)))
+	}
+
+	summaryRaw := raw["summary"].(map[string]any)
+	return ConformanceSuiteReport{
+		Results: results,
+		Summary: ConformanceSuiteSummary{
+			Total:   int(summaryRaw["total"].(float64)),
+			Passed:  int(summaryRaw["passed"].(float64)),
+			Failed:  int(summaryRaw["failed"].(float64)),
+			Skipped: int(summaryRaw["skipped"].(float64)),
+		},
 	}
 }
 
