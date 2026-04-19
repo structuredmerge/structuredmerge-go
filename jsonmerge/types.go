@@ -155,6 +155,31 @@ func JSONFeatureProfileInfo() JSONFeatureProfile {
 	}
 }
 
+func ParseJSONWithLanguagePack(source string, dialect JSONDialect) astmerge.ParseResult[JSONAnalysis] {
+	if dialect != DialectJSON {
+		return astmerge.ParseResult[JSONAnalysis]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{
+				{
+					Severity: astmerge.SeverityError,
+					Category: astmerge.CategoryUnsupportedFeature,
+					Message:  "tree-sitter-language-pack json parsing currently supports only the json dialect.",
+				},
+			},
+		}
+	}
+
+	backendResult := treehaver.ParseWithLanguagePack(JSONParseRequest(source, dialect))
+	if !backendResult.OK {
+		return astmerge.ParseResult[JSONAnalysis]{
+			OK:          false,
+			Diagnostics: backendResult.Diagnostics,
+		}
+	}
+
+	return ParseJSON(source, dialect)
+}
+
 func detectTrailingComma(source string) bool {
 	inString := false
 	inLineComment := false

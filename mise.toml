@@ -1,6 +1,11 @@
 [tools]
-go = "1.25"
-golangci-lint = "latest"
+go = "1.26"
+
+[env]
+GOFLAGS = "-tags=tspack_dev"
+
+[tasks.prepare-language-pack]
+run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml"
 
 [tasks.format]
 run = "gofmt -w $(find . -name '*.go' -type f)"
@@ -9,13 +14,13 @@ run = "gofmt -w $(find . -name '*.go' -type f)"
 run = "test -z \"$(gofmt -l $(find . -name '*.go' -type f))\""
 
 [tasks.lint]
-run = "golangci-lint run ./..."
+run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 run ./..."
 
 [tasks.typecheck]
-run = "go test ./... -run '^$'"
+run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go test ./... -run '^$'"
 
 [tasks.test]
-run = "go test ./..."
+run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go test ./..."
 
 [tasks.check]
-run = "test -z \"$(gofmt -l $(find . -name '*.go' -type f))\" && golangci-lint run ./... && go test ./..."
+run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && test -z \"$(gofmt -l $(find . -name '*.go' -type f))\" && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 run ./... && go test ./..."

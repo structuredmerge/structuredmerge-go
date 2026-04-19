@@ -27,5 +27,11 @@ The Go monorepo uses:
 - `go test ./... -run '^$'` for type-checking/compilation
 - `go test ./...` for unit and integration tests
 
+The current tree-sitter backend path uses the sibling
+`../tree-sitter-language-pack` checkout through a local `replace` in
+`go.mod`. Repo tasks build its `ts-pack-ffi` crate first and compile with the
+`tspack_dev` build tag so the Go binding can link against the local fork while
+the upstream packaging fix is pending.
+
 Integration tests consume the shared fixture corpus from the sibling
 `../fixtures` repository instead of copying fixture data into this monorepo.

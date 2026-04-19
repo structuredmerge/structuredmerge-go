@@ -186,3 +186,48 @@ func TestMergeJSONDoesNotApplyFallbackToStrictJSONCommentViolations(t *testing.T
 		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
 	}
 }
+
+func TestParseJSONWithLanguagePackPreservesAnalysis(t *testing.T) {
+	result := ParseJSONWithLanguagePack("{\"alpha\":{\"beta\":1}}", DialectJSON)
+
+	if !result.OK || result.Analysis == nil {
+		t.Fatalf("expected parse success, got diagnostics: %+v", result.Diagnostics)
+	}
+	if result.Analysis.RootKind != RootObject {
+		t.Fatalf("unexpected root kind: %s", result.Analysis.RootKind)
+	}
+	expected := []JSONOwner{
+		{Path: "/alpha", OwnerKind: OwnerMember, MatchKey: "alpha"},
+		{Path: "/alpha/beta", OwnerKind: OwnerMember, MatchKey: "beta"},
+	}
+	if len(result.Analysis.Owners) != len(expected) {
+		t.Fatalf("unexpected owners: %+v", result.Analysis.Owners)
+	}
+	for index := range expected {
+		if result.Analysis.Owners[index] != expected[index] {
+			t.Fatalf("unexpected owner at %d: %+v", index, result.Analysis.Owners[index])
+		}
+	}
+}
+
+func TestParseJSONWithLanguagePackReportsStrictSyntaxErrors(t *testing.T) {
+	result := ParseJSONWithLanguagePack("{\"alpha\":1,}", DialectJSON)
+
+	if result.OK {
+		t.Fatalf("expected parse failure")
+	}
+	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Message != "tree-sitter-language-pack reported syntax errors for json." {
+		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
+	}
+}
+
+func TestParseJSONWithLanguagePackRejectsJSONCForNow(t *testing.T) {
+	result := ParseJSONWithLanguagePack("{\n  // note\n  \"alpha\":1\n}", DialectJSONC)
+
+	if result.OK {
+		t.Fatalf("expected parse failure")
+	}
+	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Message != "tree-sitter-language-pack json parsing currently supports only the json dialect." {
+		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
+	}
+}
