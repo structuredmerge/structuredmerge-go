@@ -60,3 +60,40 @@ func TestAnalyzeJSONStructure(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchJSONOwners(t *testing.T) {
+	template := ParseJSON("{\n  \"name\": \"structuredmerge\",\n  \"tags\": [\"merge\", \"ast\"],\n  \"meta\": {\"enabled\": true}\n}\n", DialectJSON)
+	destination := ParseJSON("{\n  \"name\": \"structuredmerge\",\n  \"tags\": [\"merge\"],\n  \"meta\": {\"enabled\": true},\n  \"extra\": 1\n}\n", DialectJSON)
+
+	if template.Analysis == nil || destination.Analysis == nil {
+		t.Fatalf("expected parse success for both documents")
+	}
+
+	result := MatchJSONOwners(*template.Analysis, *destination.Analysis)
+
+	expectedMatched := []JSONOwnerMatch{
+		{TemplatePath: "/meta", DestinationPath: "/meta"},
+		{TemplatePath: "/meta/enabled", DestinationPath: "/meta/enabled"},
+		{TemplatePath: "/name", DestinationPath: "/name"},
+		{TemplatePath: "/tags", DestinationPath: "/tags"},
+		{TemplatePath: "/tags/0", DestinationPath: "/tags/0"},
+	}
+
+	if len(result.Matched) != len(expectedMatched) {
+		t.Fatalf("unexpected matched owners: %+v", result.Matched)
+	}
+
+	for index := range expectedMatched {
+		if result.Matched[index] != expectedMatched[index] {
+			t.Fatalf("unexpected matched owner at %d: %+v", index, result.Matched[index])
+		}
+	}
+
+	if len(result.UnmatchedTemplate) != 1 || result.UnmatchedTemplate[0] != "/tags/1" {
+		t.Fatalf("unexpected unmatched template owners: %+v", result.UnmatchedTemplate)
+	}
+
+	if len(result.UnmatchedDestination) != 1 || result.UnmatchedDestination[0] != "/extra" {
+		t.Fatalf("unexpected unmatched destination owners: %+v", result.UnmatchedDestination)
+	}
+}

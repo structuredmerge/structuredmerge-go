@@ -37,6 +37,17 @@ type JSONOwner struct {
 	MatchKey  string
 }
 
+type JSONOwnerMatch struct {
+	TemplatePath    string
+	DestinationPath string
+}
+
+type JSONOwnerMatchResult struct {
+	Matched              []JSONOwnerMatch
+	UnmatchedTemplate    []string
+	UnmatchedDestination []string
+}
+
 type JSONAnalysis struct {
 	Dialect          JSONDialect
 	AllowsComments   bool
@@ -59,6 +70,10 @@ type JSONAnalyzer interface {
 
 type JSONStructureAnalyzer interface {
 	Analyze(source string, dialect JSONDialect) astmerge.ParseResult[JSONAnalysis]
+}
+
+type JSONOwnerMatcher interface {
+	MatchOwners(template JSONAnalysis, destination JSONAnalysis) JSONOwnerMatchResult
 }
 
 type JSONMerger interface {
@@ -316,5 +331,43 @@ func JSONParseRequest(source string, dialect JSONDialect) treehaver.ParserReques
 		Source:   source,
 		Language: "json",
 		Dialect:  string(dialect),
+	}
+}
+
+func MatchJSONOwners(template JSONAnalysis, destination JSONAnalysis) JSONOwnerMatchResult {
+	destinationPaths := map[string]struct{}{}
+	templatePaths := map[string]struct{}{}
+	for _, owner := range destination.Owners {
+		destinationPaths[owner.Path] = struct{}{}
+	}
+	for _, owner := range template.Owners {
+		templatePaths[owner.Path] = struct{}{}
+	}
+
+	matched := make([]JSONOwnerMatch, 0)
+	unmatchedTemplate := make([]string, 0)
+	unmatchedDestination := make([]string, 0)
+
+	for _, owner := range template.Owners {
+		if _, ok := destinationPaths[owner.Path]; ok {
+			matched = append(matched, JSONOwnerMatch{
+				TemplatePath:    owner.Path,
+				DestinationPath: owner.Path,
+			})
+			continue
+		}
+		unmatchedTemplate = append(unmatchedTemplate, owner.Path)
+	}
+
+	for _, owner := range destination.Owners {
+		if _, ok := templatePaths[owner.Path]; !ok {
+			unmatchedDestination = append(unmatchedDestination, owner.Path)
+		}
+	}
+
+	return JSONOwnerMatchResult{
+		Matched:              matched,
+		UnmatchedTemplate:    unmatchedTemplate,
+		UnmatchedDestination: unmatchedDestination,
 	}
 }
