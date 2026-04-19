@@ -7,24 +7,6 @@ import (
 	"testing"
 )
 
-func readDiagnosticFixture(t *testing.T, parts ...string) map[string]any {
-	t.Helper()
-
-	pathParts := append([]string{"..", "..", "fixtures"}, parts...)
-	path := filepath.Join(pathParts...)
-	source, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read fixture: %v", err)
-	}
-
-	var fixture map[string]any
-	if err := json.Unmarshal(source, &fixture); err != nil {
-		t.Fatalf("parse fixture: %v", err)
-	}
-
-	return fixture
-}
-
 func readDiagnosticFixtureFromPath(t *testing.T, path string) map[string]any {
 	t.Helper()
 
@@ -41,26 +23,33 @@ func readDiagnosticFixtureFromPath(t *testing.T, path string) map[string]any {
 	return fixture
 }
 
+func readManifest(t *testing.T) ConformanceManifest {
+	t.Helper()
+
+	path := filepath.Join("..", "..", "fixtures", "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read manifest: %v", err)
+	}
+
+	var manifest ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("parse manifest: %v", err)
+	}
+
+	return manifest
+}
+
 func diagnosticsFixturePath(t *testing.T, role string) string {
 	t.Helper()
 
-	manifest := readDiagnosticFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
-	entries := manifest["diagnostics"].([]any)
-	for _, item := range entries {
-		entry := item.(map[string]any)
-		if entry["role"].(string) != role {
-			continue
-		}
-
-		parts := []string{"..", "..", "fixtures"}
-		for _, segment := range entry["path"].([]any) {
-			parts = append(parts, segment.(string))
-		}
-		return filepath.Join(parts...)
+	manifest := readManifest(t)
+	path := ConformanceFixturePath(manifest, "diagnostics", role)
+	if path == nil {
+		t.Fatalf("missing diagnostics fixture entry for %s", role)
 	}
 
-	t.Fatalf("missing diagnostics fixture entry for %s", role)
-	return ""
+	return filepath.Join(append([]string{"..", "..", "fixtures"}, path...)...)
 }
 
 func TestSharedFixtureDiagnosticVocabulary(t *testing.T) {
@@ -227,6 +216,60 @@ func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
 	}
 	if len(result.Messages) != len(expectedResult["messages"].([]any)) {
 		t.Fatalf("unexpected runner messages: %+v", result.Messages)
+	}
+}
+
+func TestSharedFixtureNormalizedManifestContract(t *testing.T) {
+	manifest := readManifest(t)
+
+	jsonProfilePath := ConformanceFamilyFeatureProfilePath(manifest, "json")
+	if filepath.Join(jsonProfilePath...) != filepath.Join("diagnostics", "slice-21-family-feature-profile", "json-feature-profile.json") {
+		t.Fatalf("unexpected json family profile path: %v", jsonProfilePath)
+	}
+
+	textAnalysisPath := ConformanceFixturePath(manifest, "text", "analysis")
+	if filepath.Join(textAnalysisPath...) != filepath.Join("text", "slice-03-analysis", "whitespace-and-blocks.json") {
+		t.Fatalf("unexpected text analysis path: %v", textAnalysisPath)
+	}
+
+	runnerShapePath := ConformanceFixturePath(manifest, "diagnostics", "runner_shape")
+	if filepath.Join(runnerShapePath...) != filepath.Join("diagnostics", "slice-28-conformance-runner", "runner-shape.json") {
+		t.Fatalf("unexpected runner shape path: %v", runnerShapePath)
+	}
+}
+
+func TestSharedFixtureConformanceSuiteSummary(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_summary"))
+
+	rawResults := fixture["results"].([]any)
+	results := make([]ConformanceCaseResult, 0, len(rawResults))
+	for _, item := range rawResults {
+		entry := item.(map[string]any)
+		ref := entry["ref"].(map[string]any)
+		messages := entry["messages"].([]any)
+		normalizedMessages := make([]string, 0, len(messages))
+		for _, message := range messages {
+			normalizedMessages = append(normalizedMessages, message.(string))
+		}
+
+		results = append(results, ConformanceCaseResult{
+			Ref: ConformanceCaseRef{
+				Family: ref["family"].(string),
+				Role:   ref["role"].(string),
+				Case:   ref["case"].(string),
+			},
+			Outcome:  ConformanceOutcome(entry["outcome"].(string)),
+			Messages: normalizedMessages,
+		})
+	}
+
+	expected := fixture["summary"].(map[string]any)
+	summary := SummarizeConformanceResults(results)
+	if summary.Total != int(expected["total"].(float64)) ||
+		summary.Passed != int(expected["passed"].(float64)) ||
+		summary.Failed != int(expected["failed"].(float64)) ||
+		summary.Skipped != int(expected["skipped"].(float64)) {
+		t.Fatalf("unexpected summary: %+v", summary)
 	}
 }
 

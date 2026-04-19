@@ -76,3 +76,71 @@ type ConformanceCaseResult struct {
 	Outcome  ConformanceOutcome
 	Messages []string
 }
+
+type ConformanceManifestEntry struct {
+	Role string   `json:"role"`
+	Path []string `json:"path"`
+}
+
+type ConformanceFamilyFeatureProfileEntry struct {
+	Family string   `json:"family"`
+	Role   string   `json:"role"`
+	Path   []string `json:"path"`
+}
+
+type ConformanceManifest struct {
+	FamilyFeatureProfiles []ConformanceFamilyFeatureProfileEntry `json:"family_feature_profiles"`
+	Families              map[string][]ConformanceManifestEntry  `json:"families"`
+}
+
+type ConformanceSuiteSummary struct {
+	Total   int `json:"total"`
+	Passed  int `json:"passed"`
+	Failed  int `json:"failed"`
+	Skipped int `json:"skipped"`
+}
+
+func ConformanceFamilyEntries(manifest ConformanceManifest, family string) []ConformanceManifestEntry {
+	if entries, ok := manifest.Families[family]; ok {
+		return entries
+	}
+
+	return []ConformanceManifestEntry{}
+}
+
+func ConformanceFixturePath(manifest ConformanceManifest, family string, role string) []string {
+	for _, entry := range ConformanceFamilyEntries(manifest, family) {
+		if entry.Role == role {
+			return entry.Path
+		}
+	}
+
+	return nil
+}
+
+func ConformanceFamilyFeatureProfilePath(manifest ConformanceManifest, family string) []string {
+	for _, entry := range manifest.FamilyFeatureProfiles {
+		if entry.Family == family {
+			return entry.Path
+		}
+	}
+
+	return nil
+}
+
+func SummarizeConformanceResults(results []ConformanceCaseResult) ConformanceSuiteSummary {
+	summary := ConformanceSuiteSummary{}
+	for _, result := range results {
+		summary.Total++
+		switch result.Outcome {
+		case ConformancePassed:
+			summary.Passed++
+		case ConformanceFailed:
+			summary.Failed++
+		case ConformanceSkipped:
+			summary.Skipped++
+		}
+	}
+
+	return summary
+}

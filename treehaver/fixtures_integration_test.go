@@ -46,23 +46,21 @@ func readParserFixtureFromPath(t *testing.T, path string) map[string]any {
 func diagnosticsFixturePath(t *testing.T, role string) string {
 	t.Helper()
 
-	manifest := readParserFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
-	entries := manifest["diagnostics"].([]any)
-	for _, item := range entries {
-		entry := item.(map[string]any)
-		if entry["role"].(string) != role {
-			continue
-		}
-
-		parts := []string{"..", "..", "fixtures"}
-		for _, segment := range entry["path"].([]any) {
-			parts = append(parts, segment.(string))
-		}
-		return filepath.Join(parts...)
+	manifestFixture := readParserFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	manifestSource, err := json.Marshal(manifestFixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(manifestSource, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	path := astmerge.ConformanceFixturePath(manifest, "diagnostics", role)
+	if path == nil {
+		t.Fatalf("missing diagnostics fixture entry for %s", role)
 	}
 
-	t.Fatalf("missing diagnostics fixture entry for %s", role)
-	return ""
+	return filepath.Join(append([]string{"..", "..", "fixtures"}, path...)...)
 }
 
 func TestSharedFixtureParserRequest(t *testing.T) {

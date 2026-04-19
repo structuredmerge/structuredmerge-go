@@ -46,45 +46,41 @@ func readTextFixtureFromPath(t *testing.T, path string) map[string]any {
 func familyFeatureProfileFixturePath(t *testing.T, family string) string {
 	t.Helper()
 
-	manifest := readTextFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
-	entries := manifest["family_feature_profiles"].([]any)
-	for _, item := range entries {
-		entry := item.(map[string]any)
-		if entry["family"].(string) != family {
-			continue
-		}
-
-		parts := []string{"..", "..", "fixtures"}
-		for _, segment := range entry["path"].([]any) {
-			parts = append(parts, segment.(string))
-		}
-		return filepath.Join(parts...)
+	manifestFixture := readTextFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	manifestSource, err := json.Marshal(manifestFixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(manifestSource, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	path := astmerge.ConformanceFamilyFeatureProfilePath(manifest, family)
+	if path == nil {
+		t.Fatalf("missing family feature profile entry for %s", family)
 	}
 
-	t.Fatalf("missing family feature profile entry for %s", family)
-	return ""
+	return filepath.Join(append([]string{"..", "..", "fixtures"}, path...)...)
 }
 
 func textFixturePath(t *testing.T, role string) string {
 	t.Helper()
 
-	manifest := readTextFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
-	entries := manifest["text"].([]any)
-	for _, item := range entries {
-		entry := item.(map[string]any)
-		if entry["role"].(string) != role {
-			continue
-		}
-
-		parts := []string{"..", "..", "fixtures"}
-		for _, segment := range entry["path"].([]any) {
-			parts = append(parts, segment.(string))
-		}
-		return filepath.Join(parts...)
+	manifestFixture := readTextFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	manifestSource, err := json.Marshal(manifestFixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(manifestSource, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	path := astmerge.ConformanceFixturePath(manifest, "text", role)
+	if path == nil {
+		t.Fatalf("missing text fixture entry for %s", role)
 	}
 
-	t.Fatalf("missing text fixture entry for %s", role)
-	return ""
+	return filepath.Join(append([]string{"..", "..", "fixtures"}, path...)...)
 }
 
 func asMapList(value any) []map[string]any {
