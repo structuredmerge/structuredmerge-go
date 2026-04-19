@@ -13,8 +13,9 @@ type ParserRequest struct {
 }
 
 type AdapterInfo struct {
-	Backend          string
-	SupportsDialects bool
+	Backend           string
+	SupportsDialects  bool
+	SupportedPolicies []astmerge.PolicyReference
 }
 
 type ParserAdapter[T AnalysisHandle] interface {
