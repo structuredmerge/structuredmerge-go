@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -349,6 +350,61 @@ func TestSharedFixtureCapabilityAwareSelection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureConformanceCaseRunner(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "case_runner"))
+
+	for _, item := range fixture["cases"].([]any) {
+		testCase := item.(map[string]any)
+		run := parseConformanceCaseRun(t, testCase["run"].(map[string]any))
+		execution := parseConformanceCaseExecution(testCase["execution"].(map[string]any))
+		expected := parseConformanceCaseResult(testCase["expected"].(map[string]any))
+
+		result := RunConformanceCase(run, func(ConformanceCaseRun) ConformanceCaseExecution {
+			return execution
+		})
+		if !reflect.DeepEqual(result, expected) {
+			t.Fatalf("unexpected case runner result: %+v", result)
+		}
+	}
+}
+
+func TestSharedFixtureConformanceSuiteRunner(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "suite_runner"))
+	runsRaw := fixture["cases"].([]any)
+	runs := make([]ConformanceCaseRun, 0, len(runsRaw))
+	for _, item := range runsRaw {
+		runs = append(runs, parseConformanceCaseRun(t, item.(map[string]any)))
+	}
+
+	executionsRaw := fixture["executions"].(map[string]any)
+	expectedRaw := fixture["expected_results"].([]any)
+	expected := make([]ConformanceCaseResult, 0, len(expectedRaw))
+	for _, item := range expectedRaw {
+		expected = append(expected, parseConformanceCaseResult(item.(map[string]any)))
+	}
+
+	results := RunConformanceSuite(runs, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if raw, ok := executionsRaw[key]; ok {
+			return parseConformanceCaseExecution(raw.(map[string]any))
+		}
+
+		return ConformanceCaseExecution{
+			Outcome:  ConformanceFailed,
+			Messages: []string{"missing execution"},
+		}
+	})
+
+	if len(results) != len(expected) {
+		t.Fatalf("unexpected suite runner results: %+v", results)
+	}
+	for index := range results {
+		if !reflect.DeepEqual(results[index], expected[index]) {
+			t.Fatalf("unexpected suite runner result at %d: %+v", index, results[index])
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -360,5 +416,100 @@ func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected [
 		if string(policy.Surface) != expectedPolicy["surface"].(string) || policy.Name != expectedPolicy["name"].(string) {
 			t.Fatalf("unexpected policy at %d: %+v", index, policy)
 		}
+	}
+}
+
+func parseConformanceCaseRun(t *testing.T, raw map[string]any) ConformanceCaseRun {
+	t.Helper()
+
+	rawRef := raw["ref"].(map[string]any)
+	run := ConformanceCaseRun{
+		Ref: ConformanceCaseRef{
+			Family: rawRef["family"].(string),
+			Role:   rawRef["role"].(string),
+			Case:   rawRef["case"].(string),
+		},
+		Requirements:  parseConformanceCaseRequirements(raw["requirements"].(map[string]any)),
+		FamilyProfile: parseFamilyFeatureProfile(raw["family_profile"].(map[string]any)),
+	}
+	if rawFeatureProfile, ok := raw["feature_profile"]; ok {
+		featureProfile := rawFeatureProfile.(map[string]any)
+		run.FeatureProfile = &ConformanceFeatureProfileView{
+			Backend:           featureProfile["backend"].(string),
+			SupportsDialects:  featureProfile["supports_dialects"].(bool),
+			SupportedPolicies: parsePolicyReferences(featureProfile["supported_policies"].([]any)),
+		}
+	}
+
+	return run
+}
+
+func parseConformanceCaseRequirements(raw map[string]any) ConformanceCaseRequirements {
+	requirements := ConformanceCaseRequirements{}
+	if dialect, ok := raw["dialect"]; ok {
+		requirements.Dialect = dialect.(string)
+	}
+	if rawPolicies, ok := raw["policies"]; ok {
+		requirements.Policies = parsePolicyReferences(rawPolicies.([]any))
+	}
+
+	return requirements
+}
+
+func parseFamilyFeatureProfile(raw map[string]any) FamilyFeatureProfile {
+	profile := FamilyFeatureProfile{
+		Family:            raw["family"].(string),
+		SupportedDialects: []string{},
+		SupportedPolicies: parsePolicyReferences(raw["supported_policies"].([]any)),
+	}
+	for _, dialect := range raw["supported_dialects"].([]any) {
+		profile.SupportedDialects = append(profile.SupportedDialects, dialect.(string))
+	}
+
+	return profile
+}
+
+func parsePolicyReferences(raw []any) []PolicyReference {
+	policies := make([]PolicyReference, 0, len(raw))
+	for _, item := range raw {
+		policy := item.(map[string]any)
+		policies = append(policies, PolicyReference{
+			Surface: PolicySurface(policy["surface"].(string)),
+			Name:    policy["name"].(string),
+		})
+	}
+
+	return policies
+}
+
+func parseConformanceCaseExecution(raw map[string]any) ConformanceCaseExecution {
+	messages := raw["messages"].([]any)
+	normalizedMessages := make([]string, 0, len(messages))
+	for _, message := range messages {
+		normalizedMessages = append(normalizedMessages, message.(string))
+	}
+
+	return ConformanceCaseExecution{
+		Outcome:  ConformanceOutcome(raw["outcome"].(string)),
+		Messages: normalizedMessages,
+	}
+}
+
+func parseConformanceCaseResult(raw map[string]any) ConformanceCaseResult {
+	rawRef := raw["ref"].(map[string]any)
+	messages := raw["messages"].([]any)
+	normalizedMessages := make([]string, 0, len(messages))
+	for _, message := range messages {
+		normalizedMessages = append(normalizedMessages, message.(string))
+	}
+
+	return ConformanceCaseResult{
+		Ref: ConformanceCaseRef{
+			Family: rawRef["family"].(string),
+			Role:   rawRef["role"].(string),
+			Case:   rawRef["case"].(string),
+		},
+		Outcome:  ConformanceOutcome(raw["outcome"].(string)),
+		Messages: normalizedMessages,
 	}
 }

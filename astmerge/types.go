@@ -126,6 +126,18 @@ type ConformanceFeatureProfileView struct {
 	SupportedPolicies []PolicyReference
 }
 
+type ConformanceCaseRun struct {
+	Ref            ConformanceCaseRef             `json:"ref"`
+	Requirements   ConformanceCaseRequirements    `json:"requirements"`
+	FamilyProfile  FamilyFeatureProfile           `json:"family_profile"`
+	FeatureProfile *ConformanceFeatureProfileView `json:"feature_profile,omitempty"`
+}
+
+type ConformanceCaseExecution struct {
+	Outcome  ConformanceOutcome `json:"outcome"`
+	Messages []string           `json:"messages"`
+}
+
 func includesPolicy(supportedPolicies []PolicyReference, policy PolicyReference) bool {
 	for _, supportedPolicy := range supportedPolicies {
 		if supportedPolicy == policy {
@@ -225,4 +237,37 @@ func SelectConformanceCase(
 		Status:   status,
 		Messages: messages,
 	}
+}
+
+func RunConformanceCase(
+	run ConformanceCaseRun,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) ConformanceCaseResult {
+	selection := SelectConformanceCase(run.Ref, run.Requirements, run.FamilyProfile, run.FeatureProfile)
+	if selection.Status == ConformanceSelectionSkipped {
+		return ConformanceCaseResult{
+			Ref:      run.Ref,
+			Outcome:  ConformanceSkipped,
+			Messages: selection.Messages,
+		}
+	}
+
+	execution := execute(run)
+	return ConformanceCaseResult{
+		Ref:      run.Ref,
+		Outcome:  execution.Outcome,
+		Messages: execution.Messages,
+	}
+}
+
+func RunConformanceSuite(
+	runs []ConformanceCaseRun,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) []ConformanceCaseResult {
+	results := make([]ConformanceCaseResult, 0, len(runs))
+	for _, run := range runs {
+		results = append(results, RunConformanceCase(run, execute))
+	}
+
+	return results
 }
