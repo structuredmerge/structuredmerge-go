@@ -125,6 +125,18 @@ type ConformanceSuiteReport struct {
 	Summary ConformanceSuiteSummary `json:"summary"`
 }
 
+type ConformanceSuitePlanEntry struct {
+	Ref  ConformanceCaseRef `json:"ref"`
+	Path []string           `json:"path"`
+	Run  ConformanceCaseRun `json:"run"`
+}
+
+type ConformanceSuitePlan struct {
+	Family       string                      `json:"family"`
+	Entries      []ConformanceSuitePlanEntry `json:"entries"`
+	MissingRoles []string                    `json:"missing_roles"`
+}
+
 type ConformanceFeatureProfileView struct {
 	Backend           string
 	SupportsDialects  bool
@@ -277,9 +289,63 @@ func RunConformanceSuite(
 	return results
 }
 
+func RunPlannedConformanceSuite(
+	plan ConformanceSuitePlan,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) []ConformanceCaseResult {
+	results := make([]ConformanceCaseResult, 0, len(plan.Entries))
+	for _, entry := range plan.Entries {
+		results = append(results, RunConformanceCase(entry.Run, execute))
+	}
+
+	return results
+}
+
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
 	return ConformanceSuiteReport{
 		Results: results,
 		Summary: SummarizeConformanceResults(results),
+	}
+}
+
+func PlanConformanceSuite(
+	manifest ConformanceManifest,
+	family string,
+	roles []string,
+	familyProfile FamilyFeatureProfile,
+	featureProfile *ConformanceFeatureProfileView,
+) ConformanceSuitePlan {
+	entries := make([]ConformanceSuitePlanEntry, 0, len(roles))
+	missingRoles := make([]string, 0)
+
+	for _, role := range roles {
+		path := ConformanceFixturePath(manifest, family, role)
+		if path == nil {
+			missingRoles = append(missingRoles, role)
+			continue
+		}
+
+		ref := ConformanceCaseRef{
+			Family: family,
+			Role:   role,
+			Case:   role,
+		}
+
+		entries = append(entries, ConformanceSuitePlanEntry{
+			Ref:  ref,
+			Path: slices.Clone(path),
+			Run: ConformanceCaseRun{
+				Ref:            ref,
+				Requirements:   ConformanceCaseRequirements{},
+				FamilyProfile:  familyProfile,
+				FeatureProfile: featureProfile,
+			},
+		})
+	}
+
+	return ConformanceSuitePlan{
+		Family:       family,
+		Entries:      entries,
+		MissingRoles: missingRoles,
 	}
 }

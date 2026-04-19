@@ -435,6 +435,60 @@ func TestSharedFixtureConformanceSuiteReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureConformanceSuitePlan(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "suite_plan"))
+	manifest := readManifest(t)
+
+	rolesRaw := fixture["roles"].([]any)
+	roles := make([]string, 0, len(rolesRaw))
+	for _, item := range rolesRaw {
+		roles = append(roles, item.(string))
+	}
+
+	familyProfile := parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any))
+	featureProfile := parseFeatureProfilePointer(fixture["feature_profile"])
+	expected := parseConformanceSuitePlan(t, fixture["expected"].(map[string]any))
+
+	plan := PlanConformanceSuite(
+		manifest,
+		fixture["family"].(string),
+		roles,
+		familyProfile,
+		featureProfile,
+	)
+
+	if !reflect.DeepEqual(plan, expected) {
+		t.Fatalf("unexpected suite plan: %+v", plan)
+	}
+}
+
+func TestSharedFixturePlannedConformanceSuiteRunner(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "planned_suite_runner"))
+	plan := parseConformanceSuitePlan(t, fixture["plan"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	expectedRaw := fixture["expected_results"].([]any)
+	expected := make([]ConformanceCaseResult, 0, len(expectedRaw))
+	for _, item := range expectedRaw {
+		expected = append(expected, parseConformanceCaseResult(item.(map[string]any)))
+	}
+
+	results := RunPlannedConformanceSuite(plan, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if raw, ok := executionsRaw[key]; ok {
+			return parseConformanceCaseExecution(raw.(map[string]any))
+		}
+
+		return ConformanceCaseExecution{
+			Outcome:  ConformanceFailed,
+			Messages: []string{"missing execution"},
+		}
+	})
+
+	if !reflect.DeepEqual(results, expected) {
+		t.Fatalf("unexpected planned suite runner results: %+v", results)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -499,6 +553,19 @@ func parseFamilyFeatureProfile(raw map[string]any) FamilyFeatureProfile {
 	return profile
 }
 
+func parseFeatureProfilePointer(raw any) *ConformanceFeatureProfileView {
+	if raw == nil {
+		return nil
+	}
+
+	featureProfile := raw.(map[string]any)
+	return &ConformanceFeatureProfileView{
+		Backend:           featureProfile["backend"].(string),
+		SupportsDialects:  featureProfile["supports_dialects"].(bool),
+		SupportedPolicies: parsePolicyReferences(featureProfile["supported_policies"].([]any)),
+	}
+}
+
 func parsePolicyReferences(raw []any) []PolicyReference {
 	policies := make([]PolicyReference, 0, len(raw))
 	for _, item := range raw {
@@ -541,5 +608,43 @@ func parseConformanceCaseResult(raw map[string]any) ConformanceCaseResult {
 		},
 		Outcome:  ConformanceOutcome(raw["outcome"].(string)),
 		Messages: normalizedMessages,
+	}
+}
+
+func parseConformanceSuitePlan(t *testing.T, raw map[string]any) ConformanceSuitePlan {
+	t.Helper()
+
+	entriesRaw := raw["entries"].([]any)
+	entries := make([]ConformanceSuitePlanEntry, 0, len(entriesRaw))
+	for _, item := range entriesRaw {
+		entry := item.(map[string]any)
+		refRaw := entry["ref"].(map[string]any)
+		pathRaw := entry["path"].([]any)
+		path := make([]string, 0, len(pathRaw))
+		for _, segment := range pathRaw {
+			path = append(path, segment.(string))
+		}
+
+		entries = append(entries, ConformanceSuitePlanEntry{
+			Ref: ConformanceCaseRef{
+				Family: refRaw["family"].(string),
+				Role:   refRaw["role"].(string),
+				Case:   refRaw["case"].(string),
+			},
+			Path: path,
+			Run:  parseConformanceCaseRun(t, entry["run"].(map[string]any)),
+		})
+	}
+
+	missingRaw := raw["missing_roles"].([]any)
+	missingRoles := make([]string, 0, len(missingRaw))
+	for _, item := range missingRaw {
+		missingRoles = append(missingRoles, item.(string))
+	}
+
+	return ConformanceSuitePlan{
+		Family:       raw["family"].(string),
+		Entries:      entries,
+		MissingRoles: missingRoles,
 	}
 }
