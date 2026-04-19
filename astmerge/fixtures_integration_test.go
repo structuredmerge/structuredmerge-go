@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -67,6 +68,8 @@ func TestSharedFixtureDiagnosticVocabulary(t *testing.T) {
 		CategoryUnsupportedFeature,
 		CategoryFallbackApplied,
 		CategoryAmbiguity,
+		CategoryAssumedDefault,
+		CategoryConfigurationError,
 	}
 
 	expectedSeverities := fixture["severities"].([]any)
@@ -1015,6 +1018,94 @@ func TestSharedFixtureNamedConformanceSuiteReportManifest(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureDefaultFamilyContext(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "default_family_context"))
+	family := fixture["family"].(string)
+	familyProfile := parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any))
+	expectedContext := parseConformanceFamilyPlanContext(fixture["expected_context"].(map[string]any))
+	expectedDiagnostic := parseDiagnostic(fixture["expected_diagnostic"].(map[string]any))
+
+	if context := DefaultConformanceFamilyContext(familyProfile); !reflect.DeepEqual(context, expectedContext) {
+		t.Fatalf("unexpected default family context: %+v", context)
+	}
+
+	context, diagnostics := ResolveConformanceFamilyContext(family, ConformanceManifestPlanningOptions{
+		FamilyProfiles: map[string]FamilyFeatureProfile{
+			family: familyProfile,
+		},
+	})
+	if context == nil || !reflect.DeepEqual(*context, expectedContext) {
+		t.Fatalf("unexpected resolved family context: %+v", context)
+	}
+	if !reflect.DeepEqual(diagnostics, []Diagnostic{expectedDiagnostic}) {
+		t.Fatalf("unexpected default family diagnostics: %+v", diagnostics)
+	}
+}
+
+func TestSharedFixtureExplicitFamilyContextMode(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "explicit_family_context_mode"))
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	expectedDiagnostic := parseDiagnostic(fixture["expected_diagnostic"].(map[string]any))
+
+	_, diagnostics := ResolveConformanceFamilyContext("text", options)
+	if !reflect.DeepEqual(diagnostics, []Diagnostic{expectedDiagnostic}) {
+		t.Fatalf("unexpected explicit family diagnostics: %+v", diagnostics)
+	}
+}
+
+func TestSharedFixtureMissingSuiteRoles(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "missing_suite_roles"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	expectedDiagnostic := parseDiagnostic(fixture["expected_diagnostic"].(map[string]any))
+
+	planned := PlanNamedConformanceSuitesWithDiagnostics(manifest, options)
+	if len(planned.Entries) != 0 {
+		t.Fatalf("expected no planned entries: %+v", planned.Entries)
+	}
+	if !slices.Contains(planned.Diagnostics, expectedDiagnostic) {
+		t.Fatalf("missing expected missing-role diagnostic: %+v", planned.Diagnostics)
+	}
+}
+
+func TestSharedFixtureConformanceManifestReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "conformance_manifest_report"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	expected := parseConformanceManifestReport(fixture["expected_report"].(map[string]any))
+
+	report := ReportConformanceManifest(
+		manifest,
+		options,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(report, expected) {
+		t.Fatalf("unexpected conformance manifest report: %+v", report)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -1140,6 +1231,57 @@ func parseNamedConformanceSuiteReportEnvelope(raw map[string]any) NamedConforman
 			Failed:  int(summaryRaw["failed"].(float64)),
 			Skipped: int(summaryRaw["skipped"].(float64)),
 		},
+	}
+}
+
+func parseDiagnostic(raw map[string]any) Diagnostic {
+	diagnostic := Diagnostic{
+		Severity: DiagnosticSeverity(raw["severity"].(string)),
+		Category: DiagnosticCategory(raw["category"].(string)),
+		Message:  raw["message"].(string),
+	}
+	if path, ok := raw["path"]; ok {
+		diagnostic.Path = path.(string)
+	}
+
+	return diagnostic
+}
+
+func parseConformanceManifestPlanningOptions(raw map[string]any) ConformanceManifestPlanningOptions {
+	options := ConformanceManifestPlanningOptions{}
+
+	if rawContexts, ok := raw["contexts"]; ok {
+		options.Contexts = make(map[string]ConformanceFamilyPlanContext, len(rawContexts.(map[string]any)))
+		for family, value := range rawContexts.(map[string]any) {
+			options.Contexts[family] = parseConformanceFamilyPlanContext(value.(map[string]any))
+		}
+	}
+
+	if rawFamilyProfiles, ok := raw["family_profiles"]; ok {
+		options.FamilyProfiles = make(map[string]FamilyFeatureProfile, len(rawFamilyProfiles.(map[string]any)))
+		for family, value := range rawFamilyProfiles.(map[string]any) {
+			options.FamilyProfiles[family] = parseFamilyFeatureProfile(value.(map[string]any))
+		}
+	}
+
+	if rawRequireExplicitContexts, ok := raw["require_explicit_contexts"]; ok {
+		options.RequireExplicitContexts = rawRequireExplicitContexts.(bool)
+	}
+
+	return options
+}
+
+func parseConformanceManifestReport(raw map[string]any) ConformanceManifestReport {
+	report := parseNamedConformanceSuiteReportEnvelope(raw["report"].(map[string]any))
+	diagnosticsRaw := raw["diagnostics"].([]any)
+	diagnostics := make([]Diagnostic, 0, len(diagnosticsRaw))
+	for _, item := range diagnosticsRaw {
+		diagnostics = append(diagnostics, parseDiagnostic(item.(map[string]any)))
+	}
+
+	return ConformanceManifestReport{
+		Report:      report,
+		Diagnostics: diagnostics,
 	}
 }
 

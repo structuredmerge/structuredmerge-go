@@ -18,6 +18,8 @@ const (
 	CategoryUnsupportedFeature    DiagnosticCategory = "unsupported_feature"
 	CategoryFallbackApplied       DiagnosticCategory = "fallback_applied"
 	CategoryAmbiguity             DiagnosticCategory = "ambiguity"
+	CategoryAssumedDefault        DiagnosticCategory = "assumed_default"
+	CategoryConfigurationError    DiagnosticCategory = "configuration_error"
 )
 
 type Diagnostic struct {
@@ -145,6 +147,22 @@ type NamedConformanceSuiteReportEnvelope struct {
 	Summary ConformanceSuiteSummary       `json:"summary"`
 }
 
+type ConformanceManifestPlanningOptions struct {
+	Contexts                map[string]ConformanceFamilyPlanContext `json:"contexts,omitempty"`
+	FamilyProfiles          map[string]FamilyFeatureProfile         `json:"family_profiles,omitempty"`
+	RequireExplicitContexts bool                                    `json:"require_explicit_contexts,omitempty"`
+}
+
+type ConformanceManifestReport struct {
+	Report      NamedConformanceSuiteReportEnvelope `json:"report"`
+	Diagnostics []Diagnostic                        `json:"diagnostics"`
+}
+
+type ConformanceManifestPlan struct {
+	Entries     []NamedConformanceSuitePlan `json:"entries"`
+	Diagnostics []Diagnostic                `json:"diagnostics"`
+}
+
 type ConformanceSuiteSummary struct {
 	Total   int `json:"total"`
 	Passed  int `json:"passed"`
@@ -251,6 +269,50 @@ func ConformanceSuiteNames(manifest ConformanceManifest) []string {
 	}
 	slices.Sort(names)
 	return names
+}
+
+func DefaultConformanceFamilyContext(
+	familyProfile FamilyFeatureProfile,
+) ConformanceFamilyPlanContext {
+	return ConformanceFamilyPlanContext{
+		FamilyProfile: familyProfile,
+	}
+}
+
+func ResolveConformanceFamilyContext(
+	family string,
+	options ConformanceManifestPlanningOptions,
+) (*ConformanceFamilyPlanContext, []Diagnostic) {
+	if options.Contexts != nil {
+		if context, ok := options.Contexts[family]; ok {
+			return &context, nil
+		}
+	}
+
+	if options.RequireExplicitContexts {
+		return nil, []Diagnostic{{
+			Severity: SeverityError,
+			Category: CategoryConfigurationError,
+			Message:  "missing explicit family context for " + family + ".",
+		}}
+	}
+
+	if options.FamilyProfiles != nil {
+		if familyProfile, ok := options.FamilyProfiles[family]; ok {
+			context := DefaultConformanceFamilyContext(familyProfile)
+			return &context, []Diagnostic{{
+				Severity: SeverityWarning,
+				Category: CategoryAssumedDefault,
+				Message:  "using default family context for " + family + ".",
+			}}
+		}
+	}
+
+	return nil, []Diagnostic{{
+		Severity: SeverityError,
+		Category: CategoryConfigurationError,
+		Message:  "missing family context for " + family + " and no default family profile is available.",
+	}}
 }
 
 func SummarizeConformanceResults(results []ConformanceCaseResult) ConformanceSuiteSummary {
@@ -519,6 +581,20 @@ func ReportNamedConformanceSuiteManifest(
 	)
 }
 
+func ReportConformanceManifest(
+	manifest ConformanceManifest,
+	options ConformanceManifestPlanningOptions,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) ConformanceManifestReport {
+	planned := PlanNamedConformanceSuitesWithDiagnostics(manifest, options)
+	return ConformanceManifestReport{
+		Report: ReportNamedConformanceSuiteEnvelope(
+			ReportPlannedNamedConformanceSuites(planned.Entries, execute),
+		),
+		Diagnostics: planned.Diagnostics,
+	}
+}
+
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
 	return ConformanceSuiteReport{
 		Results: results,
@@ -641,10 +717,76 @@ func PlanNamedConformanceSuites(
 	return entries
 }
 
+func PlanNamedConformanceSuitesWithDiagnostics(
+	manifest ConformanceManifest,
+	options ConformanceManifestPlanningOptions,
+) ConformanceManifestPlan {
+	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.Suites))
+	diagnostics := make([]Diagnostic, 0)
+	resolvedContexts := make(map[string]*ConformanceFamilyPlanContext)
+	resolvedFamilies := make(map[string]bool)
+
+	for _, suiteName := range ConformanceSuiteNames(manifest) {
+		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+		if definition == nil {
+			continue
+		}
+
+		var context *ConformanceFamilyPlanContext
+		if resolvedFamilies[definition.Family] {
+			context = resolvedContexts[definition.Family]
+		} else {
+			context, diagnostics = func() (*ConformanceFamilyPlanContext, []Diagnostic) {
+				resolved, resolvedDiagnostics := ResolveConformanceFamilyContext(definition.Family, options)
+				return resolved, append(diagnostics, resolvedDiagnostics...)
+			}()
+			resolvedFamilies[definition.Family] = true
+			resolvedContexts[definition.Family] = context
+		}
+		if context == nil {
+			continue
+		}
+
+		entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, *context)
+		if entry == nil {
+			continue
+		}
+
+		if len(entry.Plan.MissingRoles) > 0 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Category: CategoryConfigurationError,
+				Message:  "suite " + suiteName + " declares missing roles: " + joinComma(entry.Plan.MissingRoles) + ".",
+			})
+			continue
+		}
+
+		entries = append(entries, *entry)
+	}
+
+	return ConformanceManifestPlan{
+		Entries:     entries,
+		Diagnostics: diagnostics,
+	}
+}
+
 func derefRequirements(requirements *ConformanceCaseRequirements) ConformanceCaseRequirements {
 	if requirements == nil {
 		return ConformanceCaseRequirements{}
 	}
 
 	return *requirements
+}
+
+func joinComma(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+
+	result := values[0]
+	for _, value := range values[1:] {
+		result += ", " + value
+	}
+
+	return result
 }
