@@ -20,6 +20,7 @@ const (
 	CategoryAmbiguity             DiagnosticCategory = "ambiguity"
 	CategoryAssumedDefault        DiagnosticCategory = "assumed_default"
 	CategoryConfigurationError    DiagnosticCategory = "configuration_error"
+	CategoryReplayRejected        DiagnosticCategory = "replay_rejected"
 )
 
 type Diagnostic struct {
@@ -201,6 +202,7 @@ type ConformanceManifestReviewOptions struct {
 	FamilyProfiles          map[string]FamilyFeatureProfile         `json:"family_profiles,omitempty"`
 	RequireExplicitContexts bool                                    `json:"require_explicit_contexts,omitempty"`
 	ReviewDecisions         []ReviewDecision                        `json:"review_decisions,omitempty"`
+	ReviewReplayContext     *ReviewReplayContext                    `json:"review_replay_context,omitempty"`
 	Interactive             bool                                    `json:"interactive,omitempty"`
 }
 
@@ -365,6 +367,19 @@ func ConformanceManifestReplayContext(
 		Families:                families,
 		RequireExplicitContexts: options.RequireExplicitContexts,
 	}
+}
+
+func ReviewReplayContextCompatible(
+	current ReviewReplayContext,
+	candidate *ReviewReplayContext,
+) bool {
+	if candidate == nil {
+		return false
+	}
+
+	return current.Surface == candidate.Surface &&
+		current.RequireExplicitContexts == candidate.RequireExplicitContexts &&
+		slices.Equal(current.Families, candidate.Families)
 }
 
 func ResolveConformanceFamilyContext(
@@ -756,10 +771,29 @@ func ReviewConformanceManifest(
 	options ConformanceManifestReviewOptions,
 	execute func(ConformanceCaseRun) ConformanceCaseExecution,
 ) ConformanceManifestReviewState {
+	replayContext := ConformanceManifestReplayContext(manifest, options)
 	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.Suites))
 	diagnostics := make([]Diagnostic, 0)
 	requests := make([]ReviewRequest, 0)
 	appliedDecisions := make([]ReviewDecision, 0)
+	effectiveOptions := options
+	if len(options.ReviewDecisions) > 0 {
+		if options.ReviewReplayContext == nil {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Category: CategoryReplayRejected,
+				Message:  "review decisions were provided without replay context.",
+			})
+			effectiveOptions.ReviewDecisions = nil
+		} else if !ReviewReplayContextCompatible(replayContext, options.ReviewReplayContext) {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Category: CategoryReplayRejected,
+				Message:  "review replay context does not match the current conformance manifest state.",
+			})
+			effectiveOptions.ReviewDecisions = nil
+		}
+	}
 	resolvedContexts := make(map[string]*ConformanceFamilyPlanContext)
 	resolvedFamilies := make(map[string]bool)
 
@@ -776,7 +810,7 @@ func ReviewConformanceManifest(
 			var resolvedDiagnostics []Diagnostic
 			var resolvedRequests []ReviewRequest
 			var resolvedDecisions []ReviewDecision
-			context, resolvedDiagnostics, resolvedRequests, resolvedDecisions = ReviewConformanceFamilyContext(definition.Family, options)
+			context, resolvedDiagnostics, resolvedRequests, resolvedDecisions = ReviewConformanceFamilyContext(definition.Family, effectiveOptions)
 			diagnostics = append(diagnostics, resolvedDiagnostics...)
 			requests = append(requests, resolvedRequests...)
 			appliedDecisions = append(appliedDecisions, resolvedDecisions...)
@@ -810,7 +844,7 @@ func ReviewConformanceManifest(
 		Requests:         requests,
 		AppliedDecisions: appliedDecisions,
 		HostHints:        ConformanceReviewHostHints(options),
-		ReplayContext:    ConformanceManifestReplayContext(manifest, options),
+		ReplayContext:    replayContext,
 	}
 }
 

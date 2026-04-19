@@ -70,6 +70,7 @@ func TestSharedFixtureDiagnosticVocabulary(t *testing.T) {
 		CategoryAmbiguity,
 		CategoryAssumedDefault,
 		CategoryConfigurationError,
+		CategoryReplayRejected,
 	}
 
 	expectedSeverities := fixture["severities"].([]any)
@@ -1205,6 +1206,56 @@ func TestSharedFixtureReviewedDefaultContext(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewReplayCompatibility(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_compatibility"))
+	current := parseReviewReplayContext(fixture["current_context"].(map[string]any))
+	compatible := parseReviewReplayContext(fixture["compatible_context"].(map[string]any))
+	incompatible := parseReviewReplayContext(fixture["incompatible_context"].(map[string]any))
+
+	if !ReviewReplayContextCompatible(current, &compatible) {
+		t.Fatalf("expected compatible replay context")
+	}
+	if ReviewReplayContextCompatible(current, &incompatible) {
+		t.Fatalf("expected incompatible replay context")
+	}
+	if ReviewReplayContextCompatible(current, nil) {
+		t.Fatalf("expected missing replay context to be incompatible")
+	}
+}
+
+func TestSharedFixtureReviewReplayRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_rejection"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+
+	state := ReviewConformanceManifest(
+		manifest,
+		options,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected review replay rejection state: %+v", state)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -1405,6 +1456,10 @@ func parseConformanceManifestReviewOptions(raw map[string]any) ConformanceManife
 		for _, item := range rawReviewDecisions.([]any) {
 			options.ReviewDecisions = append(options.ReviewDecisions, parseReviewDecision(item.(map[string]any)))
 		}
+	}
+	if rawReviewReplayContext, ok := raw["review_replay_context"]; ok {
+		context := parseReviewReplayContext(rawReviewReplayContext.(map[string]any))
+		options.ReviewReplayContext = &context
 	}
 
 	return options
