@@ -140,6 +140,11 @@ type NamedConformanceSuiteResults struct {
 	Results []ConformanceCaseResult `json:"results"`
 }
 
+type NamedConformanceSuiteReportEnvelope struct {
+	Entries []NamedConformanceSuiteReport `json:"entries"`
+	Summary ConformanceSuiteSummary       `json:"summary"`
+}
+
 type ConformanceSuiteSummary struct {
 	Total   int `json:"total"`
 	Passed  int `json:"passed"`
@@ -476,6 +481,42 @@ func ReportPlannedNamedConformanceSuites(
 	}
 
 	return reports
+}
+
+func SummarizeNamedConformanceSuiteReports(
+	entries []NamedConformanceSuiteReport,
+) ConformanceSuiteSummary {
+	summary := ConformanceSuiteSummary{}
+	for _, entry := range entries {
+		summary.Total += entry.Report.Summary.Total
+		summary.Passed += entry.Report.Summary.Passed
+		summary.Failed += entry.Report.Summary.Failed
+		summary.Skipped += entry.Report.Summary.Skipped
+	}
+
+	return summary
+}
+
+func ReportNamedConformanceSuiteEnvelope(
+	entries []NamedConformanceSuiteReport,
+) NamedConformanceSuiteReportEnvelope {
+	return NamedConformanceSuiteReportEnvelope{
+		Entries: entries,
+		Summary: SummarizeNamedConformanceSuiteReports(entries),
+	}
+}
+
+func ReportNamedConformanceSuiteManifest(
+	manifest ConformanceManifest,
+	contexts map[string]ConformanceFamilyPlanContext,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) NamedConformanceSuiteReportEnvelope {
+	return ReportNamedConformanceSuiteEnvelope(
+		ReportPlannedNamedConformanceSuites(
+			PlanNamedConformanceSuites(manifest, contexts),
+			execute,
+		),
+	)
 }
 
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
