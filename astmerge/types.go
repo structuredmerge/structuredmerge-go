@@ -158,6 +158,61 @@ type ConformanceManifestReport struct {
 	Diagnostics []Diagnostic                        `json:"diagnostics"`
 }
 
+type ReviewRequestKind string
+
+const (
+	ReviewRequestFamilyContext ReviewRequestKind = "family_context"
+)
+
+type ReviewDecisionAction string
+
+const (
+	ReviewDecisionAcceptDefaultContext ReviewDecisionAction = "accept_default_context"
+)
+
+type ReviewRequest struct {
+	ID               string                 `json:"id"`
+	Kind             ReviewRequestKind      `json:"kind"`
+	Family           string                 `json:"family"`
+	Message          string                 `json:"message"`
+	Blocking         bool                   `json:"blocking"`
+	AvailableActions []ReviewDecisionAction `json:"available_actions"`
+	DefaultAction    ReviewDecisionAction   `json:"default_action,omitempty"`
+}
+
+type ReviewDecision struct {
+	RequestID string               `json:"request_id"`
+	Action    ReviewDecisionAction `json:"action"`
+}
+
+type ReviewHostHints struct {
+	Interactive             bool `json:"interactive"`
+	RequireExplicitContexts bool `json:"require_explicit_contexts"`
+}
+
+type ReviewReplayContext struct {
+	Surface                 string   `json:"surface"`
+	Families                []string `json:"families"`
+	RequireExplicitContexts bool     `json:"require_explicit_contexts"`
+}
+
+type ConformanceManifestReviewOptions struct {
+	Contexts                map[string]ConformanceFamilyPlanContext `json:"contexts,omitempty"`
+	FamilyProfiles          map[string]FamilyFeatureProfile         `json:"family_profiles,omitempty"`
+	RequireExplicitContexts bool                                    `json:"require_explicit_contexts,omitempty"`
+	ReviewDecisions         []ReviewDecision                        `json:"review_decisions,omitempty"`
+	Interactive             bool                                    `json:"interactive,omitempty"`
+}
+
+type ConformanceManifestReviewState struct {
+	Report           NamedConformanceSuiteReportEnvelope `json:"report"`
+	Diagnostics      []Diagnostic                        `json:"diagnostics"`
+	Requests         []ReviewRequest                     `json:"requests"`
+	AppliedDecisions []ReviewDecision                    `json:"applied_decisions"`
+	HostHints        ReviewHostHints                     `json:"host_hints"`
+	ReplayContext    ReviewReplayContext                 `json:"replay_context"`
+}
+
 type ConformanceManifestPlan struct {
 	Entries     []NamedConformanceSuitePlan `json:"entries"`
 	Diagnostics []Diagnostic                `json:"diagnostics"`
@@ -279,6 +334,39 @@ func DefaultConformanceFamilyContext(
 	}
 }
 
+func ReviewRequestIDForFamilyContext(family string) string {
+	return "family_context:" + family
+}
+
+func ConformanceReviewHostHints(options ConformanceManifestReviewOptions) ReviewHostHints {
+	return ReviewHostHints{
+		Interactive:             options.Interactive,
+		RequireExplicitContexts: options.RequireExplicitContexts,
+	}
+}
+
+func ConformanceManifestReplayContext(
+	manifest ConformanceManifest,
+	options ConformanceManifestReviewOptions,
+) ReviewReplayContext {
+	families := make([]string, 0, len(manifest.Suites))
+	seen := make(map[string]bool)
+	for _, suiteName := range ConformanceSuiteNames(manifest) {
+		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+		if definition == nil || seen[definition.Family] {
+			continue
+		}
+		seen[definition.Family] = true
+		families = append(families, definition.Family)
+	}
+
+	return ReviewReplayContext{
+		Surface:                 "conformance_manifest",
+		Families:                families,
+		RequireExplicitContexts: options.RequireExplicitContexts,
+	}
+}
+
 func ResolveConformanceFamilyContext(
 	family string,
 	options ConformanceManifestPlanningOptions,
@@ -313,6 +401,74 @@ func ResolveConformanceFamilyContext(
 		Category: CategoryConfigurationError,
 		Message:  "missing family context for " + family + " and no default family profile is available.",
 	}}
+}
+
+func reviewDecisionForFamilyContext(
+	family string,
+	options ConformanceManifestReviewOptions,
+) *ReviewDecision {
+	requestID := ReviewRequestIDForFamilyContext(family)
+	for _, decision := range options.ReviewDecisions {
+		if decision.RequestID == requestID && decision.Action == ReviewDecisionAcceptDefaultContext {
+			copyDecision := decision
+			return &copyDecision
+		}
+	}
+
+	return nil
+}
+
+func ReviewConformanceFamilyContext(
+	family string,
+	options ConformanceManifestReviewOptions,
+) (*ConformanceFamilyPlanContext, []Diagnostic, []ReviewRequest, []ReviewDecision) {
+	if context, ok := options.Contexts[family]; ok {
+		copyContext := context
+		return &copyContext, nil, nil, nil
+	}
+
+	if !options.RequireExplicitContexts {
+		planningOptions := ConformanceManifestPlanningOptions{
+			Contexts:                options.Contexts,
+			FamilyProfiles:          options.FamilyProfiles,
+			RequireExplicitContexts: false,
+		}
+		context, diagnostics := ResolveConformanceFamilyContext(family, planningOptions)
+		return context, diagnostics, nil, nil
+	}
+
+	familyProfile, ok := options.FamilyProfiles[family]
+	if !ok {
+		return nil, []Diagnostic{{
+			Severity: SeverityError,
+			Category: CategoryConfigurationError,
+			Message:  "missing family context for " + family + " and no default family profile is available.",
+		}}, nil, nil
+	}
+
+	if decision := reviewDecisionForFamilyContext(family, options); decision != nil {
+		return &ConformanceFamilyPlanContext{
+				FamilyProfile: familyProfile,
+			}, []Diagnostic{{
+				Severity: SeverityWarning,
+				Category: CategoryAssumedDefault,
+				Message:  "using default family context for " + family + ".",
+			}}, nil, []ReviewDecision{*decision}
+	}
+
+	return nil, []Diagnostic{{
+			Severity: SeverityError,
+			Category: CategoryConfigurationError,
+			Message:  "missing explicit family context for " + family + ".",
+		}}, []ReviewRequest{{
+			ID:               ReviewRequestIDForFamilyContext(family),
+			Kind:             ReviewRequestFamilyContext,
+			Family:           family,
+			Message:          "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
+			Blocking:         true,
+			AvailableActions: []ReviewDecisionAction{ReviewDecisionAcceptDefaultContext},
+			DefaultAction:    ReviewDecisionAcceptDefaultContext,
+		}}, nil
 }
 
 func SummarizeConformanceResults(results []ConformanceCaseResult) ConformanceSuiteSummary {
@@ -592,6 +748,69 @@ func ReportConformanceManifest(
 			ReportPlannedNamedConformanceSuites(planned.Entries, execute),
 		),
 		Diagnostics: planned.Diagnostics,
+	}
+}
+
+func ReviewConformanceManifest(
+	manifest ConformanceManifest,
+	options ConformanceManifestReviewOptions,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) ConformanceManifestReviewState {
+	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.Suites))
+	diagnostics := make([]Diagnostic, 0)
+	requests := make([]ReviewRequest, 0)
+	appliedDecisions := make([]ReviewDecision, 0)
+	resolvedContexts := make(map[string]*ConformanceFamilyPlanContext)
+	resolvedFamilies := make(map[string]bool)
+
+	for _, suiteName := range ConformanceSuiteNames(manifest) {
+		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+		if definition == nil {
+			continue
+		}
+
+		var context *ConformanceFamilyPlanContext
+		if resolvedFamilies[definition.Family] {
+			context = resolvedContexts[definition.Family]
+		} else {
+			var resolvedDiagnostics []Diagnostic
+			var resolvedRequests []ReviewRequest
+			var resolvedDecisions []ReviewDecision
+			context, resolvedDiagnostics, resolvedRequests, resolvedDecisions = ReviewConformanceFamilyContext(definition.Family, options)
+			diagnostics = append(diagnostics, resolvedDiagnostics...)
+			requests = append(requests, resolvedRequests...)
+			appliedDecisions = append(appliedDecisions, resolvedDecisions...)
+			resolvedFamilies[definition.Family] = true
+			resolvedContexts[definition.Family] = context
+		}
+		if context == nil {
+			continue
+		}
+
+		entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, *context)
+		if entry == nil {
+			continue
+		}
+
+		if len(entry.Plan.MissingRoles) > 0 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Category: CategoryConfigurationError,
+				Message:  "suite " + suiteName + " declares missing roles: " + joinComma(entry.Plan.MissingRoles) + ".",
+			})
+			continue
+		}
+
+		entries = append(entries, *entry)
+	}
+
+	return ConformanceManifestReviewState{
+		Report:           ReportNamedConformanceSuiteEnvelope(ReportPlannedNamedConformanceSuites(entries, execute)),
+		Diagnostics:      diagnostics,
+		Requests:         requests,
+		AppliedDecisions: appliedDecisions,
+		HostHints:        ConformanceReviewHostHints(options),
+		ReplayContext:    ConformanceManifestReplayContext(manifest, options),
 	}
 }
 

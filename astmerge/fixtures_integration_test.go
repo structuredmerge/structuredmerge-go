@@ -1106,6 +1106,105 @@ func TestSharedFixtureConformanceManifestReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewHostHints(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_host_hints"))
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expected := parseReviewHostHints(fixture["expected_hints"].(map[string]any))
+
+	if hints := ConformanceReviewHostHints(options); !reflect.DeepEqual(hints, expected) {
+		t.Fatalf("unexpected review host hints: %+v", hints)
+	}
+}
+
+func TestSharedFixtureFamilyContextReviewRequest(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "family_context_review_request"))
+	family := fixture["family"].(string)
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expectedDiagnostic := parseDiagnostic(fixture["expected_diagnostic"].(map[string]any))
+	expectedRequest := parseReviewRequest(fixture["expected_request"].(map[string]any))
+
+	_, diagnostics, requests, _ := ReviewConformanceFamilyContext(family, options)
+	if ReviewRequestIDForFamilyContext(family) != expectedRequest.ID {
+		t.Fatalf("unexpected request id: %s", ReviewRequestIDForFamilyContext(family))
+	}
+	if !reflect.DeepEqual(diagnostics, []Diagnostic{expectedDiagnostic}) {
+		t.Fatalf("unexpected family-context diagnostics: %+v", diagnostics)
+	}
+	if !reflect.DeepEqual(requests, []ReviewRequest{expectedRequest}) {
+		t.Fatalf("unexpected family-context requests: %+v", requests)
+	}
+}
+
+func TestSharedFixtureConformanceManifestReviewState(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "conformance_manifest_review_state"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+	expectedReplayContext := parseReviewReplayContext(fixture["expected_state"].(map[string]any)["replay_context"].(map[string]any))
+
+	state := ReviewConformanceManifest(
+		manifest,
+		options,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected conformance manifest review state: %+v", state)
+	}
+	if replayContext := ConformanceManifestReplayContext(manifest, options); !reflect.DeepEqual(replayContext, expectedReplayContext) {
+		t.Fatalf("unexpected replay context: %+v", replayContext)
+	}
+}
+
+func TestSharedFixtureReviewedDefaultContext(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "reviewed_default_context"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+
+	state := ReviewConformanceManifest(
+		manifest,
+		options,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected reviewed default-context state: %+v", state)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -1271,6 +1370,46 @@ func parseConformanceManifestPlanningOptions(raw map[string]any) ConformanceMani
 	return options
 }
 
+func parseConformanceManifestReviewOptions(raw map[string]any) ConformanceManifestReviewOptions {
+	options := ConformanceManifestReviewOptions{
+		Contexts:       map[string]ConformanceFamilyPlanContext{},
+		FamilyProfiles: map[string]FamilyFeatureProfile{},
+	}
+
+	if rawContexts, ok := raw["contexts"]; ok {
+		for family, value := range rawContexts.(map[string]any) {
+			options.Contexts[family] = parseConformanceFamilyPlanContext(value.(map[string]any))
+		}
+	}
+	if len(options.Contexts) == 0 {
+		options.Contexts = nil
+	}
+
+	if rawFamilyProfiles, ok := raw["family_profiles"]; ok {
+		for family, value := range rawFamilyProfiles.(map[string]any) {
+			options.FamilyProfiles[family] = parseFamilyFeatureProfile(value.(map[string]any))
+		}
+	}
+	if len(options.FamilyProfiles) == 0 {
+		options.FamilyProfiles = nil
+	}
+
+	if rawRequireExplicitContexts, ok := raw["require_explicit_contexts"]; ok {
+		options.RequireExplicitContexts = rawRequireExplicitContexts.(bool)
+	}
+	if rawInteractive, ok := raw["interactive"]; ok {
+		options.Interactive = rawInteractive.(bool)
+	}
+	if rawReviewDecisions, ok := raw["review_decisions"]; ok {
+		options.ReviewDecisions = make([]ReviewDecision, 0, len(rawReviewDecisions.([]any)))
+		for _, item := range rawReviewDecisions.([]any) {
+			options.ReviewDecisions = append(options.ReviewDecisions, parseReviewDecision(item.(map[string]any)))
+		}
+	}
+
+	return options
+}
+
 func parseConformanceManifestReport(raw map[string]any) ConformanceManifestReport {
 	report := parseNamedConformanceSuiteReportEnvelope(raw["report"].(map[string]any))
 	diagnosticsRaw := raw["diagnostics"].([]any)
@@ -1283,6 +1422,77 @@ func parseConformanceManifestReport(raw map[string]any) ConformanceManifestRepor
 		Report:      report,
 		Diagnostics: diagnostics,
 	}
+}
+
+func parseReviewRequest(raw map[string]any) ReviewRequest {
+	request := ReviewRequest{
+		ID:               raw["id"].(string),
+		Kind:             ReviewRequestKind(raw["kind"].(string)),
+		Family:           raw["family"].(string),
+		Message:          raw["message"].(string),
+		Blocking:         raw["blocking"].(bool),
+		AvailableActions: []ReviewDecisionAction{},
+	}
+	if rawAvailableActions, ok := raw["available_actions"]; ok {
+		request.AvailableActions = make([]ReviewDecisionAction, 0, len(rawAvailableActions.([]any)))
+		for _, item := range rawAvailableActions.([]any) {
+			request.AvailableActions = append(request.AvailableActions, ReviewDecisionAction(item.(string)))
+		}
+	}
+	if rawDefaultAction, ok := raw["default_action"]; ok {
+		request.DefaultAction = ReviewDecisionAction(rawDefaultAction.(string))
+	}
+
+	return request
+}
+
+func parseReviewDecision(raw map[string]any) ReviewDecision {
+	return ReviewDecision{
+		RequestID: raw["request_id"].(string),
+		Action:    ReviewDecisionAction(raw["action"].(string)),
+	}
+}
+
+func parseReviewHostHints(raw map[string]any) ReviewHostHints {
+	return ReviewHostHints{
+		Interactive:             raw["interactive"].(bool),
+		RequireExplicitContexts: raw["require_explicit_contexts"].(bool),
+	}
+}
+
+func parseReviewReplayContext(raw map[string]any) ReviewReplayContext {
+	context := ReviewReplayContext{
+		Surface:                 raw["surface"].(string),
+		Families:                []string{},
+		RequireExplicitContexts: raw["require_explicit_contexts"].(bool),
+	}
+	for _, family := range raw["families"].([]any) {
+		context.Families = append(context.Families, family.(string))
+	}
+
+	return context
+}
+
+func parseConformanceManifestReviewState(raw map[string]any) ConformanceManifestReviewState {
+	state := ConformanceManifestReviewState{
+		Report:           parseNamedConformanceSuiteReportEnvelope(raw["report"].(map[string]any)),
+		Diagnostics:      []Diagnostic{},
+		Requests:         []ReviewRequest{},
+		AppliedDecisions: []ReviewDecision{},
+		HostHints:        parseReviewHostHints(raw["host_hints"].(map[string]any)),
+		ReplayContext:    parseReviewReplayContext(raw["replay_context"].(map[string]any)),
+	}
+	for _, item := range raw["diagnostics"].([]any) {
+		state.Diagnostics = append(state.Diagnostics, parseDiagnostic(item.(map[string]any)))
+	}
+	for _, item := range raw["requests"].([]any) {
+		state.Requests = append(state.Requests, parseReviewRequest(item.(map[string]any)))
+	}
+	for _, item := range raw["applied_decisions"].([]any) {
+		state.AppliedDecisions = append(state.AppliedDecisions, parseReviewDecision(item.(map[string]any)))
+	}
+
+	return state
 }
 
 func parseConformanceCaseRequirements(raw map[string]any) ConformanceCaseRequirements {
