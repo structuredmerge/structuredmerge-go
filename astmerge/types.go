@@ -120,6 +120,11 @@ type ConformanceSuiteSummary struct {
 	Skipped int `json:"skipped"`
 }
 
+type ConformanceSuiteReport struct {
+	Results []ConformanceCaseResult `json:"results"`
+	Summary ConformanceSuiteSummary `json:"summary"`
+}
+
 type ConformanceFeatureProfileView struct {
 	Backend           string
 	SupportsDialects  bool
@@ -270,4 +275,11 @@ func RunConformanceSuite(
 	}
 
 	return results
+}
+
+func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
+	return ConformanceSuiteReport{
+		Results: results,
+		Summary: SummarizeConformanceResults(results),
+	}
 }

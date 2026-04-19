@@ -405,6 +405,36 @@ func TestSharedFixtureConformanceSuiteRunner(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureConformanceSuiteReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "suite_report"))
+	rawResults := fixture["results"].([]any)
+	results := make([]ConformanceCaseResult, 0, len(rawResults))
+	for _, item := range rawResults {
+		results = append(results, parseConformanceCaseResult(item.(map[string]any)))
+	}
+
+	rawReport := fixture["report"].(map[string]any)
+	report := ReportConformanceSuite(results)
+	expectedSummary := rawReport["summary"].(map[string]any)
+	if report.Summary.Total != int(expectedSummary["total"].(float64)) ||
+		report.Summary.Passed != int(expectedSummary["passed"].(float64)) ||
+		report.Summary.Failed != int(expectedSummary["failed"].(float64)) ||
+		report.Summary.Skipped != int(expectedSummary["skipped"].(float64)) {
+		t.Fatalf("unexpected suite report summary: %+v", report.Summary)
+	}
+
+	expectedResults := rawReport["results"].([]any)
+	if len(report.Results) != len(expectedResults) {
+		t.Fatalf("unexpected suite report results: %+v", report.Results)
+	}
+	for index, item := range expectedResults {
+		expected := parseConformanceCaseResult(item.(map[string]any))
+		if !reflect.DeepEqual(report.Results[index], expected) {
+			t.Fatalf("unexpected suite report result at %d: %+v", index, report.Results[index])
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
