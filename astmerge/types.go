@@ -29,12 +29,14 @@ type ParseResult[T any] struct {
 	OK          bool
 	Diagnostics []Diagnostic
 	Analysis    *T
+	Policies    []PolicyReference
 }
 
 type MergeResult[T any] struct {
 	OK          bool
 	Diagnostics []Diagnostic
 	Output      *T
+	Policies    []PolicyReference
 }
 
 type PolicySurface string

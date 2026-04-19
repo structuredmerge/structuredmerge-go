@@ -101,3 +101,29 @@ func TestSharedFixturePolicyVocabulary(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedFixturePolicyReporting(t *testing.T) {
+	fixture := readDiagnosticFixture(t, "diagnostics", "slice-18-policy-reporting", "result-policies.json")
+
+	policies := []PolicyReference{
+		{
+			Surface: PolicySurfaceArray,
+			Name:    "destination_wins_array",
+		},
+		{
+			Surface: PolicySurfaceFallback,
+			Name:    "trailing_comma_destination_fallback",
+		},
+	}
+
+	expectedPolicies := fixture["merge_policies"].([]any)
+	if len(policies) != len(expectedPolicies) {
+		t.Fatalf("unexpected policies: %+v", policies)
+	}
+	for index, policy := range policies {
+		expected := expectedPolicies[index].(map[string]any)
+		if string(policy.Surface) != expected["surface"].(string) || policy.Name != expected["name"].(string) {
+			t.Fatalf("unexpected policy at %d: %+v", index, policy)
+		}
+	}
+}

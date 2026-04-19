@@ -108,6 +108,20 @@ func fallbackApplied(message string) astmerge.Diagnostic {
 	}
 }
 
+func destinationWinsArrayPolicy() astmerge.PolicyReference {
+	return astmerge.PolicyReference{
+		Surface: astmerge.PolicySurfaceArray,
+		Name:    "destination_wins_array",
+	}
+}
+
+func trailingCommaFallbackPolicy() astmerge.PolicyReference {
+	return astmerge.PolicyReference{
+		Surface: astmerge.PolicySurfaceFallback,
+		Name:    "trailing_comma_destination_fallback",
+	}
+}
+
 func detectTrailingComma(source string) bool {
 	inString := false
 	inLineComment := false
@@ -396,6 +410,7 @@ func ParseJSON(source string, dialect JSONDialect) astmerge.ParseResult[JSONAnal
 		return astmerge.ParseResult[JSONAnalysis]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{parseError("Trailing commas are not supported.")},
+			Policies:    []astmerge.PolicyReference{},
 		}
 	}
 
@@ -406,6 +421,7 @@ func ParseJSON(source string, dialect JSONDialect) astmerge.ParseResult[JSONAnal
 			return astmerge.ParseResult[JSONAnalysis]{
 				OK:          false,
 				Diagnostics: []astmerge.Diagnostic{parseError("Comments are not supported in strict JSON.")},
+				Policies:    []astmerge.PolicyReference{},
 			}
 		}
 	} else {
@@ -417,6 +433,7 @@ func ParseJSON(source string, dialect JSONDialect) astmerge.ParseResult[JSONAnal
 		return astmerge.ParseResult[JSONAnalysis]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{parseError("JSON parse failed.")},
+			Policies:    []astmerge.PolicyReference{},
 		}
 	}
 	rootKind, owners := analyzeValue(decoded, "")
@@ -433,6 +450,7 @@ func ParseJSON(source string, dialect JSONDialect) astmerge.ParseResult[JSONAnal
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},
 		Analysis:    &analysis,
+		Policies:    []astmerge.PolicyReference{},
 	}
 }
 
@@ -594,10 +612,12 @@ func MergeJSON(templateSource string, destinationSource string, dialect JSONDial
 		return astmerge.MergeResult[string]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{diagnostic},
+			Policies:    []astmerge.PolicyReference{},
 		}
 	}
 
 	diagnostics := []astmerge.Diagnostic{}
+	policies := []astmerge.PolicyReference{destinationWinsArrayPolicy()}
 	destination, diagnostic, ok := parseNormalizedJSON(destinationSource, dialect, destinationParseError)
 	if !ok {
 		if diagnostic.Category == astmerge.CategoryDestinationParseError && detectTrailingComma(destinationSource) {
@@ -606,6 +626,7 @@ func MergeJSON(templateSource string, destinationSource string, dialect JSONDial
 				return astmerge.MergeResult[string]{
 					OK:          false,
 					Diagnostics: []astmerge.Diagnostic{diagnostic},
+					Policies:    []astmerge.PolicyReference{},
 				}
 			}
 			destination, diagnostic, ok = parseNormalizedJSON(sanitizedDestination, dialect, destinationParseError)
@@ -613,13 +634,16 @@ func MergeJSON(templateSource string, destinationSource string, dialect JSONDial
 				return astmerge.MergeResult[string]{
 					OK:          false,
 					Diagnostics: []astmerge.Diagnostic{diagnostic},
+					Policies:    []astmerge.PolicyReference{},
 				}
 			}
 			diagnostics = append(diagnostics, fallbackApplied("Applied destination trailing-comma fallback during merge."))
+			policies = append(policies, trailingCommaFallbackPolicy())
 		} else {
 			return astmerge.MergeResult[string]{
 				OK:          false,
 				Diagnostics: []astmerge.Diagnostic{diagnostic},
+				Policies:    []astmerge.PolicyReference{},
 			}
 		}
 	}
@@ -630,5 +654,6 @@ func MergeJSON(templateSource string, destinationSource string, dialect JSONDial
 		OK:          true,
 		Diagnostics: diagnostics,
 		Output:      &output,
+		Policies:    policies,
 	}
 }

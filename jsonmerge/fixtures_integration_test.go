@@ -209,6 +209,10 @@ func TestSharedFixtureJSONFallbackMerge(t *testing.T) {
 		t.Fatalf("unexpected merge status: %+v", result)
 	}
 	assertExpectedDiagnostics(t, result.Diagnostics, expected["diagnostics"].([]any))
+	assertExpectedPolicies(t, result.Policies, []astmerge.PolicyReference{
+		{Surface: astmerge.PolicySurfaceArray, Name: "destination_wins_array"},
+		{Surface: astmerge.PolicySurfaceFallback, Name: "trailing_comma_destination_fallback"},
+	})
 	if result.Output == nil || *result.Output != expected["output"].(string) {
 		t.Fatalf("unexpected output: %+v", result.Output)
 	}
@@ -263,6 +267,9 @@ func TestSharedFixtureJSONArrayPolicy(t *testing.T) {
 	if len(result.Diagnostics) != 0 {
 		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
 	}
+	assertExpectedPolicies(t, result.Policies, []astmerge.PolicyReference{
+		{Surface: astmerge.PolicySurfaceArray, Name: "destination_wins_array"},
+	})
 	if result.Output == nil || *result.Output != expected["output"].(string) {
 		t.Fatalf("unexpected output: %+v", result.Output)
 	}
@@ -284,6 +291,19 @@ func assertExpectedDiagnostics(t *testing.T, diagnostics []astmerge.Diagnostic, 
 		}
 		if string(diagnostic.Category) != expectedDiagnostic["category"].(string) {
 			t.Fatalf("unexpected category at %d: %+v", index, diagnostic)
+		}
+	}
+}
+
+func assertExpectedPolicies(t *testing.T, policies []astmerge.PolicyReference, expected []astmerge.PolicyReference) {
+	t.Helper()
+
+	if len(policies) != len(expected) {
+		t.Fatalf("unexpected policies: %+v", policies)
+	}
+	for index, policy := range policies {
+		if policy != expected[index] {
+			t.Fatalf("unexpected policy at %d: %+v", index, policy)
 		}
 	}
 }

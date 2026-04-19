@@ -143,6 +143,9 @@ func TestMergeJSONPreservesDestinationArrayAsBaselineArrayPolicy(t *testing.T) {
 	if *result.Output != "{\"items\":[9],\"meta\":{\"mode\":\"template\",\"tags\":[\"destination\"]}}" {
 		t.Fatalf("unexpected output: %q", *result.Output)
 	}
+	if len(result.Policies) != 1 || result.Policies[0].Name != "destination_wins_array" {
+		t.Fatalf("unexpected policies: %+v", result.Policies)
+	}
 }
 
 func TestMergeJSONAppliesTrailingCommaFallback(t *testing.T) {
@@ -156,6 +159,9 @@ func TestMergeJSONAppliesTrailingCommaFallback(t *testing.T) {
 	}
 	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Category != astmerge.CategoryFallbackApplied {
 		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
+	}
+	if len(result.Policies) != 2 {
+		t.Fatalf("unexpected policies: %+v", result.Policies)
 	}
 }
 
