@@ -611,6 +611,59 @@ func TestSharedFixtureConformanceSuiteDefinitions(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNamedConformanceSuiteReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_report"))
+	manifest := readManifest(t)
+	suiteName := fixture["suite_name"].(string)
+	executionsRaw := fixture["executions"].(map[string]any)
+	expected := fixture["expected_report"].(map[string]any)
+
+	report := ReportNamedConformanceSuite(
+		manifest,
+		suiteName,
+		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+		&ConformanceFeatureProfileView{
+			Backend:           "kreuzberg-language-pack",
+			SupportsDialects:  false,
+			SupportedPolicies: []PolicyReference{{Surface: PolicySurfaceArray, Name: "destination_wins_array"}},
+		},
+	)
+
+	if report == nil {
+		t.Fatalf("expected named suite report")
+	}
+
+	expectedSummary := expected["summary"].(map[string]any)
+	if report.Summary.Total != int(expectedSummary["total"].(float64)) ||
+		report.Summary.Passed != int(expectedSummary["passed"].(float64)) ||
+		report.Summary.Failed != int(expectedSummary["failed"].(float64)) ||
+		report.Summary.Skipped != int(expectedSummary["skipped"].(float64)) {
+		t.Fatalf("unexpected named suite report summary: %+v", report.Summary)
+	}
+
+	expectedResults := expected["results"].([]any)
+	if len(report.Results) != len(expectedResults) {
+		t.Fatalf("unexpected named suite report results: %+v", report.Results)
+	}
+	for index, item := range expectedResults {
+		expectedResult := parseConformanceCaseResult(item.(map[string]any))
+		if !reflect.DeepEqual(report.Results[index], expectedResult) {
+			t.Fatalf("unexpected named suite report result at %d: %+v", index, report.Results[index])
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 

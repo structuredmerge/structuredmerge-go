@@ -330,6 +330,27 @@ func ReportPlannedConformanceSuite(
 	return ReportConformanceSuite(RunPlannedConformanceSuite(plan, execute))
 }
 
+func ReportNamedConformanceSuite(
+	manifest ConformanceManifest,
+	suiteName string,
+	familyProfile FamilyFeatureProfile,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+	featureProfile *ConformanceFeatureProfileView,
+) *ConformanceSuiteReport {
+	plan := PlanNamedConformanceSuite(
+		manifest,
+		suiteName,
+		familyProfile,
+		featureProfile,
+	)
+	if plan == nil {
+		return nil
+	}
+
+	report := ReportPlannedConformanceSuite(*plan, execute)
+	return &report
+}
+
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
 	return ConformanceSuiteReport{
 		Results: results,
