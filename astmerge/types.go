@@ -301,6 +301,13 @@ func RunPlannedConformanceSuite(
 	return results
 }
 
+func ReportPlannedConformanceSuite(
+	plan ConformanceSuitePlan,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) ConformanceSuiteReport {
+	return ReportConformanceSuite(RunPlannedConformanceSuite(plan, execute))
+}
+
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
 	return ConformanceSuiteReport{
 		Results: results,
