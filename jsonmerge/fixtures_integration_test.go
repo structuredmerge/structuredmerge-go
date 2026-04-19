@@ -248,6 +248,26 @@ func TestSharedFixtureJSONFallbackBoundaries(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureJSONArrayPolicy(t *testing.T) {
+	fixture := readJSONFixture(t, "json", "slice-16-array-policy", "destination-wins-array.json")
+	expected := fixture["expected"].(map[string]any)
+
+	result := MergeJSON(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		DialectJSON,
+	)
+	if result.OK != expected["ok"].(bool) {
+		t.Fatalf("unexpected merge status: %+v", result)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("unexpected diagnostics: %+v", result.Diagnostics)
+	}
+	if result.Output == nil || *result.Output != expected["output"].(string) {
+		t.Fatalf("unexpected output: %+v", result.Output)
+	}
+}
+
 func assertExpectedDiagnostics(t *testing.T, diagnostics []astmerge.Diagnostic, expected []any) {
 	t.Helper()
 

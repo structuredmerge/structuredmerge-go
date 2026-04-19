@@ -130,6 +130,21 @@ func TestMergeJSONReportsDestinationParseError(t *testing.T) {
 	}
 }
 
+func TestMergeJSONPreservesDestinationArrayAsBaselineArrayPolicy(t *testing.T) {
+	result := MergeJSON(
+		"{\"items\":[1,2,3],\"meta\":{\"tags\":[\"template\"],\"mode\":\"template\"}}",
+		"{\"items\":[9],\"meta\":{\"tags\":[\"destination\"]}}",
+		DialectJSON,
+	)
+
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected merge success, got diagnostics: %+v", result.Diagnostics)
+	}
+	if *result.Output != "{\"items\":[9],\"meta\":{\"mode\":\"template\",\"tags\":[\"destination\"]}}" {
+		t.Fatalf("unexpected output: %q", *result.Output)
+	}
+}
+
 func TestMergeJSONAppliesTrailingCommaFallback(t *testing.T) {
 	result := MergeJSON("{\"alpha\":1}", "{\"beta\":[1,2,],}", DialectJSON)
 
