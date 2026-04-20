@@ -1185,6 +1185,29 @@ func TestSlice130SourceFamilyBackendRestrictedReport(t *testing.T) {
 	}
 }
 
+func TestSlice131CanonicalManifestSourceFamilyPaths(t *testing.T) {
+	manifest := readManifest(t)
+
+	if path := ConformanceFamilyFeatureProfilePath(manifest, "typescript"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-101-typescript-family-feature-profile", "typescript-feature-profile.json") {
+		t.Fatalf("unexpected canonical typescript family profile path: %+v", path)
+	}
+	if path := ConformanceFamilyFeatureProfilePath(manifest, "rust"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-105-rust-family-feature-profile", "rust-feature-profile.json") {
+		t.Fatalf("unexpected canonical rust family profile path: %+v", path)
+	}
+	if path := ConformanceFamilyFeatureProfilePath(manifest, "go"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-109-go-family-feature-profile", "go-feature-profile.json") {
+		t.Fatalf("unexpected canonical go family profile path: %+v", path)
+	}
+	if path := ConformanceFixturePath(manifest, "typescript", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("typescript", "slice-102-analysis", "module-owners.json") {
+		t.Fatalf("unexpected canonical typescript analysis path: %+v", path)
+	}
+	if path := ConformanceFixturePath(manifest, "rust", "matching"); path == nil || filepath.Join(path...) != filepath.Join("rust", "slice-107-matching", "path-equality.json") {
+		t.Fatalf("unexpected canonical rust matching path: %+v", path)
+	}
+	if path := ConformanceFixturePath(manifest, "go", "merge"); path == nil || filepath.Join(path...) != filepath.Join("go", "slice-112-merge", "module-merge.json") {
+		t.Fatalf("unexpected canonical go merge path: %+v", path)
+	}
+}
+
 func TestSharedFixturePlannedNamedConformanceSuiteReports(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_report_entries"))
 	manifest := readManifest(t)
