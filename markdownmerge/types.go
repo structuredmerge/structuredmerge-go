@@ -89,7 +89,7 @@ func unsupportedFeature(message string) astmerge.Diagnostic {
 	}
 }
 
-func normalizeSource(source string) string {
+func NormalizeMarkdownSource(source string) string {
 	source = strings.ReplaceAll(source, "\r\n", "\n")
 	return strings.ReplaceAll(source, "\r", "\n")
 }
@@ -119,8 +119,8 @@ func slugify(value string) string {
 var headingPattern = regexp.MustCompile(`^(#{1,6})\s+(.+?)\s*#*\s*$`)
 var codeFencePattern = regexp.MustCompile("^\\s*([`]{3,}|[~]{3,})\\s*(.*?)\\s*$")
 
-func collectMarkdownOwners(source string) []MarkdownOwner {
-	lines := strings.Split(normalizeSource(source), "\n")
+func CollectMarkdownOwners(source string) []MarkdownOwner {
+	lines := strings.Split(NormalizeMarkdownSource(source), "\n")
 	owners := make([]MarkdownOwner, 0)
 	headingIndex := 0
 	codeFenceIndex := 0
@@ -262,7 +262,7 @@ func ParseMarkdownWithBackend(source string, dialect MarkdownDialect, backend Ma
 		}
 	}
 
-	normalized := normalizeSource(source)
+	normalized := NormalizeMarkdownSource(source)
 	return astmerge.ParseResult[MarkdownAnalysis]{
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},
@@ -270,7 +270,7 @@ func ParseMarkdownWithBackend(source string, dialect MarkdownDialect, backend Ma
 			Dialect:          dialect,
 			NormalizedSource: normalized,
 			RootKind:         RootDocument,
-			Owners:           collectMarkdownOwners(normalized),
+			Owners:           CollectMarkdownOwners(normalized),
 		},
 		Policies: []astmerge.PolicyReference{},
 	}
