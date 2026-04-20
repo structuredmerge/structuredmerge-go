@@ -103,6 +103,20 @@ func GoBackendFeatureProfile(backend GoBackend) astmerge.ConformanceFeatureProfi
 	}
 }
 
+func GoPlanContext(backend GoBackend) astmerge.ConformanceFamilyPlanContext {
+	return astmerge.ConformanceFamilyPlanContext{
+		FamilyProfile: astmerge.FamilyFeatureProfile{
+			Family:            GoFeatureProfileInfo().Family,
+			SupportedDialects: []string{string(DialectGo)},
+			SupportedPolicies: GoFeatureProfileInfo().SupportedPolicies,
+		},
+		FeatureProfile: func() *astmerge.ConformanceFeatureProfileView {
+			profile := GoBackendFeatureProfile(backend)
+			return &profile
+		}(),
+	}
+}
+
 func GoBackends() []GoBackend {
 	return []GoBackend{BackendTreeSitter, BackendNative}
 }

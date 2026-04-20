@@ -39,6 +39,20 @@ func TestGoFixtures(t *testing.T) {
 		t.Fatalf("unexpected native backend profile: %+v", nativeProfile)
 	}
 
+	planContextFixture := readGoFixture(t, "diagnostics", "slice-123-source-family-plan-contexts", "go-plan-contexts.json")
+	treeContext := GoPlanContext(BackendTreeSitter)
+	if treeContext.FamilyProfile.Family != planContextFixture["tree_sitter"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) ||
+		treeContext.FeatureProfile == nil ||
+		treeContext.FeatureProfile.Backend != planContextFixture["tree_sitter"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected tree-sitter plan context: %+v", treeContext)
+	}
+	nativeContext := GoPlanContext(BackendNative)
+	if nativeContext.FamilyProfile.Family != planContextFixture["native"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) ||
+		nativeContext.FeatureProfile == nil ||
+		nativeContext.FeatureProfile.Backend != planContextFixture["native"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected native plan context: %+v", nativeContext)
+	}
+
 	analysisFixture := readGoFixture(t, "go", "slice-110-analysis", "module-owners.json")
 	analysis := ParseGo(analysisFixture["source"].(string), DialectGo)
 	if !analysis.OK || analysis.Analysis == nil {
