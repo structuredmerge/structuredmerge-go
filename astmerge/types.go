@@ -287,6 +287,13 @@ type ReviewDecision struct {
 	Context   *ConformanceFamilyPlanContext `json:"context,omitempty"`
 }
 
+type DelegatedChildGroupReviewState struct {
+	Requests         []ReviewRequest             `json:"requests"`
+	AcceptedGroups   []ProjectedChildReviewGroup `json:"accepted_groups"`
+	AppliedDecisions []ReviewDecision            `json:"applied_decisions"`
+	Diagnostics      []Diagnostic                `json:"diagnostics"`
+}
+
 type ReviewReplayBundle struct {
 	ReplayContext ReviewReplayContext `json:"replay_context"`
 	Decisions     []ReviewDecision    `json:"decisions"`
@@ -575,6 +582,55 @@ func SelectProjectedChildReviewGroupsAcceptedForApply(groups []ProjectedChildRev
 	}
 
 	return accepted
+}
+
+func ReviewProjectedChildGroups(groups []ProjectedChildReviewGroup, family string, decisions []ReviewDecision) DelegatedChildGroupReviewState {
+	requestIDs := make(map[string]bool)
+	for _, group := range groups {
+		requestIDs[ReviewRequestIDForProjectedChildGroup(group)] = true
+	}
+
+	appliedDecisions := make([]ReviewDecision, 0)
+	diagnostics := make([]Diagnostic, 0)
+	for _, decision := range decisions {
+		if decision.Action != ReviewDecisionApplyDelegatedChildGroup {
+			continue
+		}
+		if requestIDs[decision.RequestID] {
+			appliedDecisions = append(appliedDecisions, decision)
+		} else {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Category: CategoryReplayRejected,
+				Message:  "review decision " + decision.RequestID + " does not match any current delegated child review request.",
+				Review: &ReviewDiagnosticDetail{
+					RequestID: decision.RequestID,
+					Action:    decision.Action,
+					Reason:    ReasonRequestNotFound,
+				},
+			})
+		}
+	}
+
+	acceptedGroups := SelectProjectedChildReviewGroupsAcceptedForApply(groups, family, appliedDecisions)
+	acceptedRequestIDs := make(map[string]bool)
+	for _, group := range acceptedGroups {
+		acceptedRequestIDs[ReviewRequestIDForProjectedChildGroup(group)] = true
+	}
+
+	requests := make([]ReviewRequest, 0)
+	for _, group := range groups {
+		if !acceptedRequestIDs[ReviewRequestIDForProjectedChildGroup(group)] {
+			requests = append(requests, ProjectedChildGroupReviewRequest(group, family))
+		}
+	}
+
+	return DelegatedChildGroupReviewState{
+		Requests:         requests,
+		AcceptedGroups:   acceptedGroups,
+		AppliedDecisions: appliedDecisions,
+		Diagnostics:      diagnostics,
+	}
 }
 
 func DefaultConformanceFamilyContext(

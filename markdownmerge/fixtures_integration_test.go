@@ -317,3 +317,22 @@ func TestSharedFixtureMarkdownDelegatedChildReviewTransport(t *testing.T) {
 		t.Fatalf("unexpected accepted projected child review groups: %+v", actual)
 	}
 }
+
+func TestSharedFixtureMarkdownDelegatedChildReviewState(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-241-delegated-child-review-state", "fenced-code-review-state.json")
+	groupSource, err := json.Marshal(fixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal projected groups: %v", err)
+	}
+	var groups []astmerge.ProjectedChildReviewGroup
+	if err := json.Unmarshal(groupSource, &groups); err != nil {
+		t.Fatalf("unmarshal projected groups: %v", err)
+	}
+	decisions := make([]astmerge.ReviewDecision, 0, len(fixture["decisions"].([]any)))
+	for _, item := range fixture["decisions"].([]any) {
+		decisions = append(decisions, parseReviewDecision(item.(map[string]any)))
+	}
+	if actual := jsonReadyMarkdown(t, astmerge.ReviewProjectedChildGroups(groups, fixture["family"].(string), decisions)); !reflect.DeepEqual(actual, fixture["expected_state"]) {
+		t.Fatalf("unexpected delegated child review state: %+v", actual)
+	}
+}

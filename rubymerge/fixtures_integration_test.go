@@ -237,6 +237,31 @@ func TestRubyFixtures(t *testing.T) {
 	if !deepEqualJSON(decodedAccepted, transportFixture["expected_accepted_groups"]) {
 		t.Fatalf("unexpected accepted groups: %+v", decodedAccepted)
 	}
+
+	stateFixture := readRubyFixture(t, "ruby", "slice-242-delegated-child-review-state", "yard-example-review-state.json")
+	stateSource, err := json.Marshal(stateFixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal state groups: %v", err)
+	}
+	var stateGroups []astmerge.ProjectedChildReviewGroup
+	if err := json.Unmarshal(stateSource, &stateGroups); err != nil {
+		t.Fatalf("unmarshal state groups: %v", err)
+	}
+	stateDecisions := make([]astmerge.ReviewDecision, 0, len(stateFixture["decisions"].([]any)))
+	for _, item := range stateFixture["decisions"].([]any) {
+		stateDecisions = append(stateDecisions, parseReviewDecision(item.(map[string]any)))
+	}
+	stateValue, err := json.Marshal(astmerge.ReviewProjectedChildGroups(stateGroups, stateFixture["family"].(string), stateDecisions))
+	if err != nil {
+		t.Fatalf("marshal state: %v", err)
+	}
+	var decodedState any
+	if err := json.Unmarshal(stateValue, &decodedState); err != nil {
+		t.Fatalf("unmarshal state: %v", err)
+	}
+	if !deepEqualJSON(decodedState, stateFixture["expected_state"]) {
+		t.Fatalf("unexpected delegated child review state: %+v", decodedState)
+	}
 }
 
 func deepEqualJSON(left any, right any) bool {

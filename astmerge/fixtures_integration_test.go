@@ -2798,6 +2798,33 @@ func TestSharedFixtureDelegatedChildGroupsAcceptedForApply(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureDelegatedChildGroupReviewState(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "delegated_child_group_review_state"))
+	groupSource, err := json.Marshal(fixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal projected child review groups: %v", err)
+	}
+	var groups []ProjectedChildReviewGroup
+	if err := json.Unmarshal(groupSource, &groups); err != nil {
+		t.Fatalf("unmarshal projected child review groups: %v", err)
+	}
+	decisions := make([]ReviewDecision, 0, len(fixture["decisions"].([]any)))
+	for _, item := range fixture["decisions"].([]any) {
+		decisions = append(decisions, parseReviewDecision(item.(map[string]any)))
+	}
+	encoded, err := json.Marshal(ReviewProjectedChildGroups(groups, fixture["family"].(string), decisions))
+	if err != nil {
+		t.Fatalf("marshal delegated child review state: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal delegated child review state: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, fixture["expected_state"]) {
+		t.Fatalf("unexpected delegated child review state: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
 	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))
