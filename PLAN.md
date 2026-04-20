@@ -133,6 +133,10 @@ Requirements:
 
 - Use one monorepo rooted at `structuredmerge-go`.
 - Start with one root Go module and multiple publishable packages.
+- Keep `tree-haver` focused on reusable parser frameworks such as tree-sitter
+  and `pigeon`.
+- Keep one-trick parser integrations such as `go/parser` inside merge-family
+  packages, not in `tree-haver`.
 
 ## First Implementation Sequence
 
