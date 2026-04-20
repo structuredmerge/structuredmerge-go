@@ -1222,6 +1222,61 @@ func TestSlice174YAMLFamilyBackendManifestReport(t *testing.T) {
 	}
 }
 
+func TestSlice185YAMLFamilyPolyglotBackendNamedSuitePlans(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-185-yaml-family-polyglot-backend-named-suite-plans", "go-yaml-polyglot-named-suite-plans.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuitePlan, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("unexpected polyglot YAML named suite plans: %+v", plans)
+	}
+}
+
+func TestSlice186YAMLFamilyPolyglotBackendManifestReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-186-yaml-family-polyglot-backend-manifest-report", "go-yaml-polyglot-manifest-report.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	expected := parseConformanceManifestReport(fixture["expected_report"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	executions := make(map[string]ConformanceCaseExecution, len(executionsRaw))
+	for key, raw := range executionsRaw {
+		executions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+	}
+
+	report := ReportConformanceManifest(manifest, options, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if execution, ok := executions[key]; ok {
+			return execution
+		}
+		return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+	})
+
+	if !reflect.DeepEqual(report, expected) {
+		t.Fatalf("unexpected polyglot YAML manifest report: %+v", report)
+	}
+}
+
 func TestSlice148ConfigFamilyAggregateManifest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-148-config-family-aggregate-manifest", "config-family-aggregate.json"))
 	var manifest ConformanceManifest

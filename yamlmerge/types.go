@@ -8,6 +8,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 	yamlv3 "gopkg.in/yaml.v3"
 )
 
@@ -22,6 +23,7 @@ type YAMLBackend string
 const (
 	BackendYAMLV3      YAMLBackend = "yaml-v3"
 	BackendGoccyGoYAML YAMLBackend = "goccy-go-yaml"
+	BackendKreuzberg   YAMLBackend = "kreuzberg-language-pack"
 )
 
 type YAMLRootKind string
@@ -117,7 +119,7 @@ func YAMLFeatureProfileInfo() YAMLFeatureProfile {
 }
 
 func AvailableYAMLBackends() []YAMLBackend {
-	return []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML}
+	return []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg}
 }
 
 func YAMLBackendFeatureProfileInfo(backend YAMLBackend) YAMLBackendFeatureProfile {
@@ -143,7 +145,7 @@ func YAMLPlanContextWithBackend(backend YAMLBackend) astmerge.ConformanceFamilyP
 		},
 		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
 			Backend:           backendProfile.Backend,
-			SupportsDialects:  true,
+			SupportsDialects:  backend != BackendKreuzberg,
 			SupportedPolicies: backendProfile.SupportedPolicies,
 		},
 	}
@@ -381,6 +383,10 @@ func parseYAMLMapping(source string, backend YAMLBackend) (map[string]any, error
 		if err := yaml.Unmarshal([]byte(source), &parsed); err != nil {
 			return nil, err
 		}
+	case BackendKreuzberg:
+		if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
+			return nil, err
+		}
 	default:
 		if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
 			return nil, err
@@ -403,6 +409,20 @@ func ParseYAMLWithBackend(source string, dialect YAMLDialect, backend YAMLBacken
 		return astmerge.ParseResult[YAMLAnalysis]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{unsupportedFeature("Unsupported YAML dialect.")},
+		}
+	}
+
+	if backend == BackendKreuzberg {
+		backendResult := treehaver.ParseWithLanguagePack(treehaver.ParserRequest{
+			Source:   source,
+			Language: "yaml",
+			Dialect:  "yaml",
+		})
+		if !backendResult.OK {
+			return astmerge.ParseResult[YAMLAnalysis]{
+				OK:          false,
+				Diagnostics: backendResult.Diagnostics,
+			}
 		}
 	}
 

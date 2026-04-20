@@ -45,7 +45,7 @@ func TestSharedFixtureYAMLFeatureProfile(t *testing.T) {
 func TestSharedFixtureYAMLBackendFeatureProfiles(t *testing.T) {
 	fixture := readYAMLFixture(t, "diagnostics", "slice-171-yaml-family-backend-feature-profiles", "go-yaml-backend-feature-profiles.json")
 	backends := AvailableYAMLBackends()
-	if len(backends) != 2 || backends[0] != BackendYAMLV3 || backends[1] != BackendGoccyGoYAML {
+	if len(backends) != 3 || backends[0] != BackendYAMLV3 || backends[1] != BackendGoccyGoYAML || backends[2] != BackendKreuzberg {
 		t.Fatalf("unexpected backends: %+v", backends)
 	}
 
@@ -56,6 +56,14 @@ func TestSharedFixtureYAMLBackendFeatureProfiles(t *testing.T) {
 	goccy := YAMLBackendFeatureProfileInfo(BackendGoccyGoYAML)
 	if goccy.Backend != fixture["goccy"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected goccy backend profile: %+v", goccy)
+	}
+}
+
+func TestSharedFixtureYAMLPolyglotBackendFeatureProfiles(t *testing.T) {
+	fixture := readYAMLFixture(t, "diagnostics", "slice-183-yaml-family-polyglot-backend-feature-profiles", "go-yaml-polyglot-backend-feature-profiles.json")
+	treeSitter := YAMLBackendFeatureProfileInfo(BackendKreuzberg)
+	if treeSitter.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeSitter)
 	}
 }
 
@@ -76,6 +84,18 @@ func TestSharedFixtureYAMLPlanContext(t *testing.T) {
 	}
 	if goccy.FeatureProfile == nil || goccy.FeatureProfile.Backend != fixture["goccy"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected goccy feature profile: %+v", goccy.FeatureProfile)
+	}
+}
+
+func TestSharedFixtureYAMLPolyglotPlanContext(t *testing.T) {
+	fixture := readYAMLFixture(t, "diagnostics", "slice-184-yaml-family-polyglot-backend-plan-contexts", "go-yaml-polyglot-plan-contexts.json")
+
+	treeSitter := YAMLPlanContextWithBackend(BackendKreuzberg)
+	if treeSitter.FamilyProfile.Family != fixture["tree_sitter"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected tree-sitter family profile: %+v", treeSitter)
+	}
+	if treeSitter.FeatureProfile == nil || treeSitter.FeatureProfile.Backend != fixture["tree_sitter"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected tree-sitter feature profile: %+v", treeSitter.FeatureProfile)
 	}
 }
 
@@ -124,7 +144,7 @@ func TestCanonicalManifestIncludesYAMLPaths(t *testing.T) {
 
 func TestSharedFixtureYAMLParse(t *testing.T) {
 	valid := readYAMLFixture(t, "yaml", "slice-96-parse", "valid-document.json")
-	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg} {
 		validResult := ParseYAMLWithBackend(valid["source"].(string), DialectYAML, backend)
 		if !validResult.OK || validResult.Analysis == nil || string(validResult.Analysis.RootKind) != "mapping" {
 			t.Fatalf("unexpected valid parse result for %s: %+v", backend, validResult)
@@ -135,7 +155,7 @@ func TestSharedFixtureYAMLParse(t *testing.T) {
 	}
 
 	invalid := readYAMLFixture(t, "yaml", "slice-96-parse", "invalid-document.json")
-	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg} {
 		invalidResult := ParseYAMLWithBackend(invalid["source"].(string), DialectYAML, backend)
 		if invalidResult.OK {
 			t.Fatalf("expected invalid parse failure for %s: %+v", backend, invalidResult)
@@ -150,7 +170,7 @@ func TestSharedFixtureYAMLStructure(t *testing.T) {
 	fixture := readYAMLFixture(t, "yaml", "slice-97-structure", "mapping-and-sequence.json")
 	expectedOwners := fixture["expected"].(map[string]any)["owners"].([]any)
 
-	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg} {
 		result := ParseYAMLWithBackend(fixture["source"].(string), DialectYAML, backend)
 		if !result.OK || result.Analysis == nil {
 			t.Fatalf("expected parse success for %s: %+v", backend, result)
@@ -175,7 +195,7 @@ func TestSharedFixtureYAMLStructure(t *testing.T) {
 func TestSharedFixtureYAMLMatching(t *testing.T) {
 	fixture := readYAMLFixture(t, "yaml", "slice-98-matching", "path-equality.json")
 
-	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg} {
 		template := ParseYAMLWithBackend(fixture["template"].(string), DialectYAML, backend)
 		destination := ParseYAMLWithBackend(fixture["destination"].(string), DialectYAML, backend)
 		result := MatchYAMLOwners(*template.Analysis, *destination.Analysis)
@@ -195,7 +215,7 @@ func TestSharedFixtureYAMLMatching(t *testing.T) {
 
 func TestSharedFixtureYAMLMerge(t *testing.T) {
 	mergeFixture := readYAMLFixture(t, "yaml", "slice-99-merge", "mapping-merge.json")
-	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg} {
 		mergeResult := MergeYAMLWithBackend(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectYAML, backend)
 		if !mergeResult.OK || mergeResult.Output == nil {
 			t.Fatalf("expected merge success for %s: %+v", backend, mergeResult)
@@ -206,7 +226,7 @@ func TestSharedFixtureYAMLMerge(t *testing.T) {
 	}
 
 	invalidTemplate := readYAMLFixture(t, "yaml", "slice-99-merge", "invalid-template.json")
-	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg} {
 		invalidTemplateResult := MergeYAMLWithBackend(invalidTemplate["template"].(string), invalidTemplate["destination"].(string), DialectYAML, backend)
 		if invalidTemplateResult.OK || len(invalidTemplateResult.Diagnostics) != 1 || string(invalidTemplateResult.Diagnostics[0].Category) != "parse_error" {
 			t.Fatalf("unexpected invalid template result for %s: %+v", backend, invalidTemplateResult)
@@ -214,7 +234,7 @@ func TestSharedFixtureYAMLMerge(t *testing.T) {
 	}
 
 	invalidDestination := readYAMLFixture(t, "yaml", "slice-99-merge", "invalid-destination.json")
-	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg} {
 		invalidDestinationResult := MergeYAMLWithBackend(invalidDestination["template"].(string), invalidDestination["destination"].(string), DialectYAML, backend)
 		if invalidDestinationResult.OK || len(invalidDestinationResult.Diagnostics) != 1 || string(invalidDestinationResult.Diagnostics[0].Category) != "destination_parse_error" {
 			t.Fatalf("unexpected invalid destination result for %s: %+v", backend, invalidDestinationResult)

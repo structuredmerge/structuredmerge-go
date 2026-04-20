@@ -15,7 +15,7 @@ func TestYAMLFeatureProfileInfo(t *testing.T) {
 	}
 
 	backends := AvailableYAMLBackends()
-	if len(backends) != 2 || backends[0] != BackendYAMLV3 || backends[1] != BackendGoccyGoYAML {
+	if len(backends) != 3 || backends[0] != BackendYAMLV3 || backends[1] != BackendGoccyGoYAML || backends[2] != BackendKreuzberg {
 		t.Fatalf("unexpected backends: %+v", backends)
 	}
 
@@ -27,5 +27,10 @@ func TestYAMLFeatureProfileInfo(t *testing.T) {
 	goccyProfile := YAMLBackendFeatureProfileInfo(BackendGoccyGoYAML)
 	if goccyProfile.Backend != "goccy-go-yaml" {
 		t.Fatalf("unexpected goccy backend profile: %+v", goccyProfile)
+	}
+
+	kreuzbergProfile := YAMLBackendFeatureProfileInfo(BackendKreuzberg)
+	if kreuzbergProfile.Backend != "kreuzberg-language-pack" {
+		t.Fatalf("unexpected kreuzberg backend profile: %+v", kreuzbergProfile)
 	}
 }
