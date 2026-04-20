@@ -4,10 +4,27 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/markdownmerge"
 )
+
+func jsonReady(t *testing.T, value any) any {
+	t.Helper()
+	source, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal value: %v", err)
+	}
+
+	var normalized any
+	if err := json.Unmarshal(source, &normalized); err != nil {
+		t.Fatalf("decode value: %v", err)
+	}
+
+	return normalized
+}
 
 func readGoldmarkFixture(t *testing.T, parts ...string) map[string]any {
 	t.Helper()
@@ -60,5 +77,138 @@ func TestSharedFixtureMarkdownProviderAnalysisAndMatching(t *testing.T) {
 	result := MatchMarkdownOwners(*template.Analysis, *destination.Analysis)
 	if len(result.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
 		t.Fatalf("unexpected matches: %+v", result.Matched)
+	}
+}
+
+func TestSharedFixtureMarkdownProviderNamedSuitePlans(t *testing.T) {
+	fixture := readGoldmarkFixture(t, "diagnostics", "slice-206-markdown-provider-named-suite-plans", "go-markdown-provider-named-suite-plans.json")
+	source, err := json.Marshal(fixture["manifest"])
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	plans := astmerge.PlanNamedConformanceSuites(manifest, map[string]astmerge.ConformanceFamilyPlanContext{
+		"markdown": MarkdownPlanContext(),
+	})
+
+	projected := make([]map[string]any, 0, len(plans))
+	for _, entry := range plans {
+		planEntries := make([]map[string]any, 0, len(entry.Plan.Entries))
+		for _, planEntry := range entry.Plan.Entries {
+			run := map[string]any{
+				"ref":          map[string]any{"family": planEntry.Run.Ref.Family, "role": planEntry.Run.Ref.Role, "case": planEntry.Run.Ref.Case},
+				"requirements": map[string]any{},
+			}
+			if planEntry.Run.FamilyProfile.Family != "" {
+				run["family_profile"] = map[string]any{
+					"family":             planEntry.Run.FamilyProfile.Family,
+					"supported_dialects": planEntry.Run.FamilyProfile.SupportedDialects,
+					"supported_policies": planEntry.Run.FamilyProfile.SupportedPolicies,
+				}
+			}
+			if planEntry.Run.FeatureProfile != nil {
+				run["feature_profile"] = map[string]any{
+					"backend":            planEntry.Run.FeatureProfile.Backend,
+					"supports_dialects":  planEntry.Run.FeatureProfile.SupportsDialects,
+					"supported_policies": planEntry.Run.FeatureProfile.SupportedPolicies,
+				}
+			}
+			planEntries = append(planEntries, map[string]any{
+				"ref":  map[string]any{"family": planEntry.Ref.Family, "role": planEntry.Ref.Role, "case": planEntry.Ref.Case},
+				"path": planEntry.Path,
+				"run":  run,
+			})
+		}
+
+		projected = append(projected, map[string]any{
+			"suite": entry.Suite,
+			"plan": map[string]any{
+				"family":        entry.Plan.Family,
+				"entries":       planEntries,
+				"missing_roles": entry.Plan.MissingRoles,
+			},
+		})
+	}
+
+	if actual := jsonReady(t, projected); !reflect.DeepEqual(actual, fixture["expected_entries"]) {
+		t.Fatalf("unexpected plans: %+v", actual)
+	}
+}
+
+func TestSharedFixtureMarkdownProviderManifestReport(t *testing.T) {
+	fixture := readGoldmarkFixture(t, "diagnostics", "slice-207-markdown-provider-manifest-report", "go-markdown-provider-manifest-report.json")
+	source, err := json.Marshal(fixture["manifest"])
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	executionsSource, err := json.Marshal(fixture["executions"])
+	if err != nil {
+		t.Fatalf("marshal executions: %v", err)
+	}
+
+	var executions map[string]astmerge.ConformanceCaseExecution
+	if err := json.Unmarshal(executionsSource, &executions); err != nil {
+		t.Fatalf("decode executions: %v", err)
+	}
+
+	entries := astmerge.ReportPlannedNamedConformanceSuites(
+		astmerge.PlanNamedConformanceSuites(manifest, map[string]astmerge.ConformanceFamilyPlanContext{
+			"markdown": MarkdownPlanContext(),
+		}),
+		func(run astmerge.ConformanceCaseRun) astmerge.ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if result, ok := executions[key]; ok {
+				return result
+			}
+			return astmerge.ConformanceCaseExecution{Outcome: "failed", Messages: []string{"missing execution"}}
+		},
+	)
+
+	report := astmerge.ReportNamedConformanceSuiteEnvelope(entries)
+	projected := map[string]any{
+		"entries": make([]map[string]any, 0, len(report.Entries)),
+		"summary": map[string]any{
+			"total": report.Summary.Total, "passed": report.Summary.Passed,
+			"failed": report.Summary.Failed, "skipped": report.Summary.Skipped,
+		},
+	}
+	for _, entry := range report.Entries {
+		results := make([]map[string]any, 0, len(entry.Report.Results))
+		for _, result := range entry.Report.Results {
+			results = append(results, map[string]any{
+				"ref": map[string]any{
+					"family": result.Ref.Family,
+					"role":   result.Ref.Role,
+					"case":   result.Ref.Case,
+				},
+				"outcome":  result.Outcome,
+				"messages": result.Messages,
+			})
+		}
+		projected["entries"] = append(projected["entries"].([]map[string]any), map[string]any{
+			"suite": entry.Suite,
+			"report": map[string]any{
+				"results": results,
+				"summary": map[string]any{
+					"total": entry.Report.Summary.Total, "passed": entry.Report.Summary.Passed,
+					"failed": entry.Report.Summary.Failed, "skipped": entry.Report.Summary.Skipped,
+				},
+			},
+		})
+	}
+
+	if actual := jsonReady(t, projected); !reflect.DeepEqual(actual, fixture["expected_report"]) {
+		t.Fatalf("unexpected report: %+v", actual)
 	}
 }
