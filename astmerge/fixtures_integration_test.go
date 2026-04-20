@@ -1522,6 +1522,45 @@ func TestSlice131CanonicalManifestSourceFamilyPaths(t *testing.T) {
 	}
 }
 
+func TestSourceFamilyReviewStateFixtures(t *testing.T) {
+	for _, relative := range []string{
+		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-158-source-family-review-state", "source-family-review-state.json"),
+		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-159-source-family-reviewed-default", "source-family-reviewed-default.json"),
+		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-160-source-family-replay-application", "source-family-replay-application.json"),
+	} {
+		fixture := readDiagnosticFixtureFromPath(t, relative)
+		var manifest ConformanceManifest
+		if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+			t.Fatalf("marshal manifest: %v", err)
+		} else if err := json.Unmarshal(raw, &manifest); err != nil {
+			t.Fatalf("unmarshal manifest: %v", err)
+		}
+
+		options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+		expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+		executionsRaw := fixture["executions"].(map[string]any)
+
+		state := ReviewConformanceManifest(
+			manifest,
+			options,
+			func(run ConformanceCaseRun) ConformanceCaseExecution {
+				key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+				if raw, ok := executionsRaw[key]; ok {
+					return parseConformanceCaseExecution(raw.(map[string]any))
+				}
+				return ConformanceCaseExecution{
+					Outcome:  ConformanceFailed,
+					Messages: []string{"missing execution"},
+				}
+			},
+		)
+
+		if !reflect.DeepEqual(state, expected) {
+			t.Fatalf("unexpected source-family review state: %+v", state)
+		}
+	}
+}
+
 func TestSharedFixturePlannedNamedConformanceSuiteReports(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_report_entries"))
 	manifest := readManifest(t)
