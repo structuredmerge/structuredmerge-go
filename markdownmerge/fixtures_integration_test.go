@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -23,6 +24,21 @@ func readMarkdownFixture(t *testing.T, parts ...string) map[string]any {
 	}
 
 	return fixture
+}
+
+func jsonReadyMarkdown(t *testing.T, value any) any {
+	t.Helper()
+	source, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal value: %v", err)
+	}
+
+	var normalized any
+	if err := json.Unmarshal(source, &normalized); err != nil {
+		t.Fatalf("decode value: %v", err)
+	}
+
+	return normalized
 }
 
 func TestSharedFixtureMarkdownFeatureProfile(t *testing.T) {
@@ -119,6 +135,19 @@ func TestSharedFixtureMarkdownMatching(t *testing.T) {
 		}
 		if len(result.UnmatchedTemplate) != len(fixture["expected"].(map[string]any)["unmatched_template"].([]any)) {
 			t.Fatalf("unexpected unmatched template for %s: %+v", backend, result.UnmatchedTemplate)
+		}
+	}
+}
+
+func TestSharedFixtureMarkdownEmbeddedFamilies(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-208-embedded-families", "code-fence-families.json")
+	for _, backend := range []MarkdownBackend{BackendGoldmark, BackendKreuzberg} {
+		result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, backend)
+		if !result.OK || result.Analysis == nil {
+			t.Fatalf("expected parse success for %s: %+v", backend, result)
+		}
+		if actual := jsonReadyMarkdown(t, MarkdownEmbeddedFamilies(*result.Analysis)); !reflect.DeepEqual(actual, fixture["expected"]) {
+			t.Fatalf("unexpected embedded families for %s: %+v", backend, actual)
 		}
 	}
 }

@@ -89,3 +89,7 @@ func ParseMarkdown(source string, dialect markdownmerge.MarkdownDialect, backend
 func MatchMarkdownOwners(template, destination markdownmerge.MarkdownAnalysis) markdownmerge.MarkdownOwnerMatchResult {
 	return markdownmerge.MatchMarkdownOwners(template, destination)
 }
+
+func MarkdownEmbeddedFamilies(analysis markdownmerge.MarkdownAnalysis) []markdownmerge.MarkdownEmbeddedFamilyCandidate {
+	return markdownmerge.MarkdownEmbeddedFamilies(analysis)
+}

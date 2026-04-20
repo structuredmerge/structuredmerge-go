@@ -80,6 +80,17 @@ func TestSharedFixtureMarkdownProviderAnalysisAndMatching(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMarkdownProviderEmbeddedFamilies(t *testing.T) {
+	fixture := readGoldmarkFixture(t, "markdown", "slice-208-embedded-families", "code-fence-families.json")
+	analysis := ParseMarkdown(fixture["source"].(string), markdownmerge.DialectMarkdown)
+	if !analysis.OK || analysis.Analysis == nil {
+		t.Fatalf("expected parse success: %+v", analysis)
+	}
+	if actual := jsonReady(t, MarkdownEmbeddedFamilies(*analysis.Analysis)); !reflect.DeepEqual(actual, fixture["expected"]) {
+		t.Fatalf("unexpected embedded families: %+v", actual)
+	}
+}
+
 func TestSharedFixtureMarkdownProviderNamedSuitePlans(t *testing.T) {
 	fixture := readGoldmarkFixture(t, "diagnostics", "slice-206-markdown-provider-named-suite-plans", "go-markdown-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])

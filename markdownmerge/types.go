@@ -64,6 +64,13 @@ type MarkdownAnalysis struct {
 	Owners           []MarkdownOwner
 }
 
+type MarkdownEmbeddedFamilyCandidate struct {
+	Path     string `json:"path"`
+	Language string `json:"language"`
+	Family   string `json:"family"`
+	Dialect  string `json:"dialect"`
+}
+
 func (MarkdownAnalysis) Kind() string {
 	return "markdown"
 }
@@ -312,4 +319,63 @@ func MatchMarkdownOwners(template MarkdownAnalysis, destination MarkdownAnalysis
 	slices.Sort(result.UnmatchedTemplate)
 	slices.Sort(result.UnmatchedDestination)
 	return result
+}
+
+func codeFenceFamily(infoString string) string {
+	switch strings.ToLower(infoString) {
+	case "ts", "typescript":
+		return "typescript"
+	case "rust", "rs":
+		return "rust"
+	case "go":
+		return "go"
+	case "json", "jsonc":
+		return "json"
+	case "yaml", "yml":
+		return "yaml"
+	case "toml":
+		return "toml"
+	default:
+		return ""
+	}
+}
+
+func codeFenceDialect(infoString string, family string) string {
+	switch family {
+	case "typescript":
+		return "typescript"
+	case "rust":
+		return "rust"
+	case "go":
+		return "go"
+	case "json":
+		if strings.EqualFold(infoString, "jsonc") {
+			return "jsonc"
+		}
+		return "json"
+	case "yaml":
+		return "yaml"
+	case "toml":
+		return "toml"
+	default:
+		return ""
+	}
+}
+
+func MarkdownEmbeddedFamilies(analysis MarkdownAnalysis) []MarkdownEmbeddedFamilyCandidate {
+	candidates := make([]MarkdownEmbeddedFamilyCandidate, 0)
+	for _, owner := range analysis.Owners {
+		if owner.OwnerKind != OwnerCodeFence || owner.InfoString == "" {
+			continue
+		}
+		family := codeFenceFamily(owner.InfoString)
+		dialect := codeFenceDialect(owner.InfoString, family)
+		if family == "" || dialect == "" {
+			continue
+		}
+		candidates = append(candidates, MarkdownEmbeddedFamilyCandidate{
+			Path: owner.Path, Language: owner.InfoString, Family: family, Dialect: dialect,
+		})
+	}
+	return candidates
 }
