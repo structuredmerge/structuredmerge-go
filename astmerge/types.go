@@ -27,10 +27,12 @@ const (
 )
 
 type Diagnostic struct {
-	Severity DiagnosticSeverity
-	Category DiagnosticCategory
-	Message  string
-	Path     string
+	Severity  DiagnosticSeverity
+	Category  DiagnosticCategory
+	Message   string
+	Path      string
+	RequestID string
+	Action    ReviewDecisionAction
 }
 
 type ParseResult[T any] struct {
@@ -582,17 +584,21 @@ func reviewDecisionForFamilyContext(
 		}
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context == nil {
 			return nil, nil, false, []Diagnostic{{
-				Severity: SeverityError,
-				Category: CategoryConfigurationError,
-				Message:  "review decision " + requestID + " requires explicit context payload.",
+				Severity:  SeverityError,
+				Category:  CategoryConfigurationError,
+				Message:   "review decision " + requestID + " requires explicit context payload.",
+				RequestID: requestID,
+				Action:    ReviewDecisionProvideExplicitContext,
 			}}
 		}
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context != nil {
 			if decision.Context.FamilyProfile.Family != family {
 				return nil, nil, false, []Diagnostic{{
-					Severity: SeverityError,
-					Category: CategoryConfigurationError,
-					Message:  "review decision " + requestID + " provided context for " + decision.Context.FamilyProfile.Family + ", expected " + family + ".",
+					Severity:  SeverityError,
+					Category:  CategoryConfigurationError,
+					Message:   "review decision " + requestID + " provided context for " + decision.Context.FamilyProfile.Family + ", expected " + family + ".",
+					RequestID: requestID,
+					Action:    ReviewDecisionProvideExplicitContext,
 				}}
 			}
 			copyDecision := decision
@@ -999,9 +1005,11 @@ func ReviewConformanceManifest(
 					acceptedDecisions = append(acceptedDecisions, decision)
 				} else {
 					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityError,
-						Category: CategoryReplayRejected,
-						Message:  "review decision " + decision.RequestID + " does not match any current review request.",
+						Severity:  SeverityError,
+						Category:  CategoryReplayRejected,
+						Message:   "review decision " + decision.RequestID + " does not match any current review request.",
+						RequestID: decision.RequestID,
+						Action:    decision.Action,
 					})
 				}
 			}

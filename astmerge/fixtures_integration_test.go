@@ -1700,6 +1700,12 @@ func parseDiagnostic(raw map[string]any) Diagnostic {
 	if path, ok := raw["path"]; ok {
 		diagnostic.Path = path.(string)
 	}
+	if requestID, ok := raw["request_id"]; ok {
+		diagnostic.RequestID = requestID.(string)
+	}
+	if action, ok := raw["action"]; ok {
+		diagnostic.Action = ReviewDecisionAction(action.(string))
+	}
 
 	return diagnostic
 }
