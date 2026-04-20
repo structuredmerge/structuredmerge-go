@@ -820,6 +820,34 @@ func TestSharedFixtureConformanceSuiteNames(t *testing.T) {
 	}
 }
 
+func TestSlice125SourceFamilySuiteDefinitions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-125-source-family-suite-definitions", "source-suite-definitions.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	expectedRaw := fixture["suite_names"].([]any)
+	expectedNames := make([]string, 0, len(expectedRaw))
+	for _, name := range expectedRaw {
+		expectedNames = append(expectedNames, name.(string))
+	}
+	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
+		t.Fatalf("unexpected source suite names: %+v", names)
+	}
+
+	definitions := fixture["definitions"].(map[string]any)
+	for suiteName, raw := range definitions {
+		expected := parseConformanceSuiteDefinition(raw.(map[string]any))
+		actual := ConformanceSuiteDefinitionByName(manifest, suiteName)
+		if actual == nil || !reflect.DeepEqual(*actual, expected) {
+			t.Fatalf("unexpected source suite definition for %s: %+v", suiteName, actual)
+		}
+	}
+}
+
 func TestSharedFixtureNamedConformanceSuiteEntry(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_entry"))
 	manifest := readManifest(t)
@@ -936,6 +964,32 @@ func TestSharedFixtureNamedConformanceSuitePlans(t *testing.T) {
 
 	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
 		t.Fatalf("unexpected named suite plans: %+v", plans)
+	}
+}
+
+func TestSlice126SourceFamilyNamedSuitePlans(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-126-source-family-named-suite-plans", "source-named-suite-plans.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuitePlan, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("unexpected source named suite plans: %+v", plans)
 	}
 }
 
@@ -1697,6 +1751,19 @@ func parseConformanceCaseRun(t *testing.T, raw map[string]any) ConformanceCaseRu
 	}
 
 	return run
+}
+
+func parseConformanceSuiteDefinition(raw map[string]any) ConformanceSuiteDefinition {
+	rolesRaw := raw["roles"].([]any)
+	roles := make([]string, 0, len(rolesRaw))
+	for _, role := range rolesRaw {
+		roles = append(roles, role.(string))
+	}
+
+	return ConformanceSuiteDefinition{
+		Family: raw["family"].(string),
+		Roles:  roles,
+	}
 }
 
 func parseConformanceFamilyPlanContext(raw map[string]any) ConformanceFamilyPlanContext {

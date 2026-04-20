@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readGoFixture(t *testing.T, parts ...string) map[string]any {
@@ -105,5 +107,30 @@ func TestGoBackends(t *testing.T) {
 	)
 	if !nativeMerge.OK || nativeMerge.Output == nil || *nativeMerge.Output != parityFixture["expected"].(map[string]any)["output"].(string) {
 		t.Fatalf("unexpected native merge: %+v", nativeMerge)
+	}
+}
+
+func TestSlice124SourceFamilyManifest(t *testing.T) {
+	manifestFixture := readGoFixture(t, "conformance", "slice-124-source-family-manifest", "source-family-manifest.json")
+	manifestSource, err := json.Marshal(manifestFixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(manifestSource, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(manifest, "go"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-109-go-family-feature-profile", "go-feature-profile.json") {
+		t.Fatalf("unexpected go family profile path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "go", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("go", "slice-110-analysis", "module-owners.json") {
+		t.Fatalf("unexpected go analysis path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "go", "matching"); path == nil || filepath.Join(path...) != filepath.Join("go", "slice-111-matching", "path-equality.json") {
+		t.Fatalf("unexpected go matching path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "go", "merge"); path == nil || filepath.Join(path...) != filepath.Join("go", "slice-112-merge", "module-merge.json") {
+		t.Fatalf("unexpected go merge path: %+v", path)
 	}
 }
