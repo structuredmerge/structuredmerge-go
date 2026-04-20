@@ -1138,6 +1138,142 @@ func TestSlice202MarkdownFamilyManifestReport(t *testing.T) {
 	}
 }
 
+func TestSlice246MarkdownNestedSuiteDefinitions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-246-markdown-nested-suite-definitions", "markdown-nested-suite-definitions.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	expectedNames := []string{"markdown_nested_portable"}
+	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
+		t.Fatalf("unexpected Markdown nested suite names: %+v", names)
+	}
+	expectedDefinition := ConformanceSuiteDefinition{Family: "markdown", Roles: []string{"analysis", "matching", "embedded_families", "discovered_surfaces", "delegated_child_operations", "delegated_child_review_transport", "delegated_child_review_state", "delegated_child_apply_plan"}}
+	if definition := ConformanceSuiteDefinitionByName(manifest, "markdown_nested_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+		t.Fatalf("unexpected Markdown nested suite definition: %+v", definition)
+	}
+}
+
+func TestSlice247MarkdownNestedNamedSuitePlans(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-247-markdown-nested-named-suite-plans", "markdown-nested-named-suite-plans.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuitePlan, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("unexpected Markdown nested named suite plans: %+v", plans)
+	}
+}
+
+func TestSlice248MarkdownNestedManifestReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-248-markdown-nested-manifest-report", "markdown-nested-manifest-report.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	expected := parseConformanceManifestReport(fixture["expected_report"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	executions := make(map[string]ConformanceCaseExecution, len(executionsRaw))
+	for key, raw := range executionsRaw {
+		executions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+	}
+	report := ReportConformanceManifest(manifest, options, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if execution, ok := executions[key]; ok {
+			return execution
+		}
+		return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+	})
+	if !reflect.DeepEqual(report, expected) {
+		t.Fatalf("unexpected Markdown nested manifest report: %+v", report)
+	}
+}
+
+func TestSlice249RubyNestedSuiteDefinitions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-249-ruby-nested-suite-definitions", "ruby-nested-suite-definitions.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	expectedNames := []string{"ruby_nested_portable"}
+	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
+		t.Fatalf("unexpected Ruby nested suite names: %+v", names)
+	}
+	expectedDefinition := ConformanceSuiteDefinition{Family: "ruby", Roles: []string{"analysis", "matching", "discovered_surfaces", "delegated_child_operations", "delegated_child_review_transport", "delegated_child_review_state", "delegated_child_apply_plan"}}
+	if definition := ConformanceSuiteDefinitionByName(manifest, "ruby_nested_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+		t.Fatalf("unexpected Ruby nested suite definition: %+v", definition)
+	}
+}
+
+func TestSlice250RubyNestedNamedSuitePlans(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-250-ruby-nested-named-suite-plans", "ruby-nested-named-suite-plans.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuitePlan, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("unexpected Ruby nested named suite plans: %+v", plans)
+	}
+}
+
+func TestSlice251RubyNestedManifestReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-251-ruby-nested-manifest-report", "ruby-nested-manifest-report.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	expected := parseConformanceManifestReport(fixture["expected_report"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	executions := make(map[string]ConformanceCaseExecution, len(executionsRaw))
+	for key, raw := range executionsRaw {
+		executions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+	}
+	report := ReportConformanceManifest(manifest, options, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if execution, ok := executions[key]; ok {
+			return execution
+		}
+		return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+	})
+	if !reflect.DeepEqual(report, expected) {
+		t.Fatalf("unexpected Ruby nested manifest report: %+v", report)
+	}
+}
+
 func TestSlice140TOMLFamilyManifestReport(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-140-toml-family-manifest-report", "go-toml-manifest-report.json"))
 	var manifest ConformanceManifest
