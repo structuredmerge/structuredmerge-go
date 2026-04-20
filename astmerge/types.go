@@ -26,6 +26,14 @@ const (
 	CategoryReplayRejected        DiagnosticCategory = "replay_rejected"
 )
 
+type ReviewDiagnosticReason string
+
+const (
+	ReasonMissingRequiredPayload ReviewDiagnosticReason = "missing_required_payload"
+	ReasonFamilyMismatch         ReviewDiagnosticReason = "family_mismatch"
+	ReasonRequestNotFound        ReviewDiagnosticReason = "request_not_found"
+)
+
 type Diagnostic struct {
 	Severity  DiagnosticSeverity
 	Category  DiagnosticCategory
@@ -33,6 +41,7 @@ type Diagnostic struct {
 	Path      string
 	RequestID string
 	Action    ReviewDecisionAction
+	Reason    ReviewDiagnosticReason
 }
 
 type ParseResult[T any] struct {
@@ -589,6 +598,7 @@ func reviewDecisionForFamilyContext(
 				Message:   "review decision " + requestID + " requires explicit context payload.",
 				RequestID: requestID,
 				Action:    ReviewDecisionProvideExplicitContext,
+				Reason:    ReasonMissingRequiredPayload,
 			}}
 		}
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context != nil {
@@ -599,6 +609,7 @@ func reviewDecisionForFamilyContext(
 					Message:   "review decision " + requestID + " provided context for " + decision.Context.FamilyProfile.Family + ", expected " + family + ".",
 					RequestID: requestID,
 					Action:    ReviewDecisionProvideExplicitContext,
+					Reason:    ReasonFamilyMismatch,
 				}}
 			}
 			copyDecision := decision
@@ -1010,6 +1021,7 @@ func ReviewConformanceManifest(
 						Message:   "review decision " + decision.RequestID + " does not match any current review request.",
 						RequestID: decision.RequestID,
 						Action:    decision.Action,
+						Reason:    ReasonRequestNotFound,
 					})
 				}
 			}

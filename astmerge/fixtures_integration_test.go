@@ -1706,6 +1706,9 @@ func parseDiagnostic(raw map[string]any) Diagnostic {
 	if action, ok := raw["action"]; ok {
 		diagnostic.Action = ReviewDecisionAction(action.(string))
 	}
+	if reason, ok := raw["reason"]; ok {
+		diagnostic.Reason = ReviewDiagnosticReason(reason.(string))
+	}
 
 	return diagnostic
 }
