@@ -109,6 +109,21 @@ func YAMLFeatureProfileInfo() YAMLFeatureProfile {
 	}
 }
 
+func YAMLPlanContext() astmerge.ConformanceFamilyPlanContext {
+	return astmerge.ConformanceFamilyPlanContext{
+		FamilyProfile: astmerge.FamilyFeatureProfile{
+			Family:            YAMLFeatureProfileInfo().Family,
+			SupportedDialects: []string{string(DialectYAML)},
+			SupportedPolicies: YAMLFeatureProfileInfo().SupportedPolicies,
+		},
+		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
+			Backend:           "yaml-v3",
+			SupportsDialects:  true,
+			SupportedPolicies: YAMLFeatureProfileInfo().SupportedPolicies,
+		},
+	}
+}
+
 func displayPath(path string) string {
 	if path == "" {
 		return "/"

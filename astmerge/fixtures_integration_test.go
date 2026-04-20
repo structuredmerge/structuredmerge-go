@@ -1093,6 +1093,80 @@ func TestSlice140TOMLFamilyManifestReport(t *testing.T) {
 	}
 }
 
+func TestSlice144YAMLFamilySuiteDefinitions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-144-yaml-family-suite-definitions", "yaml-suite-definitions.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	expectedNames := []string{"yaml_portable"}
+	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
+		t.Fatalf("unexpected YAML suite names: %+v", names)
+	}
+	expectedDefinition := ConformanceSuiteDefinition{Family: "yaml", Roles: []string{"analysis", "matching", "merge"}}
+	if definition := ConformanceSuiteDefinitionByName(manifest, "yaml_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+		t.Fatalf("unexpected YAML suite definition: %+v", definition)
+	}
+}
+
+func TestSlice145YAMLFamilyNamedSuitePlans(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-145-yaml-family-named-suite-plans", "go-yaml-named-suite-plans.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuitePlan, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("unexpected YAML named suite plans: %+v", plans)
+	}
+}
+
+func TestSlice146YAMLFamilyManifestReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-146-yaml-family-manifest-report", "go-yaml-manifest-report.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	expected := parseConformanceManifestReport(fixture["expected_report"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	executions := make(map[string]ConformanceCaseExecution, len(executionsRaw))
+	for key, raw := range executionsRaw {
+		executions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+	}
+
+	report := ReportConformanceManifest(manifest, options, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if execution, ok := executions[key]; ok {
+			return execution
+		}
+		return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+	})
+
+	if !reflect.DeepEqual(report, expected) {
+		t.Fatalf("unexpected YAML manifest report: %+v", report)
+	}
+}
+
 func TestSharedFixtureNamedConformanceSuiteResults(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_results"))
 	manifest := readManifest(t)

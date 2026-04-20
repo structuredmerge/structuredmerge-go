@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readYAMLFixture(t *testing.T, parts ...string) map[string]any {
@@ -37,6 +39,61 @@ func TestSharedFixtureYAMLFeatureProfile(t *testing.T) {
 	}
 	if len(profile.SupportedPolicies) != 1 || profile.SupportedPolicies[0].Name != "destination_wins_array" {
 		t.Fatalf("unexpected policies: %+v", profile.SupportedPolicies)
+	}
+}
+
+func TestSharedFixtureYAMLPlanContext(t *testing.T) {
+	fixture := readYAMLFixture(t, "diagnostics", "slice-142-yaml-family-plan-contexts", "go-yaml-plan-contexts.json")
+	context := YAMLPlanContext()
+
+	if context.FamilyProfile.Family != fixture["native"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected family profile: %+v", context)
+	}
+	if context.FeatureProfile == nil || context.FeatureProfile.Backend != fixture["native"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected feature profile: %+v", context.FeatureProfile)
+	}
+}
+
+func TestSharedFixtureYAMLManifest(t *testing.T) {
+	fixture := readYAMLFixture(t, "conformance", "slice-143-yaml-family-manifest", "yaml-family-manifest.json")
+	source, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(manifest, "yaml"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-95-yaml-family-feature-profile", "yaml-feature-profile.json") {
+		t.Fatalf("unexpected family feature profile path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "yaml", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("yaml", "slice-97-structure", "mapping-and-sequence.json") {
+		t.Fatalf("unexpected analysis fixture path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "yaml", "merge"); path == nil || filepath.Join(path...) != filepath.Join("yaml", "slice-99-merge", "mapping-merge.json") {
+		t.Fatalf("unexpected merge fixture path: %v", path)
+	}
+}
+
+func TestCanonicalManifestIncludesYAMLPaths(t *testing.T) {
+	fixture := readYAMLFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	source, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(manifest, "yaml"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-95-yaml-family-feature-profile", "yaml-feature-profile.json") {
+		t.Fatalf("unexpected canonical family feature profile path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "yaml", "matching"); path == nil || filepath.Join(path...) != filepath.Join("yaml", "slice-98-matching", "path-equality.json") {
+		t.Fatalf("unexpected canonical matching fixture path: %v", path)
 	}
 }
 
