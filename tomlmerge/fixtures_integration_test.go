@@ -111,6 +111,32 @@ func TestSharedFixtureTOMLManifest(t *testing.T) {
 	}
 }
 
+func TestCanonicalManifestIncludesTOMLPaths(t *testing.T) {
+	fixture := readTOMLFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	source, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(manifest, "toml"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-90-toml-family-feature-profile", "toml-feature-profile.json") {
+		t.Fatalf("unexpected canonical family feature profile path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "toml", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-92-structure", "table-and-array.json") {
+		t.Fatalf("unexpected canonical analysis fixture path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "toml", "matching"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-93-matching", "path-equality.json") {
+		t.Fatalf("unexpected canonical matching fixture path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "toml", "merge"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-94-merge", "table-merge.json") {
+		t.Fatalf("unexpected canonical merge fixture path: %v", path)
+	}
+}
+
 func TestSharedFixtureTOMLParse(t *testing.T) {
 	valid := readTOMLFixture(t, "toml", "slice-91-parse", "valid-document.json")
 	validResult := ParseTOML(valid["source"].(string), DialectTOML)
