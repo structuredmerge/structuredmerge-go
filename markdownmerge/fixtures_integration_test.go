@@ -151,3 +151,27 @@ func TestSharedFixtureMarkdownEmbeddedFamilies(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedFixtureMarkdownDiscoveredSurfaces(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-212-discovered-surfaces", "fenced-code-surfaces.json")
+	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendGoldmark)
+	if !result.OK || result.Analysis == nil {
+		t.Fatalf("expected parse success: %+v", result)
+	}
+
+	if actual := jsonReadyMarkdown(t, MarkdownDiscoveredSurfaces(*result.Analysis)); !reflect.DeepEqual(actual, fixture["expected"]) {
+		t.Fatalf("unexpected discovered surfaces: %+v", actual)
+	}
+}
+
+func TestSharedFixtureMarkdownDelegatedChildOperations(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-213-delegated-child-operations", "fenced-code-child-operations.json")
+	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendGoldmark)
+	if !result.OK || result.Analysis == nil {
+		t.Fatalf("expected parse success: %+v", result)
+	}
+
+	if actual := jsonReadyMarkdown(t, MarkdownDelegatedChildOperations(*result.Analysis, fixture["parent_operation_id"].(string))); !reflect.DeepEqual(actual, fixture["expected"]) {
+		t.Fatalf("unexpected delegated child operations: %+v", actual)
+	}
+}

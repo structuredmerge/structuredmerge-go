@@ -51,6 +51,54 @@ type Diagnostic struct {
 	Review   *ReviewDiagnosticDetail
 }
 
+type SurfaceOwnerKind string
+
+const (
+	SurfaceOwnerStructuralOwner SurfaceOwnerKind = "structural_owner"
+	SurfaceOwnerOwnedRegion     SurfaceOwnerKind = "owned_region"
+	SurfaceOwnerParentSurface   SurfaceOwnerKind = "parent_surface"
+)
+
+type SurfaceOwnerRef struct {
+	Kind    SurfaceOwnerKind `json:"kind"`
+	Address string           `json:"address"`
+}
+
+type SurfaceSpan struct {
+	StartLine int `json:"start_line"`
+	EndLine   int `json:"end_line"`
+}
+
+type DiscoveredSurface struct {
+	SurfaceKind            string          `json:"surface_kind"`
+	DeclaredLanguage       string          `json:"declared_language,omitempty"`
+	EffectiveLanguage      string          `json:"effective_language"`
+	Address                string          `json:"address"`
+	ParentAddress          string          `json:"parent_address,omitempty"`
+	Span                   *SurfaceSpan    `json:"span,omitempty"`
+	Owner                  SurfaceOwnerRef `json:"owner"`
+	ReconstructionStrategy string          `json:"reconstruction_strategy"`
+	Metadata               map[string]any  `json:"metadata,omitempty"`
+}
+
+type DelegatedChildOperation struct {
+	OperationID       string            `json:"operation_id"`
+	ParentOperationID string            `json:"parent_operation_id"`
+	RequestedStrategy string            `json:"requested_strategy"`
+	LanguageChain     []string          `json:"language_chain"`
+	Surface           DiscoveredSurface `json:"surface"`
+}
+
+type ProjectedChildReviewCase struct {
+	CaseID                      string `json:"case_id"`
+	ParentOperationID           string `json:"parent_operation_id"`
+	ChildOperationID            string `json:"child_operation_id"`
+	SurfacePath                 string `json:"surface_path"`
+	DelegatedCaseID             string `json:"delegated_case_id"`
+	DelegatedApplyGroup         string `json:"delegated_apply_group"`
+	DelegatedRuntimeSurfacePath string `json:"delegated_runtime_surface_path"`
+}
+
 type ParseResult[T any] struct {
 	OK          bool
 	Diagnostics []Diagnostic

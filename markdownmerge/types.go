@@ -379,3 +379,48 @@ func MarkdownEmbeddedFamilies(analysis MarkdownAnalysis) []MarkdownEmbeddedFamil
 	}
 	return candidates
 }
+
+func MarkdownDiscoveredSurfaces(analysis MarkdownAnalysis) []astmerge.DiscoveredSurface {
+	candidates := MarkdownEmbeddedFamilies(analysis)
+	surfaces := make([]astmerge.DiscoveredSurface, 0, len(candidates))
+	for _, candidate := range candidates {
+		surfaces = append(surfaces, astmerge.DiscoveredSurface{
+			SurfaceKind:       "markdown_fenced_code_block",
+			DeclaredLanguage:  candidate.Language,
+			EffectiveLanguage: candidate.Dialect,
+			Address:           fmt.Sprintf("document[0] > fenced_code_block[%s]", candidate.Path),
+			ParentAddress:     "document[0]",
+			Owner: astmerge.SurfaceOwnerRef{
+				Kind:    astmerge.SurfaceOwnerStructuralOwner,
+				Address: candidate.Path,
+			},
+			ReconstructionStrategy: "portable_write",
+			Metadata: map[string]any{
+				"family":  candidate.Family,
+				"dialect": candidate.Dialect,
+				"path":    candidate.Path,
+			},
+		})
+	}
+
+	return surfaces
+}
+
+func MarkdownDelegatedChildOperations(
+	analysis MarkdownAnalysis,
+	parentOperationID string,
+) []astmerge.DelegatedChildOperation {
+	surfaces := MarkdownDiscoveredSurfaces(analysis)
+	operations := make([]astmerge.DelegatedChildOperation, 0, len(surfaces))
+	for index, surface := range surfaces {
+		operations = append(operations, astmerge.DelegatedChildOperation{
+			OperationID:       fmt.Sprintf("markdown-fence-%d", index),
+			ParentOperationID: parentOperationID,
+			RequestedStrategy: "delegate_child_surface",
+			LanguageChain:     []string{"markdown", surface.EffectiveLanguage},
+			Surface:           surface,
+		})
+	}
+
+	return operations
+}

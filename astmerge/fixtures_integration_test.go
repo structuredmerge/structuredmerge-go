@@ -2603,6 +2603,75 @@ func TestSharedFixtureExplicitReviewReplayBundleApplication(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSurfaceOwnership(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "surface_ownership"))
+	var surface DiscoveredSurface
+	if raw, err := json.Marshal(fixture["surface"]); err != nil {
+		t.Fatalf("marshal surface: %v", err)
+	} else if err := json.Unmarshal(raw, &surface); err != nil {
+		t.Fatalf("unmarshal surface: %v", err)
+	}
+
+	roundtrip, err := json.Marshal(surface)
+	if err != nil {
+		t.Fatalf("marshal roundtrip surface: %v", err)
+	}
+	var decoded DiscoveredSurface
+	if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+		t.Fatalf("unmarshal roundtrip surface: %v", err)
+	}
+
+	if !reflect.DeepEqual(decoded, surface) {
+		t.Fatalf("unexpected surface roundtrip: %+v", decoded)
+	}
+}
+
+func TestSharedFixtureDelegatedChildOperation(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "delegated_child_operation"))
+	var operation DelegatedChildOperation
+	if raw, err := json.Marshal(fixture["operation"]); err != nil {
+		t.Fatalf("marshal operation: %v", err)
+	} else if err := json.Unmarshal(raw, &operation); err != nil {
+		t.Fatalf("unmarshal operation: %v", err)
+	}
+
+	roundtrip, err := json.Marshal(operation)
+	if err != nil {
+		t.Fatalf("marshal roundtrip operation: %v", err)
+	}
+	var decoded DelegatedChildOperation
+	if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+		t.Fatalf("unmarshal roundtrip operation: %v", err)
+	}
+
+	if !reflect.DeepEqual(decoded, operation) {
+		t.Fatalf("unexpected delegated child operation roundtrip: %+v", decoded)
+	}
+}
+
+func TestSharedFixtureProjectedChildReviewCases(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "projected_child_review_cases"))
+	var cases []ProjectedChildReviewCase
+	if raw, err := json.Marshal(fixture["cases"]); err != nil {
+		t.Fatalf("marshal projected child review cases: %v", err)
+	} else if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatalf("unmarshal projected child review cases: %v", err)
+	}
+
+	roundtrip, err := json.Marshal(cases)
+	if err != nil {
+		t.Fatalf("marshal roundtrip projected child review cases: %v", err)
+	}
+	var decoded []ProjectedChildReviewCase
+	if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+		t.Fatalf("unmarshal roundtrip projected child review cases: %v", err)
+	}
+
+	if !reflect.DeepEqual(decoded, cases) {
+		t.Fatalf("unexpected projected child review cases roundtrip: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
 	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))
