@@ -596,6 +596,34 @@ func TestSharedFixtureManifestCaseRequirements(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureManifestBackendRequirements(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "manifest_backend_requirements"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	rolesRaw := fixture["roles"].([]any)
+	roles := make([]string, 0, len(rolesRaw))
+	for _, item := range rolesRaw {
+		roles = append(roles, item.(string))
+	}
+
+	plan := PlanConformanceSuite(
+		manifest,
+		fixture["family"].(string),
+		roles,
+		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
+		parseFeatureProfilePointer(fixture["feature_profile"]),
+	)
+
+	expected := parseConformanceSuitePlan(t, fixture["expected"].(map[string]any))
+	if !reflect.DeepEqual(plan, expected) {
+		t.Fatalf("unexpected manifest backend requirements plan: %+v", plan)
+	}
+}
+
 func TestSharedFixtureConformanceSuiteDefinitions(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "suite_definitions"))
 	manifest := readManifest(t)
