@@ -42,15 +42,40 @@ func TestSharedFixtureYAMLFeatureProfile(t *testing.T) {
 	}
 }
 
-func TestSharedFixtureYAMLPlanContext(t *testing.T) {
-	fixture := readYAMLFixture(t, "diagnostics", "slice-142-yaml-family-plan-contexts", "go-yaml-plan-contexts.json")
-	context := YAMLPlanContext()
-
-	if context.FamilyProfile.Family != fixture["native"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
-		t.Fatalf("unexpected family profile: %+v", context)
+func TestSharedFixtureYAMLBackendFeatureProfiles(t *testing.T) {
+	fixture := readYAMLFixture(t, "diagnostics", "slice-171-yaml-family-backend-feature-profiles", "go-yaml-backend-feature-profiles.json")
+	backends := AvailableYAMLBackends()
+	if len(backends) != 2 || backends[0] != BackendYAMLV3 || backends[1] != BackendGoccyGoYAML {
+		t.Fatalf("unexpected backends: %+v", backends)
 	}
-	if context.FeatureProfile == nil || context.FeatureProfile.Backend != fixture["native"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
-		t.Fatalf("unexpected feature profile: %+v", context.FeatureProfile)
+
+	yamlV3 := YAMLBackendFeatureProfileInfo(BackendYAMLV3)
+	if yamlV3.Backend != fixture["yaml_v3"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected yaml-v3 backend profile: %+v", yamlV3)
+	}
+	goccy := YAMLBackendFeatureProfileInfo(BackendGoccyGoYAML)
+	if goccy.Backend != fixture["goccy"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected goccy backend profile: %+v", goccy)
+	}
+}
+
+func TestSharedFixtureYAMLPlanContext(t *testing.T) {
+	fixture := readYAMLFixture(t, "diagnostics", "slice-172-yaml-family-backend-plan-contexts", "go-yaml-plan-contexts.json")
+
+	yamlV3 := YAMLPlanContextWithBackend(BackendYAMLV3)
+	if yamlV3.FamilyProfile.Family != fixture["yaml_v3"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected yaml-v3 family profile: %+v", yamlV3)
+	}
+	if yamlV3.FeatureProfile == nil || yamlV3.FeatureProfile.Backend != fixture["yaml_v3"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected yaml-v3 feature profile: %+v", yamlV3.FeatureProfile)
+	}
+
+	goccy := YAMLPlanContextWithBackend(BackendGoccyGoYAML)
+	if goccy.FamilyProfile.Family != fixture["goccy"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected goccy family profile: %+v", goccy)
+	}
+	if goccy.FeatureProfile == nil || goccy.FeatureProfile.Backend != fixture["goccy"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected goccy feature profile: %+v", goccy.FeatureProfile)
 	}
 }
 
@@ -99,84 +124,100 @@ func TestCanonicalManifestIncludesYAMLPaths(t *testing.T) {
 
 func TestSharedFixtureYAMLParse(t *testing.T) {
 	valid := readYAMLFixture(t, "yaml", "slice-96-parse", "valid-document.json")
-	validResult := ParseYAML(valid["source"].(string), DialectYAML)
-	if !validResult.OK || validResult.Analysis == nil || string(validResult.Analysis.RootKind) != "mapping" {
-		t.Fatalf("unexpected valid parse result: %+v", validResult)
-	}
-	if len(validResult.Diagnostics) != 0 {
-		t.Fatalf("unexpected diagnostics: %+v", validResult.Diagnostics)
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+		validResult := ParseYAMLWithBackend(valid["source"].(string), DialectYAML, backend)
+		if !validResult.OK || validResult.Analysis == nil || string(validResult.Analysis.RootKind) != "mapping" {
+			t.Fatalf("unexpected valid parse result for %s: %+v", backend, validResult)
+		}
+		if len(validResult.Diagnostics) != 0 {
+			t.Fatalf("unexpected diagnostics for %s: %+v", backend, validResult.Diagnostics)
+		}
 	}
 
 	invalid := readYAMLFixture(t, "yaml", "slice-96-parse", "invalid-document.json")
-	invalidResult := ParseYAML(invalid["source"].(string), DialectYAML)
-	if invalidResult.OK {
-		t.Fatalf("expected invalid parse failure: %+v", invalidResult)
-	}
-	if len(invalidResult.Diagnostics) != 1 || string(invalidResult.Diagnostics[0].Category) != "parse_error" {
-		t.Fatalf("unexpected invalid diagnostics: %+v", invalidResult.Diagnostics)
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+		invalidResult := ParseYAMLWithBackend(invalid["source"].(string), DialectYAML, backend)
+		if invalidResult.OK {
+			t.Fatalf("expected invalid parse failure for %s: %+v", backend, invalidResult)
+		}
+		if len(invalidResult.Diagnostics) != 1 || string(invalidResult.Diagnostics[0].Category) != "parse_error" {
+			t.Fatalf("unexpected invalid diagnostics for %s: %+v", backend, invalidResult.Diagnostics)
+		}
 	}
 }
 
 func TestSharedFixtureYAMLStructure(t *testing.T) {
 	fixture := readYAMLFixture(t, "yaml", "slice-97-structure", "mapping-and-sequence.json")
-	result := ParseYAML(fixture["source"].(string), DialectYAML)
-	if !result.OK || result.Analysis == nil {
-		t.Fatalf("expected parse success: %+v", result)
-	}
-
 	expectedOwners := fixture["expected"].(map[string]any)["owners"].([]any)
-	if len(result.Analysis.Owners) != len(expectedOwners) {
-		t.Fatalf("unexpected owners length: %+v", result.Analysis.Owners)
-	}
-	for index, item := range expectedOwners {
-		expected := item.(map[string]any)
-		owner := result.Analysis.Owners[index]
-		if owner.Path != expected["path"].(string) || string(owner.OwnerKind) != expected["owner_kind"].(string) {
-			t.Fatalf("unexpected owner at %d: %+v", index, owner)
+
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+		result := ParseYAMLWithBackend(fixture["source"].(string), DialectYAML, backend)
+		if !result.OK || result.Analysis == nil {
+			t.Fatalf("expected parse success for %s: %+v", backend, result)
 		}
-		if expectedMatchKey, ok := expected["match_key"]; ok && owner.MatchKey != expectedMatchKey.(string) {
-			t.Fatalf("unexpected match_key at %d: %+v", index, owner)
+
+		if len(result.Analysis.Owners) != len(expectedOwners) {
+			t.Fatalf("unexpected owners length for %s: %+v", backend, result.Analysis.Owners)
+		}
+		for index, item := range expectedOwners {
+			expected := item.(map[string]any)
+			owner := result.Analysis.Owners[index]
+			if owner.Path != expected["path"].(string) || string(owner.OwnerKind) != expected["owner_kind"].(string) {
+				t.Fatalf("unexpected owner at %d for %s: %+v", index, backend, owner)
+			}
+			if expectedMatchKey, ok := expected["match_key"]; ok && owner.MatchKey != expectedMatchKey.(string) {
+				t.Fatalf("unexpected match_key at %d for %s: %+v", index, backend, owner)
+			}
 		}
 	}
 }
 
 func TestSharedFixtureYAMLMatching(t *testing.T) {
 	fixture := readYAMLFixture(t, "yaml", "slice-98-matching", "path-equality.json")
-	template := ParseYAML(fixture["template"].(string), DialectYAML)
-	destination := ParseYAML(fixture["destination"].(string), DialectYAML)
-	result := MatchYAMLOwners(*template.Analysis, *destination.Analysis)
 
-	expected := fixture["expected"].(map[string]any)
-	if len(result.Matched) != len(expected["matched"].([]any)) {
-		t.Fatalf("unexpected matched owners: %+v", result.Matched)
-	}
-	if len(result.UnmatchedTemplate) != len(expected["unmatched_template"].([]any)) {
-		t.Fatalf("unexpected unmatched template: %+v", result.UnmatchedTemplate)
-	}
-	if len(result.UnmatchedDestination) != len(expected["unmatched_destination"].([]any)) {
-		t.Fatalf("unexpected unmatched destination: %+v", result.UnmatchedDestination)
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+		template := ParseYAMLWithBackend(fixture["template"].(string), DialectYAML, backend)
+		destination := ParseYAMLWithBackend(fixture["destination"].(string), DialectYAML, backend)
+		result := MatchYAMLOwners(*template.Analysis, *destination.Analysis)
+
+		expected := fixture["expected"].(map[string]any)
+		if len(result.Matched) != len(expected["matched"].([]any)) {
+			t.Fatalf("unexpected matched owners for %s: %+v", backend, result.Matched)
+		}
+		if len(result.UnmatchedTemplate) != len(expected["unmatched_template"].([]any)) {
+			t.Fatalf("unexpected unmatched template for %s: %+v", backend, result.UnmatchedTemplate)
+		}
+		if len(result.UnmatchedDestination) != len(expected["unmatched_destination"].([]any)) {
+			t.Fatalf("unexpected unmatched destination for %s: %+v", backend, result.UnmatchedDestination)
+		}
 	}
 }
 
 func TestSharedFixtureYAMLMerge(t *testing.T) {
 	mergeFixture := readYAMLFixture(t, "yaml", "slice-99-merge", "mapping-merge.json")
-	mergeResult := MergeYAML(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectYAML)
-	if !mergeResult.OK || mergeResult.Output == nil {
-		t.Fatalf("expected merge success: %+v", mergeResult)
-	}
-	if *mergeResult.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
-		t.Fatalf("unexpected merge output:\n%s", *mergeResult.Output)
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+		mergeResult := MergeYAMLWithBackend(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectYAML, backend)
+		if !mergeResult.OK || mergeResult.Output == nil {
+			t.Fatalf("expected merge success for %s: %+v", backend, mergeResult)
+		}
+		if *mergeResult.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
+			t.Fatalf("unexpected merge output for %s:\n%s", backend, *mergeResult.Output)
+		}
 	}
 
 	invalidTemplate := readYAMLFixture(t, "yaml", "slice-99-merge", "invalid-template.json")
-	invalidTemplateResult := MergeYAML(invalidTemplate["template"].(string), invalidTemplate["destination"].(string), DialectYAML)
-	if invalidTemplateResult.OK || len(invalidTemplateResult.Diagnostics) != 1 || string(invalidTemplateResult.Diagnostics[0].Category) != "parse_error" {
-		t.Fatalf("unexpected invalid template result: %+v", invalidTemplateResult)
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+		invalidTemplateResult := MergeYAMLWithBackend(invalidTemplate["template"].(string), invalidTemplate["destination"].(string), DialectYAML, backend)
+		if invalidTemplateResult.OK || len(invalidTemplateResult.Diagnostics) != 1 || string(invalidTemplateResult.Diagnostics[0].Category) != "parse_error" {
+			t.Fatalf("unexpected invalid template result for %s: %+v", backend, invalidTemplateResult)
+		}
 	}
 
 	invalidDestination := readYAMLFixture(t, "yaml", "slice-99-merge", "invalid-destination.json")
-	invalidDestinationResult := MergeYAML(invalidDestination["template"].(string), invalidDestination["destination"].(string), DialectYAML)
-	if invalidDestinationResult.OK || len(invalidDestinationResult.Diagnostics) != 1 || string(invalidDestinationResult.Diagnostics[0].Category) != "destination_parse_error" {
-		t.Fatalf("unexpected invalid destination result: %+v", invalidDestinationResult)
+	for _, backend := range []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML} {
+		invalidDestinationResult := MergeYAMLWithBackend(invalidDestination["template"].(string), invalidDestination["destination"].(string), DialectYAML, backend)
+		if invalidDestinationResult.OK || len(invalidDestinationResult.Diagnostics) != 1 || string(invalidDestinationResult.Diagnostics[0].Category) != "destination_parse_error" {
+			t.Fatalf("unexpected invalid destination result for %s: %+v", backend, invalidDestinationResult)
+		}
 	}
 }

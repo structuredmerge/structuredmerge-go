@@ -6,14 +6,22 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
-	"gopkg.in/yaml.v3"
+	yamlv3 "gopkg.in/yaml.v3"
 )
 
 type YAMLDialect string
 
 const (
 	DialectYAML YAMLDialect = "yaml"
+)
+
+type YAMLBackend string
+
+const (
+	BackendYAMLV3      YAMLBackend = "yaml-v3"
+	BackendGoccyGoYAML YAMLBackend = "goccy-go-yaml"
 )
 
 type YAMLRootKind string
@@ -64,18 +72,17 @@ type YAMLFeatureProfile struct {
 	SupportedPolicies []astmerge.PolicyReference
 }
 
+type YAMLBackendFeatureProfile struct {
+	Family            string
+	SupportedDialects []YAMLDialect
+	SupportedPolicies []astmerge.PolicyReference
+	Backend           string
+}
+
 func parseError(message string) astmerge.Diagnostic {
 	return astmerge.Diagnostic{
 		Severity: astmerge.SeverityError,
 		Category: astmerge.CategoryParseError,
-		Message:  message,
-	}
-}
-
-func destinationParseError(message string) astmerge.Diagnostic {
-	return astmerge.Diagnostic{
-		Severity: astmerge.SeverityError,
-		Category: astmerge.CategoryDestinationParseError,
 		Message:  message,
 	}
 }
@@ -109,17 +116,35 @@ func YAMLFeatureProfileInfo() YAMLFeatureProfile {
 	}
 }
 
+func AvailableYAMLBackends() []YAMLBackend {
+	return []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML}
+}
+
+func YAMLBackendFeatureProfileInfo(backend YAMLBackend) YAMLBackendFeatureProfile {
+	return YAMLBackendFeatureProfile{
+		Family:            YAMLFeatureProfileInfo().Family,
+		SupportedDialects: YAMLFeatureProfileInfo().SupportedDialects,
+		SupportedPolicies: YAMLFeatureProfileInfo().SupportedPolicies,
+		Backend:           string(backend),
+	}
+}
+
 func YAMLPlanContext() astmerge.ConformanceFamilyPlanContext {
+	return YAMLPlanContextWithBackend(BackendYAMLV3)
+}
+
+func YAMLPlanContextWithBackend(backend YAMLBackend) astmerge.ConformanceFamilyPlanContext {
+	backendProfile := YAMLBackendFeatureProfileInfo(backend)
 	return astmerge.ConformanceFamilyPlanContext{
 		FamilyProfile: astmerge.FamilyFeatureProfile{
-			Family:            YAMLFeatureProfileInfo().Family,
+			Family:            backendProfile.Family,
 			SupportedDialects: []string{string(DialectYAML)},
-			SupportedPolicies: YAMLFeatureProfileInfo().SupportedPolicies,
+			SupportedPolicies: backendProfile.SupportedPolicies,
 		},
 		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
-			Backend:           "yaml-v3",
+			Backend:           backendProfile.Backend,
 			SupportsDialects:  true,
-			SupportedPolicies: YAMLFeatureProfileInfo().SupportedPolicies,
+			SupportedPolicies: backendProfile.SupportedPolicies,
 		},
 	}
 }
@@ -133,10 +158,45 @@ func displayPath(path string) string {
 
 func isScalar(value any) bool {
 	switch value.(type) {
-	case string, int, int64, float64, bool:
+	case string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool:
 		return true
 	default:
 		return false
+	}
+}
+
+func normalizeYAMLValue(value any) any {
+	switch node := value.(type) {
+	case map[string]any:
+		mapping := make(map[string]any, len(node))
+		for key, child := range node {
+			mapping[key] = normalizeYAMLValue(child)
+		}
+		return mapping
+	case map[any]any:
+		mapping := make(map[string]any, len(node))
+		for key, child := range node {
+			mapping[fmt.Sprint(key)] = normalizeYAMLValue(child)
+		}
+		return mapping
+	case []any:
+		items := make([]any, len(node))
+		for index, child := range node {
+			items[index] = normalizeYAMLValue(child)
+		}
+		return items
+	case int:
+		return node
+	case int64:
+		return node
+	case float64:
+		return node
+	case bool:
+		return node
+	case string:
+		return node
+	default:
+		return node
 	}
 }
 
@@ -209,8 +269,26 @@ func renderYAMLScalar(value any) string {
 		return "false"
 	case int:
 		return strconv.Itoa(node)
+	case int8:
+		return strconv.FormatInt(int64(node), 10)
+	case int16:
+		return strconv.FormatInt(int64(node), 10)
+	case int32:
+		return strconv.FormatInt(int64(node), 10)
 	case int64:
 		return strconv.FormatInt(node, 10)
+	case uint:
+		return strconv.FormatUint(uint64(node), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(node), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(node), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(node), 10)
+	case uint64:
+		return strconv.FormatUint(node, 10)
+	case float32:
+		return strconv.FormatFloat(float64(node), 'f', -1, 32)
 	case float64:
 		return strconv.FormatFloat(node, 'f', -1, 64)
 	default:
@@ -296,15 +374,31 @@ func collectYAMLOwners(mapping map[string]any, prefix string) []YAMLOwner {
 	return owners
 }
 
-func parseYAMLMapping(source string) (map[string]any, error) {
-	var parsed map[string]any
-	if err := yaml.Unmarshal([]byte(source), &parsed); err != nil {
-		return nil, err
+func parseYAMLMapping(source string, backend YAMLBackend) (map[string]any, error) {
+	var parsed any
+	switch backend {
+	case BackendGoccyGoYAML:
+		if err := yaml.Unmarshal([]byte(source), &parsed); err != nil {
+			return nil, err
+		}
+	default:
+		if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
+			return nil, err
+		}
 	}
-	return parsed, nil
+
+	normalized, ok := normalizeYAMLValue(parsed).(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("YAML documents must parse to a mapping root")
+	}
+	return normalized, nil
 }
 
 func ParseYAML(source string, dialect YAMLDialect) astmerge.ParseResult[YAMLAnalysis] {
+	return ParseYAMLWithBackend(source, dialect, BackendYAMLV3)
+}
+
+func ParseYAMLWithBackend(source string, dialect YAMLDialect, backend YAMLBackend) astmerge.ParseResult[YAMLAnalysis] {
 	if dialect != DialectYAML {
 		return astmerge.ParseResult[YAMLAnalysis]{
 			OK:          false,
@@ -312,7 +406,7 @@ func ParseYAML(source string, dialect YAMLDialect) astmerge.ParseResult[YAMLAnal
 		}
 	}
 
-	parsed, err := parseYAMLMapping(source)
+	parsed, err := parseYAMLMapping(source, backend)
 	if err != nil {
 		return astmerge.ParseResult[YAMLAnalysis]{
 			OK:          false,
@@ -416,7 +510,11 @@ func mergeYAMLMappings(template map[string]any, destination map[string]any) map[
 }
 
 func MergeYAML(templateSource string, destinationSource string, dialect YAMLDialect) astmerge.MergeResult[string] {
-	template := ParseYAML(templateSource, dialect)
+	return MergeYAMLWithBackend(templateSource, destinationSource, dialect, BackendYAMLV3)
+}
+
+func MergeYAMLWithBackend(templateSource string, destinationSource string, dialect YAMLDialect, backend YAMLBackend) astmerge.MergeResult[string] {
+	template := ParseYAMLWithBackend(templateSource, dialect, backend)
 	if !template.OK || template.Analysis == nil {
 		return astmerge.MergeResult[string]{
 			OK:          false,
@@ -424,7 +522,7 @@ func MergeYAML(templateSource string, destinationSource string, dialect YAMLDial
 		}
 	}
 
-	destination := ParseYAML(destinationSource, dialect)
+	destination := ParseYAMLWithBackend(destinationSource, dialect, backend)
 	if !destination.OK || destination.Analysis == nil {
 		diagnostics := make([]astmerge.Diagnostic, 0, len(destination.Diagnostics))
 		for _, diagnostic := range destination.Diagnostics {
@@ -439,18 +537,22 @@ func MergeYAML(templateSource string, destinationSource string, dialect YAMLDial
 		}
 	}
 
-	templateMapping, err := parseYAMLMapping(template.Analysis.NormalizedSource)
+	templateMapping, err := parseYAMLMapping(template.Analysis.NormalizedSource, backend)
 	if err != nil {
 		return astmerge.MergeResult[string]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{parseError(err.Error())},
 		}
 	}
-	destinationMapping, err := parseYAMLMapping(destination.Analysis.NormalizedSource)
+	destinationMapping, err := parseYAMLMapping(destination.Analysis.NormalizedSource, backend)
 	if err != nil {
 		return astmerge.MergeResult[string]{
-			OK:          false,
-			Diagnostics: []astmerge.Diagnostic{destinationParseError(err.Error())},
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.CategoryDestinationParseError,
+				Message:  err.Error(),
+			}},
 		}
 	}
 
