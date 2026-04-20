@@ -108,6 +108,16 @@ type ProjectedChildReviewGroup struct {
 	DelegatedCaseIDs            []string `json:"delegated_case_ids"`
 }
 
+type ProjectedChildReviewGroupProgress struct {
+	DelegatedApplyGroup         string   `json:"delegated_apply_group"`
+	ParentOperationID           string   `json:"parent_operation_id"`
+	ChildOperationID            string   `json:"child_operation_id"`
+	DelegatedRuntimeSurfacePath string   `json:"delegated_runtime_surface_path"`
+	ResolvedCaseIDs             []string `json:"resolved_case_ids"`
+	PendingCaseIDs              []string `json:"pending_case_ids"`
+	Complete                    bool     `json:"complete"`
+}
+
 type ParseResult[T any] struct {
 	OK          bool
 	Diagnostics []Diagnostic
@@ -476,6 +486,34 @@ func GroupProjectedChildReviewCases(cases []ProjectedChildReviewCase) []Projecte
 	}
 
 	return groups
+}
+
+func SummarizeProjectedChildReviewGroupProgress(groups []ProjectedChildReviewGroup, resolvedCaseIDs []string) []ProjectedChildReviewGroupProgress {
+	progress := make([]ProjectedChildReviewGroupProgress, 0, len(groups))
+
+	for _, group := range groups {
+		resolved := make([]string, 0)
+		pending := make([]string, 0)
+		for _, caseID := range group.CaseIDs {
+			if slices.Contains(resolvedCaseIDs, caseID) {
+				resolved = append(resolved, caseID)
+			} else {
+				pending = append(pending, caseID)
+			}
+		}
+
+		progress = append(progress, ProjectedChildReviewGroupProgress{
+			DelegatedApplyGroup:         group.DelegatedApplyGroup,
+			ParentOperationID:           group.ParentOperationID,
+			ChildOperationID:            group.ChildOperationID,
+			DelegatedRuntimeSurfacePath: group.DelegatedRuntimeSurfacePath,
+			ResolvedCaseIDs:             resolved,
+			PendingCaseIDs:              pending,
+			Complete:                    len(pending) == 0,
+		})
+	}
+
+	return progress
 }
 
 func DefaultConformanceFamilyContext(

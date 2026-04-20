@@ -2696,6 +2696,37 @@ func TestSharedFixtureProjectedChildReviewGroups(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProjectedChildReviewGroupProgress(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "projected_child_review_group_progress"))
+	groupSource, err := json.Marshal(fixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal projected child review groups: %v", err)
+	}
+	var groups []ProjectedChildReviewGroup
+	if err := json.Unmarshal(groupSource, &groups); err != nil {
+		t.Fatalf("unmarshal projected child review groups: %v", err)
+	}
+	resolvedSource, err := json.Marshal(fixture["resolved_case_ids"])
+	if err != nil {
+		t.Fatalf("marshal resolved case ids: %v", err)
+	}
+	var resolvedCaseIDs []string
+	if err := json.Unmarshal(resolvedSource, &resolvedCaseIDs); err != nil {
+		t.Fatalf("unmarshal resolved case ids: %v", err)
+	}
+	encoded, err := json.Marshal(SummarizeProjectedChildReviewGroupProgress(groups, resolvedCaseIDs))
+	if err != nil {
+		t.Fatalf("marshal projected child review group progress: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal projected child review group progress: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, fixture["expected_progress"]) {
+		t.Fatalf("unexpected projected child review group progress: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
 	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))
