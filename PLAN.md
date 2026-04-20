@@ -32,6 +32,7 @@ Deferred:
 - `kettle-jem`-style scaffolding
 - full merge-family parity beyond MVP
 - non-tree-sitter native parser experiments
+- PEG-backend parity beyond the first tree-sitter and native adapter slices
 
 ## Proposed Module Family
 
@@ -76,6 +77,7 @@ Current host constraint:
   module is not yet usable as a drop-in backend in this workspace because it
   requires Go `1.26` and its published module payload omits the `include/` and
   `lib/` artifacts referenced by its own CGO bindings
+- first PEG candidate for a second backend path: `pigeon`
 
 Requirements:
 
