@@ -2825,6 +2825,29 @@ func TestSharedFixtureDelegatedChildGroupReviewState(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureDelegatedChildApplyPlan(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "delegated_child_apply_plan"))
+	stateSource, err := json.Marshal(fixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal delegated child review state: %v", err)
+	}
+	var state DelegatedChildGroupReviewState
+	if err := json.Unmarshal(stateSource, &state); err != nil {
+		t.Fatalf("unmarshal delegated child review state: %v", err)
+	}
+	encoded, err := json.Marshal(DelegatedChildApplyPlanForState(state, fixture["family"].(string)))
+	if err != nil {
+		t.Fatalf("marshal delegated child apply plan: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal delegated child apply plan: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, fixture["expected_plan"]) {
+		t.Fatalf("unexpected delegated child apply plan: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
 	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))

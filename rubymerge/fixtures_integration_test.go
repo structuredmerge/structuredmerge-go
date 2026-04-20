@@ -262,6 +262,27 @@ func TestRubyFixtures(t *testing.T) {
 	if !deepEqualJSON(decodedState, stateFixture["expected_state"]) {
 		t.Fatalf("unexpected delegated child review state: %+v", decodedState)
 	}
+
+	applyPlanFixture := readRubyFixture(t, "ruby", "slice-245-delegated-child-apply-plan", "yard-example-apply-plan.json")
+	applyPlanSource, err := json.Marshal(applyPlanFixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal delegated child review state: %v", err)
+	}
+	var applyPlanState astmerge.DelegatedChildGroupReviewState
+	if err := json.Unmarshal(applyPlanSource, &applyPlanState); err != nil {
+		t.Fatalf("unmarshal delegated child review state: %v", err)
+	}
+	applyPlanValue, err := json.Marshal(astmerge.DelegatedChildApplyPlanForState(applyPlanState, applyPlanFixture["family"].(string)))
+	if err != nil {
+		t.Fatalf("marshal delegated child apply plan: %v", err)
+	}
+	var decodedApplyPlan any
+	if err := json.Unmarshal(applyPlanValue, &decodedApplyPlan); err != nil {
+		t.Fatalf("unmarshal delegated child apply plan: %v", err)
+	}
+	if !deepEqualJSON(decodedApplyPlan, applyPlanFixture["expected_plan"]) {
+		t.Fatalf("unexpected delegated child apply plan: %+v", decodedApplyPlan)
+	}
 }
 
 func deepEqualJSON(left any, right any) bool {

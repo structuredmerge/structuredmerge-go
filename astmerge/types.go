@@ -35,20 +35,20 @@ const (
 )
 
 type ReviewDiagnosticDetail struct {
-	RequestID      string
-	Action         ReviewDecisionAction
-	Reason         ReviewDiagnosticReason
-	PayloadKind    string
-	ExpectedFamily string
-	ProvidedFamily string
+	RequestID      string                 `json:"request_id,omitempty"`
+	Action         ReviewDecisionAction   `json:"action,omitempty"`
+	Reason         ReviewDiagnosticReason `json:"reason,omitempty"`
+	PayloadKind    string                 `json:"payload_kind,omitempty"`
+	ExpectedFamily string                 `json:"expected_family,omitempty"`
+	ProvidedFamily string                 `json:"provided_family,omitempty"`
 }
 
 type Diagnostic struct {
-	Severity DiagnosticSeverity
-	Category DiagnosticCategory
-	Message  string
-	Path     string
-	Review   *ReviewDiagnosticDetail
+	Severity DiagnosticSeverity      `json:"severity"`
+	Category DiagnosticCategory      `json:"category"`
+	Message  string                  `json:"message"`
+	Path     string                  `json:"path,omitempty"`
+	Review   *ReviewDiagnosticDetail `json:"review,omitempty"`
 }
 
 type SurfaceOwnerKind string
@@ -292,6 +292,17 @@ type DelegatedChildGroupReviewState struct {
 	AcceptedGroups   []ProjectedChildReviewGroup `json:"accepted_groups"`
 	AppliedDecisions []ReviewDecision            `json:"applied_decisions"`
 	Diagnostics      []Diagnostic                `json:"diagnostics"`
+}
+
+type DelegatedChildApplyPlanEntry struct {
+	RequestID      string                    `json:"request_id"`
+	Family         string                    `json:"family"`
+	DelegatedGroup ProjectedChildReviewGroup `json:"delegated_group"`
+	Decision       ReviewDecision            `json:"decision"`
+}
+
+type DelegatedChildApplyPlan struct {
+	Entries []DelegatedChildApplyPlanEntry `json:"entries"`
 }
 
 type ReviewReplayBundle struct {
@@ -631,6 +642,33 @@ func ReviewProjectedChildGroups(groups []ProjectedChildReviewGroup, family strin
 		AppliedDecisions: appliedDecisions,
 		Diagnostics:      diagnostics,
 	}
+}
+
+func DelegatedChildApplyPlanForState(state DelegatedChildGroupReviewState, family string) DelegatedChildApplyPlan {
+	entries := make([]DelegatedChildApplyPlanEntry, 0, len(state.AcceptedGroups))
+	for _, group := range state.AcceptedGroups {
+		requestID := ReviewRequestIDForProjectedChildGroup(group)
+		var matched *ReviewDecision
+		for _, decision := range state.AppliedDecisions {
+			if decision.RequestID == requestID {
+				decisionCopy := decision
+				matched = &decisionCopy
+				break
+			}
+		}
+		if matched == nil {
+			continue
+		}
+
+		entries = append(entries, DelegatedChildApplyPlanEntry{
+			RequestID:      requestID,
+			Family:         family,
+			DelegatedGroup: group,
+			Decision:       *matched,
+		})
+	}
+
+	return DelegatedChildApplyPlan{Entries: entries}
 }
 
 func DefaultConformanceFamilyContext(

@@ -336,3 +336,18 @@ func TestSharedFixtureMarkdownDelegatedChildReviewState(t *testing.T) {
 		t.Fatalf("unexpected delegated child review state: %+v", actual)
 	}
 }
+
+func TestSharedFixtureMarkdownDelegatedChildApplyPlan(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-244-delegated-child-apply-plan", "fenced-code-apply-plan.json")
+	stateSource, err := json.Marshal(fixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal delegated child review state: %v", err)
+	}
+	var state astmerge.DelegatedChildGroupReviewState
+	if err := json.Unmarshal(stateSource, &state); err != nil {
+		t.Fatalf("unmarshal delegated child review state: %v", err)
+	}
+	if actual := jsonReadyMarkdown(t, astmerge.DelegatedChildApplyPlanForState(state, fixture["family"].(string))); !reflect.DeepEqual(actual, fixture["expected_plan"]) {
+		t.Fatalf("unexpected delegated child apply plan: %+v", actual)
+	}
+}
