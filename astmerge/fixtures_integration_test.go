@@ -1064,6 +1064,80 @@ func TestSlice139TOMLFamilyNamedSuitePlans(t *testing.T) {
 	}
 }
 
+func TestSlice200MarkdownFamilySuiteDefinitions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-200-markdown-family-suite-definitions", "markdown-suite-definitions.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	expectedNames := []string{"markdown_portable"}
+	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
+		t.Fatalf("unexpected Markdown suite names: %+v", names)
+	}
+	expectedDefinition := ConformanceSuiteDefinition{Family: "markdown", Roles: []string{"analysis", "matching"}}
+	if definition := ConformanceSuiteDefinitionByName(manifest, "markdown_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+		t.Fatalf("unexpected Markdown suite definition: %+v", definition)
+	}
+}
+
+func TestSlice201MarkdownFamilyNamedSuitePlans(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-201-markdown-family-named-suite-plans", "go-markdown-named-suite-plans.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+
+	contextsRaw := fixture["contexts"].(map[string]any)
+	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+	for family, raw := range contextsRaw {
+		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+
+	expectedRaw := fixture["expected_entries"].([]any)
+	expected := make([]NamedConformanceSuitePlan, 0, len(expectedRaw))
+	for _, raw := range expectedRaw {
+		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("unexpected Markdown named suite plans: %+v", plans)
+	}
+}
+
+func TestSlice202MarkdownFamilyManifestReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-202-markdown-family-manifest-report", "go-markdown-manifest-report.json"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+	expected := parseConformanceManifestReport(fixture["expected_report"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	executions := make(map[string]ConformanceCaseExecution, len(executionsRaw))
+	for key, raw := range executionsRaw {
+		executions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+	}
+
+	report := ReportConformanceManifest(manifest, options, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if execution, ok := executions[key]; ok {
+			return execution
+		}
+		return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+	})
+
+	if !reflect.DeepEqual(report, expected) {
+		t.Fatalf("unexpected Markdown manifest report: %+v", report)
+	}
+}
+
 func TestSlice140TOMLFamilyManifestReport(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-140-toml-family-manifest-report", "go-toml-manifest-report.json"))
 	var manifest ConformanceManifest
