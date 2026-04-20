@@ -171,7 +171,8 @@ const (
 type ReviewDecisionAction string
 
 const (
-	ReviewDecisionAcceptDefaultContext ReviewDecisionAction = "accept_default_context"
+	ReviewDecisionAcceptDefaultContext   ReviewDecisionAction = "accept_default_context"
+	ReviewDecisionProvideExplicitContext ReviewDecisionAction = "provide_explicit_context"
 )
 
 type ReviewRequest struct {
@@ -186,8 +187,9 @@ type ReviewRequest struct {
 }
 
 type ReviewDecision struct {
-	RequestID string               `json:"request_id"`
-	Action    ReviewDecisionAction `json:"action"`
+	RequestID string                        `json:"request_id"`
+	Action    ReviewDecisionAction          `json:"action"`
+	Context   *ConformanceFamilyPlanContext `json:"context,omitempty"`
 }
 
 type ReviewReplayBundle struct {
@@ -556,16 +558,30 @@ func ResolveConformanceFamilyContext(
 func reviewDecisionForFamilyContext(
 	family string,
 	options ConformanceManifestReviewOptions,
-) *ReviewDecision {
+) (*ConformanceFamilyPlanContext, *ReviewDecision, bool) {
 	requestID := ReviewRequestIDForFamilyContext(family)
+	var familyProfile *FamilyFeatureProfile
+	if profile, ok := options.FamilyProfiles[family]; ok {
+		copyProfile := profile
+		familyProfile = &copyProfile
+	}
 	for _, decision := range options.ReviewDecisions {
-		if decision.RequestID == requestID && decision.Action == ReviewDecisionAcceptDefaultContext {
+		if decision.RequestID != requestID {
+			continue
+		}
+		if decision.Action == ReviewDecisionAcceptDefaultContext && familyProfile != nil {
 			copyDecision := decision
-			return &copyDecision
+			context := DefaultConformanceFamilyContext(*familyProfile)
+			return &context, &copyDecision, true
+		}
+		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context != nil {
+			copyDecision := decision
+			context := *decision.Context
+			return &context, &copyDecision, false
 		}
 	}
 
-	return nil
+	return nil, nil, false
 }
 
 func ReviewConformanceFamilyContext(
@@ -596,14 +612,16 @@ func ReviewConformanceFamilyContext(
 		}}, nil, nil
 	}
 
-	if decision := reviewDecisionForFamilyContext(family, options); decision != nil {
-		return &ConformanceFamilyPlanContext{
-				FamilyProfile: familyProfile,
-			}, []Diagnostic{{
+	if context, decision, assumedDefault := reviewDecisionForFamilyContext(family, options); decision != nil {
+		diagnostics := []Diagnostic{}
+		if assumedDefault {
+			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityWarning,
 				Category: CategoryAssumedDefault,
 				Message:  "using default family context for " + family + ".",
-			}}, nil, []ReviewDecision{*decision}
+			})
+		}
+		return context, diagnostics, nil, []ReviewDecision{*decision}
 	}
 
 	return nil, []Diagnostic{{
@@ -617,7 +635,7 @@ func ReviewConformanceFamilyContext(
 			Message:          "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
 			Blocking:         true,
 			ProposedContext:  &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
-			AvailableActions: []ReviewDecisionAction{ReviewDecisionAcceptDefaultContext},
+			AvailableActions: []ReviewDecisionAction{ReviewDecisionAcceptDefaultContext, ReviewDecisionProvideExplicitContext},
 			DefaultAction:    ReviewDecisionAcceptDefaultContext,
 		}}, nil
 }

@@ -1148,6 +1148,28 @@ func TestSharedFixtureFamilyContextReviewProposal(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFamilyContextExplicitReviewDecision(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "family_context_explicit_review_decision"))
+	family := fixture["family"].(string)
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expectedContext := parseConformanceFamilyPlanContext(fixture["expected_context"].(map[string]any))
+	expectedApplied := make([]ReviewDecision, 0, len(fixture["expected_applied_decisions"].([]any)))
+	for _, item := range fixture["expected_applied_decisions"].([]any) {
+		expectedApplied = append(expectedApplied, parseReviewDecision(item.(map[string]any)))
+	}
+
+	context, diagnostics, requests, applied := ReviewConformanceFamilyContext(family, options)
+	if context == nil || !reflect.DeepEqual(*context, expectedContext) {
+		t.Fatalf("unexpected explicit review context: %+v", context)
+	}
+	if len(diagnostics) != 0 || len(requests) != 0 {
+		t.Fatalf("unexpected explicit review diagnostics/requests: %+v %+v", diagnostics, requests)
+	}
+	if !reflect.DeepEqual(applied, expectedApplied) {
+		t.Fatalf("unexpected explicit review applied decisions: %+v", applied)
+	}
+}
+
 func TestSharedFixtureConformanceManifestReviewState(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "conformance_manifest_review_state"))
 	var manifest ConformanceManifest
@@ -1367,6 +1389,39 @@ func TestSharedFixtureReviewReplayBundleApplication(t *testing.T) {
 
 	if !reflect.DeepEqual(state, expected) {
 		t.Fatalf("unexpected review replay bundle application state: %+v", state)
+	}
+}
+
+func TestSharedFixtureExplicitReviewReplayBundleApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "explicit_review_replay_bundle_application"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	state := ReviewConformanceManifest(
+		manifest,
+		options,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected explicit replay bundle state: %+v", state)
 	}
 }
 
@@ -1724,10 +1779,16 @@ func parseReviewRequest(raw map[string]any) ReviewRequest {
 }
 
 func parseReviewDecision(raw map[string]any) ReviewDecision {
-	return ReviewDecision{
+	decision := ReviewDecision{
 		RequestID: raw["request_id"].(string),
 		Action:    ReviewDecisionAction(raw["action"].(string)),
 	}
+	if rawContext, ok := raw["context"]; ok {
+		context := parseConformanceFamilyPlanContext(rawContext.(map[string]any))
+		decision.Context = &context
+	}
+
+	return decision
 }
 
 func parseReviewReplayBundle(raw map[string]any) ReviewReplayBundle {
