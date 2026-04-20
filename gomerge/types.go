@@ -1,6 +1,9 @@
 package gomerge
 
 import (
+	"go/ast"
+	goparser "go/parser"
+	"go/token"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,9 +13,12 @@ import (
 )
 
 type GoDialect string
+type GoBackend string
 
 const (
-	DialectGo GoDialect = "go"
+	DialectGo         GoDialect = "go"
+	BackendTreeSitter GoBackend = "tree-sitter"
+	BackendNative     GoBackend = "native"
 )
 
 type GoOwnerKind string
@@ -81,6 +87,10 @@ func GoFeatureProfileInfo() GoFeatureProfile {
 	}
 }
 
+func GoBackends() []GoBackend {
+	return []GoBackend{BackendTreeSitter, BackendNative}
+}
+
 func parseRequest(source string) treehaver.ParserRequest {
 	return treehaver.ParserRequest{Source: source, Language: "go", Dialect: "go"}
 }
@@ -115,6 +125,14 @@ func normalizeGoImportPath(importSource string) string {
 }
 
 func ParseGo(source string, _dialect GoDialect) astmerge.ParseResult[GoAnalysis] {
+	return ParseGoWithBackend(source, DialectGo, BackendTreeSitter)
+}
+
+func ParseGoWithBackend(source string, _dialect GoDialect, backend GoBackend) astmerge.ParseResult[GoAnalysis] {
+	if backend == BackendNative {
+		return parseGoNative(source)
+	}
+
 	parsed := treehaver.ParseWithLanguagePack(parseRequest(source))
 	if !parsed.OK {
 		return astmerge.ParseResult[GoAnalysis]{OK: false, Diagnostics: parsed.Diagnostics}
@@ -214,11 +232,15 @@ func MatchGoOwners(template GoAnalysis, destination GoAnalysis) GoOwnerMatchResu
 }
 
 func MergeGo(templateSource, destinationSource string, dialect GoDialect) astmerge.MergeResult[string] {
-	template := ParseGo(templateSource, dialect)
+	return MergeGoWithBackend(templateSource, destinationSource, dialect, BackendTreeSitter)
+}
+
+func MergeGoWithBackend(templateSource, destinationSource string, dialect GoDialect, backend GoBackend) astmerge.MergeResult[string] {
+	template := ParseGoWithBackend(templateSource, dialect, backend)
 	if !template.OK || template.Analysis == nil {
 		return astmerge.MergeResult[string]{OK: false, Diagnostics: template.Diagnostics}
 	}
-	destination := ParseGo(destinationSource, dialect)
+	destination := ParseGoWithBackend(destinationSource, dialect, backend)
 	if !destination.OK || destination.Analysis == nil {
 		diagnostics := make([]astmerge.Diagnostic, 0, len(destination.Diagnostics))
 		for _, diagnostic := range destination.Diagnostics {
@@ -260,4 +282,88 @@ func MergeGo(templateSource, destinationSource string, dialect GoDialect) astmer
 		Output:      &output,
 		Policies:    []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 	}
+}
+
+func parseGoNative(source string) astmerge.ParseResult[GoAnalysis] {
+	originalSource := source
+	offsetBytes := 0
+	if !strings.HasPrefix(strings.TrimSpace(source), "package ") {
+		prefix := "package main\n\n"
+		source = prefix + source
+		offsetBytes = len(prefix)
+	}
+
+	fset := token.NewFileSet()
+	file, err := goparser.ParseFile(fset, "input.go", source, goparser.ParseComments)
+	if err != nil {
+		return astmerge.ParseResult[GoAnalysis]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{
+				{
+					Severity: astmerge.SeverityError,
+					Category: astmerge.CategoryParseError,
+					Message:  strings.ReplaceAll(err.Error(), "input.go:3:", "input.go:1:"),
+				},
+			},
+		}
+	}
+
+	imports := make([]moduleImport, 0, len(file.Imports))
+	for index, item := range file.Imports {
+		matchKey := strings.Trim(item.Path.Value, "\"")
+		start := fset.Position(item.Pos()).Offset - offsetBytes
+		end := fset.Position(item.End()).Offset - offsetBytes
+		lineStart := strings.LastIndex(originalSource[:start], "\n")
+		if lineStart >= 0 {
+			lineStart++
+		} else {
+			lineStart = 0
+		}
+		imports = append(imports, moduleImport{
+			Path:     "/imports/" + strconv.Itoa(index),
+			MatchKey: matchKey,
+			Text:     strings.TrimSpace(originalSource[lineStart:end]) + "\n",
+		})
+	}
+
+	declarations := make([]moduleDeclaration, 0)
+	for _, decl := range file.Decls {
+		funcDecl, ok := decl.(*ast.FuncDecl)
+		if !ok || funcDecl.Name == nil {
+			continue
+		}
+		start := fset.Position(funcDecl.Pos()).Offset - offsetBytes
+		end := fset.Position(funcDecl.End()).Offset - offsetBytes
+		lineStart := strings.LastIndex(originalSource[:start], "\n")
+		if lineStart >= 0 {
+			lineStart++
+		} else {
+			lineStart = 0
+		}
+		declarations = append(declarations, moduleDeclaration{
+			Path:     "/declarations/" + funcDecl.Name.Name,
+			MatchKey: funcDecl.Name.Name,
+			Text:     strings.TrimSpace(originalSource[lineStart:end]) + "\n",
+		})
+	}
+	slices.SortFunc(declarations, func(left, right moduleDeclaration) int {
+		return strings.Compare(left.Path, right.Path)
+	})
+
+	owners := make([]GoOwner, 0, len(imports)+len(declarations))
+	for _, item := range imports {
+		owners = append(owners, GoOwner{Path: item.Path, OwnerKind: OwnerImport, MatchKey: item.MatchKey})
+	}
+	for _, item := range declarations {
+		owners = append(owners, GoOwner{Path: item.Path, OwnerKind: OwnerDeclaration, MatchKey: item.MatchKey})
+	}
+
+	analysis := GoAnalysis{
+		Dialect:      DialectGo,
+		Source:       originalSource,
+		Owners:       owners,
+		Imports:      imports,
+		Declarations: declarations,
+	}
+	return astmerge.ParseResult[GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
 }

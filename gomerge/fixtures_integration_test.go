@@ -47,3 +47,37 @@ func TestGoFixtures(t *testing.T) {
 		t.Fatalf("unexpected merge: %+v", merge)
 	}
 }
+
+func TestGoBackends(t *testing.T) {
+	fixture := readGoFixture(t, "diagnostics", "slice-113-go-family-backends", "go-backends.json")
+	backends := GoBackends()
+	if len(backends) != len(fixture["backends"].([]any)) {
+		t.Fatalf("unexpected backends: %+v", backends)
+	}
+
+	parityFixture := readGoFixture(t, "go", "slice-114-native", "module-parity.json")
+	treeResult := ParseGoWithBackend(parityFixture["source"].(string), DialectGo, BackendTreeSitter)
+	nativeResult := ParseGoWithBackend(parityFixture["source"].(string), DialectGo, BackendNative)
+	if !treeResult.OK || treeResult.Analysis == nil {
+		t.Fatalf("unexpected tree-sitter result: %+v", treeResult)
+	}
+	if !nativeResult.OK || nativeResult.Analysis == nil {
+		t.Fatalf("unexpected native result: %+v", nativeResult)
+	}
+	if len(treeResult.Analysis.Owners) != len(parityFixture["expected"].(map[string]any)["owners"].([]any)) {
+		t.Fatalf("unexpected tree owners: %+v", treeResult.Analysis.Owners)
+	}
+	if len(nativeResult.Analysis.Owners) != len(parityFixture["expected"].(map[string]any)["owners"].([]any)) {
+		t.Fatalf("unexpected native owners: %+v", nativeResult.Analysis.Owners)
+	}
+
+	nativeMerge := MergeGoWithBackend(
+		parityFixture["template"].(string),
+		parityFixture["destination"].(string),
+		DialectGo,
+		BackendNative,
+	)
+	if !nativeMerge.OK || nativeMerge.Output == nil || *nativeMerge.Output != parityFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected native merge: %+v", nativeMerge)
+	}
+}
