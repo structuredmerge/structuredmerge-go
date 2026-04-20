@@ -213,3 +213,26 @@ func TestSharedFixtureMarkdownProjectedChildReviewGroupProgress(t *testing.T) {
 		t.Fatalf("unexpected projected child review group progress: %+v", actual)
 	}
 }
+
+func TestSharedFixtureMarkdownProjectedChildReviewGroupsReadyForApply(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-234-projected-child-review-groups-ready-for-apply", "fenced-code-ready-groups.json")
+	groupSource, err := json.Marshal(fixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal projected groups: %v", err)
+	}
+	var groups []astmerge.ProjectedChildReviewGroup
+	if err := json.Unmarshal(groupSource, &groups); err != nil {
+		t.Fatalf("unmarshal projected groups: %v", err)
+	}
+	resolvedSource, err := json.Marshal(fixture["resolved_case_ids"])
+	if err != nil {
+		t.Fatalf("marshal resolved case ids: %v", err)
+	}
+	var resolvedCaseIDs []string
+	if err := json.Unmarshal(resolvedSource, &resolvedCaseIDs); err != nil {
+		t.Fatalf("unmarshal resolved case ids: %v", err)
+	}
+	if actual := jsonReadyMarkdown(t, astmerge.SelectProjectedChildReviewGroupsReadyForApply(groups, resolvedCaseIDs)); !reflect.DeepEqual(actual, fixture["expected_ready_groups"]) {
+		t.Fatalf("unexpected ready projected child review groups: %+v", actual)
+	}
+}

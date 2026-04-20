@@ -516,6 +516,26 @@ func SummarizeProjectedChildReviewGroupProgress(groups []ProjectedChildReviewGro
 	return progress
 }
 
+func SelectProjectedChildReviewGroupsReadyForApply(groups []ProjectedChildReviewGroup, resolvedCaseIDs []string) []ProjectedChildReviewGroup {
+	ready := make([]ProjectedChildReviewGroup, 0)
+
+	for _, group := range groups {
+		complete := true
+		for _, caseID := range group.CaseIDs {
+			if !slices.Contains(resolvedCaseIDs, caseID) {
+				complete = false
+				break
+			}
+		}
+
+		if complete {
+			ready = append(ready, group)
+		}
+	}
+
+	return ready
+}
+
 func DefaultConformanceFamilyContext(
 	familyProfile FamilyFeatureProfile,
 ) ConformanceFamilyPlanContext {

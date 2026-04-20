@@ -123,6 +123,35 @@ func TestRubyFixtures(t *testing.T) {
 	if !deepEqualJSON(decodedProgress, progressFixture["expected_progress"]) {
 		t.Fatalf("unexpected projected progress: %+v", decodedProgress)
 	}
+
+	readyFixture := readRubyFixture(t, "ruby", "slice-235-projected-child-review-groups-ready-for-apply", "yard-example-ready-groups.json")
+	readySource, err := json.Marshal(readyFixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal ready groups: %v", err)
+	}
+	var readyGroups []astmerge.ProjectedChildReviewGroup
+	if err := json.Unmarshal(readySource, &readyGroups); err != nil {
+		t.Fatalf("unmarshal ready groups: %v", err)
+	}
+	readyResolvedSource, err := json.Marshal(readyFixture["resolved_case_ids"])
+	if err != nil {
+		t.Fatalf("marshal ready resolved case ids: %v", err)
+	}
+	var readyResolvedCaseIDs []string
+	if err := json.Unmarshal(readyResolvedSource, &readyResolvedCaseIDs); err != nil {
+		t.Fatalf("unmarshal ready resolved case ids: %v", err)
+	}
+	readyValue, err := json.Marshal(astmerge.SelectProjectedChildReviewGroupsReadyForApply(readyGroups, readyResolvedCaseIDs))
+	if err != nil {
+		t.Fatalf("marshal ready groups: %v", err)
+	}
+	var decodedReady any
+	if err := json.Unmarshal(readyValue, &decodedReady); err != nil {
+		t.Fatalf("unmarshal ready groups: %v", err)
+	}
+	if !deepEqualJSON(decodedReady, readyFixture["expected_ready_groups"]) {
+		t.Fatalf("unexpected ready groups: %+v", decodedReady)
+	}
 }
 
 func deepEqualJSON(left any, right any) bool {
