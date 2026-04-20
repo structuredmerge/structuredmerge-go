@@ -178,6 +178,7 @@ const (
 type ReviewActionOffer struct {
 	Action          ReviewDecisionAction `json:"action"`
 	RequiresContext bool                 `json:"requires_context"`
+	PayloadKind     string               `json:"payload_kind,omitempty"`
 }
 
 type ReviewRequest struct {
@@ -651,7 +652,7 @@ func ReviewConformanceFamilyContext(
 			ProposedContext: &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
 			ActionOffers: []ReviewActionOffer{
 				{Action: ReviewDecisionAcceptDefaultContext, RequiresContext: false},
-				{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true},
+				{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true, PayloadKind: "conformance_family_context"},
 			},
 			DefaultAction: ReviewDecisionAcceptDefaultContext,
 		}}, nil
@@ -670,7 +671,7 @@ func ReviewConformanceFamilyContext(
 			ProposedContext: &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
 			ActionOffers: []ReviewActionOffer{
 				{Action: ReviewDecisionAcceptDefaultContext, RequiresContext: false},
-				{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true},
+				{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true, PayloadKind: "conformance_family_context"},
 			},
 			DefaultAction: ReviewDecisionAcceptDefaultContext,
 		}}, nil

@@ -1810,6 +1810,12 @@ func parseReviewRequest(raw map[string]any) ReviewRequest {
 			request.ActionOffers = append(request.ActionOffers, ReviewActionOffer{
 				Action:          ReviewDecisionAction(offer["action"].(string)),
 				RequiresContext: offer["requires_context"].(bool),
+				PayloadKind: func() string {
+					if payloadKind, ok := offer["payload_kind"]; ok {
+						return payloadKind.(string)
+					}
+					return ""
+				}(),
 			})
 		}
 	}
