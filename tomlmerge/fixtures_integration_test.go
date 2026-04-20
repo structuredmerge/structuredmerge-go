@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readTOMLFixture(t *testing.T, parts ...string) map[string]any {
@@ -46,6 +48,66 @@ func TestSharedFixtureTOMLFeatureProfile(t *testing.T) {
 	pigeonProfile := TOMLBackendFeatureProfileInfo(BackendPigeon)
 	if pigeonProfile.Backend != "pigeon" || pigeonProfile.BackendRef == nil || pigeonProfile.BackendRef.Family != "peg" {
 		t.Fatalf("unexpected pigeon backend profile: %+v", pigeonProfile)
+	}
+}
+
+func TestSharedFixtureTOMLBackendFeatureProfiles(t *testing.T) {
+	fixture := readTOMLFixture(t, "diagnostics", "slice-135-toml-family-backend-feature-profiles", "go-toml-backend-feature-profiles.json")
+
+	nativeProfile := TOMLBackendFeatureProfileInfo(BackendNative)
+	if nativeProfile.Backend != fixture["native"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected native backend feature profile: %+v", nativeProfile)
+	}
+
+	pigeonProfile := TOMLBackendFeatureProfileInfo(BackendPigeon)
+	if pigeonProfile.Backend != fixture["pigeon"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected pigeon backend feature profile: %+v", pigeonProfile)
+	}
+}
+
+func TestSharedFixtureTOMLPlanContexts(t *testing.T) {
+	fixture := readTOMLFixture(t, "diagnostics", "slice-136-toml-family-plan-contexts", "go-toml-plan-contexts.json")
+
+	nativeContext := TOMLPlanContext(BackendNative)
+	if nativeContext.FamilyProfile.Family != fixture["native"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected native plan context: %+v", nativeContext)
+	}
+	if nativeContext.FeatureProfile == nil || nativeContext.FeatureProfile.Backend != fixture["native"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected native feature profile: %+v", nativeContext.FeatureProfile)
+	}
+
+	pigeonContext := TOMLPlanContext(BackendPigeon)
+	if pigeonContext.FamilyProfile.Family != fixture["pigeon"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected pigeon plan context: %+v", pigeonContext)
+	}
+	if pigeonContext.FeatureProfile == nil || pigeonContext.FeatureProfile.Backend != fixture["pigeon"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected pigeon feature profile: %+v", pigeonContext.FeatureProfile)
+	}
+}
+
+func TestSharedFixtureTOMLManifest(t *testing.T) {
+	fixture := readTOMLFixture(t, "conformance", "slice-137-toml-family-manifest", "toml-family-manifest.json")
+	source, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(manifest, "toml"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-90-toml-family-feature-profile", "toml-feature-profile.json") {
+		t.Fatalf("unexpected family feature profile path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "toml", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-92-structure", "table-and-array.json") {
+		t.Fatalf("unexpected analysis fixture path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "toml", "matching"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-93-matching", "path-equality.json") {
+		t.Fatalf("unexpected matching fixture path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "toml", "merge"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-94-merge", "table-merge.json") {
+		t.Fatalf("unexpected merge fixture path: %v", path)
 	}
 }
 

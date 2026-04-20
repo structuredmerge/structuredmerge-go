@@ -149,6 +149,22 @@ func TOMLBackendFeatureProfileInfo(backend TOMLBackend) TOMLBackendFeatureProfil
 	}
 }
 
+func TOMLPlanContext(backend TOMLBackend) astmerge.ConformanceFamilyPlanContext {
+	backendProfile := TOMLBackendFeatureProfileInfo(backend)
+	return astmerge.ConformanceFamilyPlanContext{
+		FamilyProfile: astmerge.FamilyFeatureProfile{
+			Family:            TOMLFeatureProfileInfo().Family,
+			SupportedDialects: []string{string(DialectTOML)},
+			SupportedPolicies: TOMLFeatureProfileInfo().SupportedPolicies,
+		},
+		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
+			Backend:           backendProfile.Backend,
+			SupportsDialects:  backendProfile.SupportsDialects,
+			SupportedPolicies: backendProfile.SupportedPolicies,
+		},
+	}
+}
+
 func displayPath(path string) string {
 	if path == "" {
 		return "/"
