@@ -1170,6 +1170,44 @@ func TestSharedFixtureFamilyContextExplicitReviewDecision(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureExplicitReviewDecisionPayloadValidation(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "explicit_review_decision_missing_context"))
+	family := fixture["family"].(string)
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expectedDiagnostic := parseDiagnostic(fixture["expected_diagnostic"].(map[string]any))
+	expectedRequest := parseReviewRequest(fixture["expected_request"].(map[string]any))
+
+	context, diagnostics, requests, applied := ReviewConformanceFamilyContext(family, options)
+	if context != nil || len(applied) != 0 {
+		t.Fatalf("unexpected explicit payload validation application: %+v %+v", context, applied)
+	}
+	if !reflect.DeepEqual(diagnostics, []Diagnostic{expectedDiagnostic}) {
+		t.Fatalf("unexpected explicit payload diagnostics: %+v", diagnostics)
+	}
+	if !reflect.DeepEqual(requests, []ReviewRequest{expectedRequest}) {
+		t.Fatalf("unexpected explicit payload requests: %+v", requests)
+	}
+}
+
+func TestSharedFixtureExplicitReviewDecisionFamilyValidation(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "explicit_review_decision_family_mismatch"))
+	family := fixture["family"].(string)
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expectedDiagnostic := parseDiagnostic(fixture["expected_diagnostic"].(map[string]any))
+	expectedRequest := parseReviewRequest(fixture["expected_request"].(map[string]any))
+
+	context, diagnostics, requests, applied := ReviewConformanceFamilyContext(family, options)
+	if context != nil || len(applied) != 0 {
+		t.Fatalf("unexpected explicit family validation application: %+v %+v", context, applied)
+	}
+	if !reflect.DeepEqual(diagnostics, []Diagnostic{expectedDiagnostic}) {
+		t.Fatalf("unexpected explicit family diagnostics: %+v", diagnostics)
+	}
+	if !reflect.DeepEqual(requests, []ReviewRequest{expectedRequest}) {
+		t.Fatalf("unexpected explicit family requests: %+v", requests)
+	}
+}
+
 func TestSharedFixtureConformanceManifestReviewState(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "conformance_manifest_review_state"))
 	var manifest ConformanceManifest
