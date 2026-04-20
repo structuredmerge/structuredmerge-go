@@ -1640,6 +1640,59 @@ func TestCanonicalWidenedSuiteFixtures(t *testing.T) {
 	}
 }
 
+func TestBackendSensitiveAggregateFixtures(t *testing.T) {
+	plansFixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-167-backend-sensitive-aggregate-suite-plans", "backend-sensitive-aggregate-suite-plans.json"))
+	var plansManifest ConformanceManifest
+	if raw, err := json.Marshal(plansFixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &plansManifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	planContextsRaw := plansFixture["contexts"].(map[string]any)
+	planContexts := make(map[string]ConformanceFamilyPlanContext, len(planContextsRaw))
+	for family, raw := range planContextsRaw {
+		planContexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+	}
+	expectedEntriesRaw := plansFixture["expected_entries"].([]any)
+	expectedEntries := make([]NamedConformanceSuitePlan, 0, len(expectedEntriesRaw))
+	for _, raw := range expectedEntriesRaw {
+		expectedEntries = append(expectedEntries, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+	}
+	if plans := PlanNamedConformanceSuites(plansManifest, planContexts); !reflect.DeepEqual(plans, expectedEntries) {
+		t.Fatalf("unexpected backend-sensitive aggregate plans: %+v", plans)
+	}
+
+	for _, relative := range []string{
+		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-168-backend-sensitive-aggregate-tree-sitter-report", "backend-sensitive-aggregate-tree-sitter-report.json"),
+		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-169-backend-sensitive-aggregate-native-report", "backend-sensitive-aggregate-native-report.json"),
+	} {
+		fixture := readDiagnosticFixtureFromPath(t, relative)
+		var manifest ConformanceManifest
+		if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+			t.Fatalf("marshal manifest: %v", err)
+		} else if err := json.Unmarshal(raw, &manifest); err != nil {
+			t.Fatalf("unmarshal manifest: %v", err)
+		}
+		options := parseConformanceManifestPlanningOptions(fixture["options"].(map[string]any))
+		expected := parseConformanceManifestReport(fixture["expected_report"].(map[string]any))
+		executionsRaw := fixture["executions"].(map[string]any)
+		report := ReportConformanceManifest(
+			manifest,
+			options,
+			func(run ConformanceCaseRun) ConformanceCaseExecution {
+				key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+				if raw, ok := executionsRaw[key]; ok {
+					return parseConformanceCaseExecution(raw.(map[string]any))
+				}
+				return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+			},
+		)
+		if !reflect.DeepEqual(report, expected) {
+			t.Fatalf("unexpected backend-sensitive aggregate report: %+v", report)
+		}
+	}
+}
+
 func TestSharedFixturePlannedNamedConformanceSuiteReports(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_report_entries"))
 	manifest := readManifest(t)
