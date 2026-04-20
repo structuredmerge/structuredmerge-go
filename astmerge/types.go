@@ -1,6 +1,9 @@
 package astmerge
 
-import "slices"
+import (
+	"slices"
+	"strconv"
+)
 
 type DiagnosticSeverity string
 
@@ -189,6 +192,32 @@ type ReviewDecision struct {
 type ReviewReplayBundle struct {
 	ReplayContext ReviewReplayContext `json:"replay_context"`
 	Decisions     []ReviewDecision    `json:"decisions"`
+}
+
+const ReviewTransportVersion = 1
+
+type ReviewTransportImportErrorCategory string
+
+const (
+	ReviewTransportKindMismatch       ReviewTransportImportErrorCategory = "kind_mismatch"
+	ReviewTransportUnsupportedVersion ReviewTransportImportErrorCategory = "unsupported_version"
+)
+
+type ReviewTransportImportError struct {
+	Category ReviewTransportImportErrorCategory `json:"category"`
+	Message  string                             `json:"message"`
+}
+
+type ConformanceManifestReviewStateEnvelope struct {
+	Kind    string                         `json:"kind"`
+	Version int                            `json:"version"`
+	State   ConformanceManifestReviewState `json:"state"`
+}
+
+type ReviewReplayBundleEnvelope struct {
+	Kind         string             `json:"kind"`
+	Version      int                `json:"version"`
+	ReplayBundle ReviewReplayBundle `json:"replay_bundle"`
 }
 
 type ReviewHostHints struct {
@@ -423,6 +452,68 @@ func ReviewReplayBundleInputs(
 	}
 
 	return options.ReviewReplayContext, options.ReviewDecisions
+}
+
+func ConformanceManifestReviewStateEnvelopeFor(
+	state ConformanceManifestReviewState,
+) ConformanceManifestReviewStateEnvelope {
+	return ConformanceManifestReviewStateEnvelope{
+		Kind:    "conformance_manifest_review_state",
+		Version: ReviewTransportVersion,
+		State:   state,
+	}
+}
+
+func ReviewReplayBundleEnvelopeFor(
+	bundle ReviewReplayBundle,
+) ReviewReplayBundleEnvelope {
+	return ReviewReplayBundleEnvelope{
+		Kind:         "review_replay_bundle",
+		Version:      ReviewTransportVersion,
+		ReplayBundle: bundle,
+	}
+}
+
+func ImportConformanceManifestReviewStateEnvelope(
+	envelope ConformanceManifestReviewStateEnvelope,
+) (*ConformanceManifestReviewState, *ReviewTransportImportError) {
+	if envelope.Kind != "conformance_manifest_review_state" {
+		return nil, &ReviewTransportImportError{
+			Category: ReviewTransportKindMismatch,
+			Message:  "expected conformance_manifest_review_state envelope kind.",
+		}
+	}
+
+	if envelope.Version != ReviewTransportVersion {
+		return nil, &ReviewTransportImportError{
+			Category: ReviewTransportUnsupportedVersion,
+			Message:  "unsupported conformance_manifest_review_state envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	state := envelope.State
+	return &state, nil
+}
+
+func ImportReviewReplayBundleEnvelope(
+	envelope ReviewReplayBundleEnvelope,
+) (*ReviewReplayBundle, *ReviewTransportImportError) {
+	if envelope.Kind != "review_replay_bundle" {
+		return nil, &ReviewTransportImportError{
+			Category: ReviewTransportKindMismatch,
+			Message:  "expected review_replay_bundle envelope kind.",
+		}
+	}
+
+	if envelope.Version != ReviewTransportVersion {
+		return nil, &ReviewTransportImportError{
+			Category: ReviewTransportUnsupportedVersion,
+			Message:  "unsupported review_replay_bundle envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	bundle := envelope.ReplayBundle
+	return &bundle, nil
 }
 
 func ResolveConformanceFamilyContext(

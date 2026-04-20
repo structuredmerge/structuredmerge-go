@@ -1394,6 +1394,70 @@ func TestSharedFixtureReviewReplayBundleJSONRoundtrip(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewStateTransportEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_envelope"))
+	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))
+	expected := parseConformanceManifestReviewStateEnvelope(fixture["expected_envelope"].(map[string]any))
+
+	envelope := ConformanceManifestReviewStateEnvelopeFor(state)
+	if !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected review state envelope: %+v", envelope)
+	}
+	imported, importErr := ImportConformanceManifestReviewStateEnvelope(expected)
+	if importErr != nil {
+		t.Fatalf("unexpected review state import error: %+v", importErr)
+	}
+	if imported == nil || !reflect.DeepEqual(*imported, state) {
+		t.Fatalf("unexpected imported review state: %+v", imported)
+	}
+}
+
+func TestSharedFixtureReviewReplayBundleTransportEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope"))
+	bundle := parseReviewReplayBundle(fixture["replay_bundle"].(map[string]any))
+	expected := parseReviewReplayBundleEnvelope(fixture["expected_envelope"].(map[string]any))
+
+	envelope := ReviewReplayBundleEnvelopeFor(bundle)
+	if !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected replay bundle envelope: %+v", envelope)
+	}
+	imported, importErr := ImportReviewReplayBundleEnvelope(expected)
+	if importErr != nil {
+		t.Fatalf("unexpected replay bundle import error: %+v", importErr)
+	}
+	if imported == nil || !reflect.DeepEqual(*imported, bundle) {
+		t.Fatalf("unexpected imported replay bundle: %+v", imported)
+	}
+}
+
+func TestSharedFixtureReviewStateTransportRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		rejectionCase := rawCase.(map[string]any)
+		envelope := parseConformanceManifestReviewStateEnvelope(rejectionCase["envelope"].(map[string]any))
+		expected := parseReviewTransportImportError(rejectionCase["expected_error"].(map[string]any))
+
+		imported, importErr := ImportConformanceManifestReviewStateEnvelope(envelope)
+		if imported != nil || !reflect.DeepEqual(importErr, &expected) {
+			t.Fatalf("unexpected review state rejection: imported=%+v error=%+v", imported, importErr)
+		}
+	}
+}
+
+func TestSharedFixtureReviewReplayBundleTransportRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		rejectionCase := rawCase.(map[string]any)
+		envelope := parseReviewReplayBundleEnvelope(rejectionCase["envelope"].(map[string]any))
+		expected := parseReviewTransportImportError(rejectionCase["expected_error"].(map[string]any))
+
+		imported, importErr := ImportReviewReplayBundleEnvelope(envelope)
+		if imported != nil || !reflect.DeepEqual(importErr, &expected) {
+			t.Fatalf("unexpected replay bundle rejection: imported=%+v error=%+v", imported, importErr)
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -1661,6 +1725,29 @@ func parseReviewReplayBundle(raw map[string]any) ReviewReplayBundle {
 			}
 			return decisions
 		}(),
+	}
+}
+
+func parseConformanceManifestReviewStateEnvelope(raw map[string]any) ConformanceManifestReviewStateEnvelope {
+	return ConformanceManifestReviewStateEnvelope{
+		Kind:    raw["kind"].(string),
+		Version: int(raw["version"].(float64)),
+		State:   parseConformanceManifestReviewState(raw["state"].(map[string]any)),
+	}
+}
+
+func parseReviewReplayBundleEnvelope(raw map[string]any) ReviewReplayBundleEnvelope {
+	return ReviewReplayBundleEnvelope{
+		Kind:         raw["kind"].(string),
+		Version:      int(raw["version"].(float64)),
+		ReplayBundle: parseReviewReplayBundle(raw["replay_bundle"].(map[string]any)),
+	}
+}
+
+func parseReviewTransportImportError(raw map[string]any) ReviewTransportImportError {
+	return ReviewTransportImportError{
+		Category: ReviewTransportImportErrorCategory(raw["category"].(string)),
+		Message:  raw["message"].(string),
 	}
 }
 
