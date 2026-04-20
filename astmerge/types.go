@@ -104,6 +104,7 @@ type ConformanceCaseResult struct {
 }
 
 type ConformanceCaseRequirements struct {
+	Backend  string            `json:"backend,omitempty"`
 	Dialect  string            `json:"dialect,omitempty"`
 	Policies []PolicyReference `json:"policies,omitempty"`
 }
@@ -732,6 +733,20 @@ func SelectConformanceCase(
 	featureProfile *ConformanceFeatureProfileView,
 ) ConformanceCaseSelection {
 	messages := []string{}
+
+	if requirements.Backend != "" {
+		if featureProfile == nil {
+			messages = append(
+				messages,
+				"case requires backend "+requirements.Backend+" but no backend feature profile is available for family "+familyProfile.Family+".",
+			)
+		} else if featureProfile.Backend != requirements.Backend {
+			messages = append(
+				messages,
+				"case requires backend "+requirements.Backend+" but backend "+featureProfile.Backend+" is active for family "+familyProfile.Family+".",
+			)
+		}
+	}
 
 	if requirements.Dialect != "" {
 		if !slices.Contains(familyProfile.SupportedDialects, requirements.Dialect) {

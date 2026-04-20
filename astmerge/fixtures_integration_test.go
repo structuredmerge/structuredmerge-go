@@ -354,6 +354,37 @@ func TestSharedFixtureCapabilityAwareSelection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureBackendAwareSelection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "backend_selection"))
+
+	for _, item := range fixture["cases"].([]any) {
+		testCase := item.(map[string]any)
+		rawRef := testCase["ref"].(map[string]any)
+		ref := ConformanceCaseRef{
+			Family: rawRef["family"].(string),
+			Role:   rawRef["role"].(string),
+			Case:   rawRef["case"].(string),
+		}
+
+		requirements := parseConformanceCaseRequirements(testCase["requirements"].(map[string]any))
+		familyProfile := parseFamilyFeatureProfile(testCase["family_profile"].(map[string]any))
+		featureProfile := parseFeatureProfilePointer(testCase["feature_profile"])
+
+		selection := SelectConformanceCase(ref, requirements, familyProfile, featureProfile)
+		expected := testCase["expected"].(map[string]any)
+		if string(selection.Status) != expected["status"].(string) {
+			t.Fatalf("unexpected selection status: %+v", selection)
+		}
+		expectedMessages := make([]string, 0, len(expected["messages"].([]any)))
+		for _, message := range expected["messages"].([]any) {
+			expectedMessages = append(expectedMessages, message.(string))
+		}
+		if !reflect.DeepEqual(selection.Messages, expectedMessages) {
+			t.Fatalf("unexpected selection messages: %+v", selection.Messages)
+		}
+	}
+}
+
 func TestSharedFixtureConformanceCaseRunner(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "case_runner"))
 
@@ -1961,6 +1992,9 @@ func parseConformanceManifestReviewState(raw map[string]any) ConformanceManifest
 
 func parseConformanceCaseRequirements(raw map[string]any) ConformanceCaseRequirements {
 	requirements := ConformanceCaseRequirements{}
+	if backend, ok := raw["backend"]; ok {
+		requirements.Backend = backend.(string)
+	}
 	if dialect, ok := raw["dialect"]; ok {
 		requirements.Dialect = dialect.(string)
 	}
