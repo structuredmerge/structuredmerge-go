@@ -27,6 +27,18 @@ func TestGoFixtures(t *testing.T) {
 		t.Fatal("unexpected profile family")
 	}
 
+	backendProfileFixture := readGoFixture(t, "diagnostics", "slice-122-source-family-backend-feature-profiles", "go-backend-feature-profiles.json")
+	treeProfile := GoBackendFeatureProfile(BackendTreeSitter)
+	if treeProfile.Backend != backendProfileFixture["tree_sitter"].(map[string]any)["backend"].(string) ||
+		treeProfile.SupportsDialects != backendProfileFixture["tree_sitter"].(map[string]any)["supports_dialects"].(bool) {
+		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeProfile)
+	}
+	nativeProfile := GoBackendFeatureProfile(BackendNative)
+	if nativeProfile.Backend != backendProfileFixture["native"].(map[string]any)["backend"].(string) ||
+		nativeProfile.SupportsDialects != backendProfileFixture["native"].(map[string]any)["supports_dialects"].(bool) {
+		t.Fatalf("unexpected native backend profile: %+v", nativeProfile)
+	}
+
 	analysisFixture := readGoFixture(t, "go", "slice-110-analysis", "module-owners.json")
 	analysis := ParseGo(analysisFixture["source"].(string), DialectGo)
 	if !analysis.OK || analysis.Analysis == nil {

@@ -87,6 +87,22 @@ func GoFeatureProfileInfo() GoFeatureProfile {
 	}
 }
 
+func GoBackendFeatureProfile(backend GoBackend) astmerge.ConformanceFeatureProfileView {
+	if backend == BackendNative {
+		return astmerge.ConformanceFeatureProfileView{
+			Backend:           "go-parser",
+			SupportsDialects:  true,
+			SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+		}
+	}
+
+	return astmerge.ConformanceFeatureProfileView{
+		Backend:           treehaver.LanguagePackAdapterInfo().Backend,
+		SupportsDialects:  true,
+		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+	}
+}
+
 func GoBackends() []GoBackend {
 	return []GoBackend{BackendTreeSitter, BackendNative}
 }
