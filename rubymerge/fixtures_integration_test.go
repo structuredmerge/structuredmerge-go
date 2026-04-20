@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readRubyFixture(t *testing.T, parts ...string) map[string]any {
@@ -70,6 +72,27 @@ func TestRubyFixtures(t *testing.T) {
 	}
 	if !deepEqualJSON(childValue, childFixture["expected"]) {
 		t.Fatalf("unexpected child operations: %+v", childValue)
+	}
+
+	groupedFixture := readRubyFixture(t, "ruby", "slice-229-projected-child-review-groups", "yard-example-review-groups.json")
+	groupedSource, err := json.Marshal(groupedFixture["cases"])
+	if err != nil {
+		t.Fatalf("marshal projected cases: %v", err)
+	}
+	var groupedCases []astmerge.ProjectedChildReviewCase
+	if err := json.Unmarshal(groupedSource, &groupedCases); err != nil {
+		t.Fatalf("unmarshal projected cases: %v", err)
+	}
+	groupedValue, err := json.Marshal(astmerge.GroupProjectedChildReviewCases(groupedCases))
+	if err != nil {
+		t.Fatalf("marshal projected groups: %v", err)
+	}
+	var decodedGroups any
+	if err := json.Unmarshal(groupedValue, &decodedGroups); err != nil {
+		t.Fatalf("unmarshal projected groups: %v", err)
+	}
+	if !deepEqualJSON(decodedGroups, groupedFixture["expected_groups"]) {
+		t.Fatalf("unexpected projected groups: %+v", decodedGroups)
 	}
 }
 

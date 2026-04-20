@@ -99,6 +99,15 @@ type ProjectedChildReviewCase struct {
 	DelegatedRuntimeSurfacePath string `json:"delegated_runtime_surface_path"`
 }
 
+type ProjectedChildReviewGroup struct {
+	DelegatedApplyGroup         string   `json:"delegated_apply_group"`
+	ParentOperationID           string   `json:"parent_operation_id"`
+	ChildOperationID            string   `json:"child_operation_id"`
+	DelegatedRuntimeSurfacePath string   `json:"delegated_runtime_surface_path"`
+	CaseIDs                     []string `json:"case_ids"`
+	DelegatedCaseIDs            []string `json:"delegated_case_ids"`
+}
+
 type ParseResult[T any] struct {
 	OK          bool
 	Diagnostics []Diagnostic
@@ -437,6 +446,36 @@ func ConformanceSuiteNames(manifest ConformanceManifest) []string {
 	}
 	slices.Sort(names)
 	return names
+}
+
+func GroupProjectedChildReviewCases(cases []ProjectedChildReviewCase) []ProjectedChildReviewGroup {
+	groups := make([]ProjectedChildReviewGroup, 0)
+
+	for _, entry := range cases {
+		found := false
+		for index := range groups {
+			if groups[index].DelegatedApplyGroup == entry.DelegatedApplyGroup {
+				groups[index].CaseIDs = append(groups[index].CaseIDs, entry.CaseID)
+				groups[index].DelegatedCaseIDs = append(groups[index].DelegatedCaseIDs, entry.DelegatedCaseID)
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+
+		groups = append(groups, ProjectedChildReviewGroup{
+			DelegatedApplyGroup:         entry.DelegatedApplyGroup,
+			ParentOperationID:           entry.ParentOperationID,
+			ChildOperationID:            entry.ChildOperationID,
+			DelegatedRuntimeSurfacePath: entry.DelegatedRuntimeSurfacePath,
+			CaseIDs:                     []string{entry.CaseID},
+			DelegatedCaseIDs:            []string{entry.DelegatedCaseID},
+		})
+	}
+
+	return groups
 }
 
 func DefaultConformanceFamilyContext(

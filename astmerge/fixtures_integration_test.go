@@ -2672,6 +2672,30 @@ func TestSharedFixtureProjectedChildReviewCases(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProjectedChildReviewGroups(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "projected_child_review_groups"))
+	source, err := json.Marshal(fixture["cases"])
+	if err != nil {
+		t.Fatalf("marshal projected child review cases: %v", err)
+	}
+	var cases []ProjectedChildReviewCase
+	if err := json.Unmarshal(source, &cases); err != nil {
+		t.Fatalf("unmarshal projected child review cases: %v", err)
+	}
+	grouped := GroupProjectedChildReviewCases(cases)
+	encoded, err := json.Marshal(grouped)
+	if err != nil {
+		t.Fatalf("marshal projected child review groups: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal projected child review groups: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, fixture["expected_groups"]) {
+		t.Fatalf("unexpected projected child review groups: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
 	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))

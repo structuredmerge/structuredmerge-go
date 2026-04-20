@@ -175,3 +175,18 @@ func TestSharedFixtureMarkdownDelegatedChildOperations(t *testing.T) {
 		t.Fatalf("unexpected delegated child operations: %+v", actual)
 	}
 }
+
+func TestSharedFixtureMarkdownProjectedChildReviewGroups(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-228-projected-child-review-groups", "fenced-code-review-groups.json")
+	source, err := json.Marshal(fixture["cases"])
+	if err != nil {
+		t.Fatalf("marshal projected cases: %v", err)
+	}
+	var cases []astmerge.ProjectedChildReviewCase
+	if err := json.Unmarshal(source, &cases); err != nil {
+		t.Fatalf("unmarshal projected cases: %v", err)
+	}
+	if actual := jsonReadyMarkdown(t, astmerge.GroupProjectedChildReviewCases(cases)); !reflect.DeepEqual(actual, fixture["expected_groups"]) {
+		t.Fatalf("unexpected projected child review groups: %+v", actual)
+	}
+}
