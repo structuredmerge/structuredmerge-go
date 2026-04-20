@@ -1700,23 +1700,46 @@ func parseDiagnostic(raw map[string]any) Diagnostic {
 	if path, ok := raw["path"]; ok {
 		diagnostic.Path = path.(string)
 	}
-	if requestID, ok := raw["request_id"]; ok {
-		diagnostic.RequestID = requestID.(string)
-	}
-	if action, ok := raw["action"]; ok {
-		diagnostic.Action = ReviewDecisionAction(action.(string))
-	}
-	if reason, ok := raw["reason"]; ok {
-		diagnostic.Reason = ReviewDiagnosticReason(reason.(string))
-	}
-	if payloadKind, ok := raw["payload_kind"]; ok {
-		diagnostic.PayloadKind = payloadKind.(string)
-	}
-	if expectedFamily, ok := raw["expected_family"]; ok {
-		diagnostic.ExpectedFamily = expectedFamily.(string)
-	}
-	if providedFamily, ok := raw["provided_family"]; ok {
-		diagnostic.ProvidedFamily = providedFamily.(string)
+	if rawReview, ok := raw["review"]; ok {
+		review := ReviewDiagnosticDetail{}
+		reviewRaw := rawReview.(map[string]any)
+		if requestID, ok := reviewRaw["request_id"]; ok {
+			review.RequestID = requestID.(string)
+		}
+		if action, ok := reviewRaw["action"]; ok {
+			review.Action = ReviewDecisionAction(action.(string))
+		}
+		if reason, ok := reviewRaw["reason"]; ok {
+			review.Reason = ReviewDiagnosticReason(reason.(string))
+		}
+		if payloadKind, ok := reviewRaw["payload_kind"]; ok {
+			review.PayloadKind = payloadKind.(string)
+		}
+		if expectedFamily, ok := reviewRaw["expected_family"]; ok {
+			review.ExpectedFamily = expectedFamily.(string)
+		}
+		if providedFamily, ok := reviewRaw["provided_family"]; ok {
+			review.ProvidedFamily = providedFamily.(string)
+		}
+		diagnostic.Review = &review
+	} else if requestID, ok := raw["request_id"]; ok {
+		review := ReviewDiagnosticDetail{RequestID: requestID.(string)}
+		if action, ok := raw["action"]; ok {
+			review.Action = ReviewDecisionAction(action.(string))
+		}
+		if reason, ok := raw["reason"]; ok {
+			review.Reason = ReviewDiagnosticReason(reason.(string))
+		}
+		if payloadKind, ok := raw["payload_kind"]; ok {
+			review.PayloadKind = payloadKind.(string)
+		}
+		if expectedFamily, ok := raw["expected_family"]; ok {
+			review.ExpectedFamily = expectedFamily.(string)
+		}
+		if providedFamily, ok := raw["provided_family"]; ok {
+			review.ProvidedFamily = providedFamily.(string)
+		}
+		diagnostic.Review = &review
 	}
 
 	return diagnostic

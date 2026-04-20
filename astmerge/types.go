@@ -34,17 +34,21 @@ const (
 	ReasonRequestNotFound        ReviewDiagnosticReason = "request_not_found"
 )
 
-type Diagnostic struct {
-	Severity       DiagnosticSeverity
-	Category       DiagnosticCategory
-	Message        string
-	Path           string
+type ReviewDiagnosticDetail struct {
 	RequestID      string
 	Action         ReviewDecisionAction
 	Reason         ReviewDiagnosticReason
 	PayloadKind    string
 	ExpectedFamily string
 	ProvidedFamily string
+}
+
+type Diagnostic struct {
+	Severity DiagnosticSeverity
+	Category DiagnosticCategory
+	Message  string
+	Path     string
+	Review   *ReviewDiagnosticDetail
 }
 
 type ParseResult[T any] struct {
@@ -596,26 +600,30 @@ func reviewDecisionForFamilyContext(
 		}
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context == nil {
 			return nil, nil, false, []Diagnostic{{
-				Severity:    SeverityError,
-				Category:    CategoryConfigurationError,
-				Message:     "review decision " + requestID + " requires explicit context payload.",
-				RequestID:   requestID,
-				Action:      ReviewDecisionProvideExplicitContext,
-				Reason:      ReasonMissingRequiredPayload,
-				PayloadKind: "conformance_family_context",
+				Severity: SeverityError,
+				Category: CategoryConfigurationError,
+				Message:  "review decision " + requestID + " requires explicit context payload.",
+				Review: &ReviewDiagnosticDetail{
+					RequestID:   requestID,
+					Action:      ReviewDecisionProvideExplicitContext,
+					Reason:      ReasonMissingRequiredPayload,
+					PayloadKind: "conformance_family_context",
+				},
 			}}
 		}
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context != nil {
 			if decision.Context.FamilyProfile.Family != family {
 				return nil, nil, false, []Diagnostic{{
-					Severity:       SeverityError,
-					Category:       CategoryConfigurationError,
-					Message:        "review decision " + requestID + " provided context for " + decision.Context.FamilyProfile.Family + ", expected " + family + ".",
-					RequestID:      requestID,
-					Action:         ReviewDecisionProvideExplicitContext,
-					Reason:         ReasonFamilyMismatch,
-					ExpectedFamily: family,
-					ProvidedFamily: decision.Context.FamilyProfile.Family,
+					Severity: SeverityError,
+					Category: CategoryConfigurationError,
+					Message:  "review decision " + requestID + " provided context for " + decision.Context.FamilyProfile.Family + ", expected " + family + ".",
+					Review: &ReviewDiagnosticDetail{
+						RequestID:      requestID,
+						Action:         ReviewDecisionProvideExplicitContext,
+						Reason:         ReasonFamilyMismatch,
+						ExpectedFamily: family,
+						ProvidedFamily: decision.Context.FamilyProfile.Family,
+					},
 				}}
 			}
 			copyDecision := decision
@@ -1022,12 +1030,14 @@ func ReviewConformanceManifest(
 					acceptedDecisions = append(acceptedDecisions, decision)
 				} else {
 					diagnostics = append(diagnostics, Diagnostic{
-						Severity:  SeverityError,
-						Category:  CategoryReplayRejected,
-						Message:   "review decision " + decision.RequestID + " does not match any current review request.",
-						RequestID: decision.RequestID,
-						Action:    decision.Action,
-						Reason:    ReasonRequestNotFound,
+						Severity: SeverityError,
+						Category: CategoryReplayRejected,
+						Message:  "review decision " + decision.RequestID + " does not match any current review request.",
+						Review: &ReviewDiagnosticDetail{
+							RequestID: decision.RequestID,
+							Action:    decision.Action,
+							Reason:    ReasonRequestNotFound,
+						},
 					})
 				}
 			}
