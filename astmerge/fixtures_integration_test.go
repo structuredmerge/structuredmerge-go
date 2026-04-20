@@ -1505,68 +1505,89 @@ func TestCanonicalStableSuiteBackendFixtures(t *testing.T) {
 }
 
 func TestCanonicalWidenedSuiteBackendFixtures(t *testing.T) {
-	plansFixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-178-canonical-widened-suite-backend-plans", "go-canonical-widened-suite-backend-plans.json"))
-	var manifest ConformanceManifest
-	if raw, err := json.Marshal(plansFixture["manifest"]); err != nil {
-		t.Fatalf("marshal manifest: %v", err)
-	} else if err := json.Unmarshal(raw, &manifest); err != nil {
-		t.Fatalf("unmarshal manifest: %v", err)
-	}
-	contextsRaw := plansFixture["contexts"].(map[string]any)
-	contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
-	for family, raw := range contextsRaw {
-		contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
-	}
-	expectedPlansRaw := plansFixture["expected_entries"].([]any)
-	expectedPlans := make([]NamedConformanceSuitePlan, 0, len(expectedPlansRaw))
-	for _, raw := range expectedPlansRaw {
-		expectedPlans = append(expectedPlans, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
-	}
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expectedPlans) {
-		t.Fatalf("unexpected canonical widened suite backend plans: %+v", plans)
-	}
-
-	reportFixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-179-canonical-widened-suite-backend-report", "go-canonical-widened-suite-backend-report.json"))
-	reportOptions := parseConformanceManifestPlanningOptions(reportFixture["options"].(map[string]any))
-	expectedReport := parseConformanceManifestReport(reportFixture["expected_report"].(map[string]any))
-	reportExecutionsRaw := reportFixture["executions"].(map[string]any)
-	reportExecutions := make(map[string]ConformanceCaseExecution, len(reportExecutionsRaw))
-	for key, raw := range reportExecutionsRaw {
-		reportExecutions[key] = parseConformanceCaseExecution(raw.(map[string]any))
-	}
-	report := ReportConformanceManifest(manifest, reportOptions, func(run ConformanceCaseRun) ConformanceCaseExecution {
-		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
-		if execution, ok := reportExecutions[key]; ok {
-			return execution
-		}
-		return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
-	})
-	if !reflect.DeepEqual(report, expectedReport) {
-		t.Fatalf("unexpected canonical widened suite backend report: %+v", report)
-	}
-
-	for _, fixturePath := range []string{
-		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-180-canonical-widened-suite-backend-review-state", "go-canonical-widened-suite-backend-review-state.json"),
-		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-181-canonical-widened-suite-backend-reviewed-default", "go-canonical-widened-suite-backend-reviewed-default.json"),
-		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-182-canonical-widened-suite-backend-replay-application", "go-canonical-widened-suite-backend-replay-application.json"),
+	for _, fixtureSet := range []struct {
+		plansPath   string
+		reportPath  string
+		reviewPaths []string
+	}{
+		{
+			plansPath:  filepath.Join("..", "..", "fixtures", "diagnostics", "slice-178-canonical-widened-suite-backend-plans", "go-canonical-widened-suite-backend-plans.json"),
+			reportPath: filepath.Join("..", "..", "fixtures", "diagnostics", "slice-179-canonical-widened-suite-backend-report", "go-canonical-widened-suite-backend-report.json"),
+			reviewPaths: []string{
+				filepath.Join("..", "..", "fixtures", "diagnostics", "slice-180-canonical-widened-suite-backend-review-state", "go-canonical-widened-suite-backend-review-state.json"),
+				filepath.Join("..", "..", "fixtures", "diagnostics", "slice-181-canonical-widened-suite-backend-reviewed-default", "go-canonical-widened-suite-backend-reviewed-default.json"),
+				filepath.Join("..", "..", "fixtures", "diagnostics", "slice-182-canonical-widened-suite-backend-replay-application", "go-canonical-widened-suite-backend-replay-application.json"),
+			},
+		},
+		{
+			plansPath:  filepath.Join("..", "..", "fixtures", "diagnostics", "slice-187-canonical-widened-suite-polyglot-backend-plans", "go-canonical-widened-suite-polyglot-backend-plans.json"),
+			reportPath: filepath.Join("..", "..", "fixtures", "diagnostics", "slice-188-canonical-widened-suite-polyglot-backend-report", "go-canonical-widened-suite-polyglot-backend-report.json"),
+			reviewPaths: []string{
+				filepath.Join("..", "..", "fixtures", "diagnostics", "slice-189-canonical-widened-suite-polyglot-backend-review-state", "go-canonical-widened-suite-polyglot-backend-review-state.json"),
+				filepath.Join("..", "..", "fixtures", "diagnostics", "slice-190-canonical-widened-suite-polyglot-backend-reviewed-default", "go-canonical-widened-suite-polyglot-backend-reviewed-default.json"),
+				filepath.Join("..", "..", "fixtures", "diagnostics", "slice-191-canonical-widened-suite-polyglot-backend-replay-application", "go-canonical-widened-suite-polyglot-backend-replay-application.json"),
+			},
+		},
 	} {
-		fixture := readDiagnosticFixtureFromPath(t, fixturePath)
-		reviewOptions := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
-		expectedState := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
-		reviewExecutionsRaw := fixture["executions"].(map[string]any)
-		reviewExecutions := make(map[string]ConformanceCaseExecution, len(reviewExecutionsRaw))
-		for key, raw := range reviewExecutionsRaw {
-			reviewExecutions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+		plansFixture := readDiagnosticFixtureFromPath(t, fixtureSet.plansPath)
+		var manifest ConformanceManifest
+		if raw, err := json.Marshal(plansFixture["manifest"]); err != nil {
+			t.Fatalf("marshal manifest: %v", err)
+		} else if err := json.Unmarshal(raw, &manifest); err != nil {
+			t.Fatalf("unmarshal manifest: %v", err)
 		}
-		state := ReviewConformanceManifest(manifest, reviewOptions, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		contextsRaw := plansFixture["contexts"].(map[string]any)
+		contexts := make(map[string]ConformanceFamilyPlanContext, len(contextsRaw))
+		for family, raw := range contextsRaw {
+			contexts[family] = parseConformanceFamilyPlanContext(raw.(map[string]any))
+		}
+		expectedPlansRaw := plansFixture["expected_entries"].([]any)
+		expectedPlans := make([]NamedConformanceSuitePlan, 0, len(expectedPlansRaw))
+		for _, raw := range expectedPlansRaw {
+			expectedPlans = append(expectedPlans, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
+		}
+		if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expectedPlans) {
+			t.Fatalf("unexpected canonical widened suite backend plans: %+v", plans)
+		}
+
+		reportFixture := readDiagnosticFixtureFromPath(t, fixtureSet.reportPath)
+		reportOptions := parseConformanceManifestPlanningOptions(reportFixture["options"].(map[string]any))
+		expectedReport := parseConformanceManifestReport(reportFixture["expected_report"].(map[string]any))
+		reportExecutionsRaw := reportFixture["executions"].(map[string]any)
+		reportExecutions := make(map[string]ConformanceCaseExecution, len(reportExecutionsRaw))
+		for key, raw := range reportExecutionsRaw {
+			reportExecutions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+		}
+		report := ReportConformanceManifest(manifest, reportOptions, func(run ConformanceCaseRun) ConformanceCaseExecution {
 			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
-			if execution, ok := reviewExecutions[key]; ok {
+			if execution, ok := reportExecutions[key]; ok {
 				return execution
 			}
 			return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
 		})
-		if !reflect.DeepEqual(state, expectedState) {
-			t.Fatalf("unexpected canonical widened suite backend review state for %s: %+v", fixturePath, state)
+		if !reflect.DeepEqual(report, expectedReport) {
+			t.Fatalf("unexpected canonical widened suite backend report: %+v", report)
+		}
+
+		for _, fixturePath := range fixtureSet.reviewPaths {
+			fixture := readDiagnosticFixtureFromPath(t, fixturePath)
+			reviewOptions := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+			expectedState := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+			reviewExecutionsRaw := fixture["executions"].(map[string]any)
+			reviewExecutions := make(map[string]ConformanceCaseExecution, len(reviewExecutionsRaw))
+			for key, raw := range reviewExecutionsRaw {
+				reviewExecutions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+			}
+			state := ReviewConformanceManifest(manifest, reviewOptions, func(run ConformanceCaseRun) ConformanceCaseExecution {
+				key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+				if execution, ok := reviewExecutions[key]; ok {
+					return execution
+				}
+				return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+			})
+			if !reflect.DeepEqual(state, expectedState) {
+				t.Fatalf("unexpected canonical widened suite backend review state for %s: %+v", fixturePath, state)
+			}
 		}
 	}
 }
