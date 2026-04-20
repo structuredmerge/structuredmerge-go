@@ -1237,6 +1237,41 @@ func TestSlice150ConfigFamilyAggregateManifestReport(t *testing.T) {
 	}
 }
 
+func TestAggregateConfigFamilyReviewStateFixtures(t *testing.T) {
+	for _, fixtureName := range []string{
+		filepath.Join("slice-151-config-family-aggregate-review-state", "config-family-aggregate-review-state.json"),
+		filepath.Join("slice-152-config-family-aggregate-reviewed-default", "config-family-aggregate-reviewed-default.json"),
+		filepath.Join("slice-153-config-family-aggregate-replay-application", "config-family-aggregate-replay-application.json"),
+	} {
+		fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", fixtureName))
+		var manifest ConformanceManifest
+		if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+			t.Fatalf("marshal manifest: %v", err)
+		} else if err := json.Unmarshal(raw, &manifest); err != nil {
+			t.Fatalf("unmarshal manifest: %v", err)
+		}
+		options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+		expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+		executionsRaw := fixture["executions"].(map[string]any)
+		executions := make(map[string]ConformanceCaseExecution, len(executionsRaw))
+		for key, raw := range executionsRaw {
+			executions[key] = parseConformanceCaseExecution(raw.(map[string]any))
+		}
+
+		state := ReviewConformanceManifest(manifest, options, func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if execution, ok := executions[key]; ok {
+				return execution
+			}
+			return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+		})
+
+		if !reflect.DeepEqual(state, expected) {
+			t.Fatalf("unexpected aggregate review state for %s: %+v", fixtureName, state)
+		}
+	}
+}
+
 func TestSharedFixtureNamedConformanceSuiteResults(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_results"))
 	manifest := readManifest(t)
