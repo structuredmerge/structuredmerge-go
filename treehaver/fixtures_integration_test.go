@@ -191,3 +191,45 @@ func TestSharedFixtureBackendRegistry(t *testing.T) {
 		t.Fatalf("unexpected backend reference on feature profile: %+v", profile)
 	}
 }
+
+func TestSharedFixtureProcessBaseline(t *testing.T) {
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "process_baseline"))
+	requestFixture := fixture["request"].(map[string]any)
+	expected := fixture["expected"].(map[string]any)
+
+	result := ProcessWithLanguagePack(ProcessRequest{
+		Source:   requestFixture["source"].(string),
+		Language: requestFixture["language"].(string),
+	})
+	if !result.OK || result.Analysis == nil {
+		t.Fatalf("unexpected process result: %+v", result)
+	}
+	if result.Analysis.Language != expected["language"].(string) {
+		t.Fatalf("unexpected language: %+v", result.Analysis)
+	}
+	expectedStructure := expected["structure"].([]any)
+	if len(result.Analysis.Structure) != len(expectedStructure) {
+		t.Fatalf("unexpected structure: %+v", result.Analysis.Structure)
+	}
+	for index, item := range expectedStructure {
+		expectedItem := item.(map[string]any)
+		actual := result.Analysis.Structure[index]
+		if actual.Kind != expectedItem["kind"].(string) {
+			t.Fatalf("unexpected structure kind at %d: %+v", index, actual)
+		}
+		if expectedName, ok := expectedItem["name"]; ok && actual.Name != expectedName.(string) {
+			t.Fatalf("unexpected structure name at %d: %+v", index, actual)
+		}
+	}
+	expectedImports := expected["imports"].([]any)
+	if len(result.Analysis.Imports) != len(expectedImports) {
+		t.Fatalf("unexpected imports: %+v", result.Analysis.Imports)
+	}
+	for index, item := range expectedImports {
+		expectedItem := item.(map[string]any)
+		actual := result.Analysis.Imports[index]
+		if actual.Source != expectedItem["source"].(string) {
+			t.Fatalf("unexpected import at %d: %+v", index, actual)
+		}
+	}
+}
