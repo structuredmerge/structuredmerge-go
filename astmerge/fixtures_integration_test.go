@@ -1358,6 +1358,42 @@ func TestSharedFixtureReviewReplayBundleApplication(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
+	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))
+
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal review state: %v", err)
+	}
+	var roundTripped ConformanceManifestReviewState
+	if err := json.Unmarshal(raw, &roundTripped); err != nil {
+		t.Fatalf("unmarshal review state: %v", err)
+	}
+
+	if !reflect.DeepEqual(roundTripped, state) {
+		t.Fatalf("unexpected review state roundtrip: %+v", roundTripped)
+	}
+}
+
+func TestSharedFixtureReviewReplayBundleJSONRoundtrip(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_json_roundtrip"))
+	bundle := parseReviewReplayBundle(fixture["replay_bundle"].(map[string]any))
+
+	raw, err := json.Marshal(bundle)
+	if err != nil {
+		t.Fatalf("marshal replay bundle: %v", err)
+	}
+	var roundTripped ReviewReplayBundle
+	if err := json.Unmarshal(raw, &roundTripped); err != nil {
+		t.Fatalf("unmarshal replay bundle: %v", err)
+	}
+
+	if !reflect.DeepEqual(roundTripped, bundle) {
+		t.Fatalf("unexpected replay bundle roundtrip: %+v", roundTripped)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
