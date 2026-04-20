@@ -251,14 +251,16 @@ type ConformanceManifestReport struct {
 type ReviewRequestKind string
 
 const (
-	ReviewRequestFamilyContext ReviewRequestKind = "family_context"
+	ReviewRequestFamilyContext       ReviewRequestKind = "family_context"
+	ReviewRequestDelegatedChildGroup ReviewRequestKind = "delegated_child_group"
 )
 
 type ReviewDecisionAction string
 
 const (
-	ReviewDecisionAcceptDefaultContext   ReviewDecisionAction = "accept_default_context"
-	ReviewDecisionProvideExplicitContext ReviewDecisionAction = "provide_explicit_context"
+	ReviewDecisionAcceptDefaultContext     ReviewDecisionAction = "accept_default_context"
+	ReviewDecisionProvideExplicitContext   ReviewDecisionAction = "provide_explicit_context"
+	ReviewDecisionApplyDelegatedChildGroup ReviewDecisionAction = "apply_delegated_child_group"
 )
 
 type ReviewActionOffer struct {
@@ -274,6 +276,7 @@ type ReviewRequest struct {
 	Message         string                        `json:"message"`
 	Blocking        bool                          `json:"blocking"`
 	ProposedContext *ConformanceFamilyPlanContext `json:"proposed_context,omitempty"`
+	DelegatedGroup  *ProjectedChildReviewGroup    `json:"delegated_group,omitempty"`
 	ActionOffers    []ReviewActionOffer           `json:"action_offers"`
 	DefaultAction   ReviewDecisionAction          `json:"default_action,omitempty"`
 }
@@ -534,6 +537,44 @@ func SelectProjectedChildReviewGroupsReadyForApply(groups []ProjectedChildReview
 	}
 
 	return ready
+}
+
+func ReviewRequestIDForProjectedChildGroup(group ProjectedChildReviewGroup) string {
+	return "projected_child_group:" + group.DelegatedApplyGroup
+}
+
+func ProjectedChildGroupReviewRequest(group ProjectedChildReviewGroup, family string) ReviewRequest {
+	return ReviewRequest{
+		ID:             ReviewRequestIDForProjectedChildGroup(group),
+		Kind:           ReviewRequestDelegatedChildGroup,
+		Family:         family,
+		Message:        "delegated child group " + group.DelegatedApplyGroup + " is ready to apply for " + family + ".",
+		Blocking:       true,
+		DelegatedGroup: &group,
+		ActionOffers: []ReviewActionOffer{{
+			Action:          ReviewDecisionApplyDelegatedChildGroup,
+			RequiresContext: false,
+		}},
+		DefaultAction: ReviewDecisionApplyDelegatedChildGroup,
+	}
+}
+
+func SelectProjectedChildReviewGroupsAcceptedForApply(groups []ProjectedChildReviewGroup, _family string, decisions []ReviewDecision) []ProjectedChildReviewGroup {
+	acceptedRequestIDs := make(map[string]bool)
+	for _, decision := range decisions {
+		if decision.Action == ReviewDecisionApplyDelegatedChildGroup {
+			acceptedRequestIDs[decision.RequestID] = true
+		}
+	}
+
+	accepted := make([]ProjectedChildReviewGroup, 0)
+	for _, group := range groups {
+		if acceptedRequestIDs[ReviewRequestIDForProjectedChildGroup(group)] {
+			accepted = append(accepted, group)
+		}
+	}
+
+	return accepted
 }
 
 func DefaultConformanceFamilyContext(

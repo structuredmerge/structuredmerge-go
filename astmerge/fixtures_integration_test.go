@@ -2758,6 +2758,46 @@ func TestSharedFixtureProjectedChildReviewGroupsReadyForApply(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureDelegatedChildGroupReviewRequest(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "delegated_child_group_review_request"))
+	group := parseProjectedChildReviewGroup(fixture["group"].(map[string]any))
+	expectedRequest := parseReviewRequest(fixture["expected_request"].(map[string]any))
+
+	if actualID := ReviewRequestIDForProjectedChildGroup(group); actualID != expectedRequest.ID {
+		t.Fatalf("unexpected delegated child review request id: %s", actualID)
+	}
+	if actual := ProjectedChildGroupReviewRequest(group, fixture["family"].(string)); !reflect.DeepEqual(actual, expectedRequest) {
+		t.Fatalf("unexpected delegated child review request: %+v", actual)
+	}
+}
+
+func TestSharedFixtureDelegatedChildGroupsAcceptedForApply(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "delegated_child_groups_accepted_for_apply"))
+	groupSource, err := json.Marshal(fixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal projected child review groups: %v", err)
+	}
+	var groups []ProjectedChildReviewGroup
+	if err := json.Unmarshal(groupSource, &groups); err != nil {
+		t.Fatalf("unmarshal projected child review groups: %v", err)
+	}
+	decisions := make([]ReviewDecision, 0, len(fixture["decisions"].([]any)))
+	for _, item := range fixture["decisions"].([]any) {
+		decisions = append(decisions, parseReviewDecision(item.(map[string]any)))
+	}
+	encoded, err := json.Marshal(SelectProjectedChildReviewGroupsAcceptedForApply(groups, fixture["family"].(string), decisions))
+	if err != nil {
+		t.Fatalf("marshal accepted projected child review groups: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal accepted projected child review groups: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, fixture["expected_accepted_groups"]) {
+		t.Fatalf("unexpected accepted projected child review groups: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
 	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))
@@ -3152,6 +3192,10 @@ func parseReviewRequest(raw map[string]any) ReviewRequest {
 		context := parseConformanceFamilyPlanContext(rawProposedContext.(map[string]any))
 		request.ProposedContext = &context
 	}
+	if rawDelegatedGroup, ok := raw["delegated_group"]; ok {
+		group := parseProjectedChildReviewGroup(rawDelegatedGroup.(map[string]any))
+		request.DelegatedGroup = &group
+	}
 	if rawActionOffers, ok := raw["action_offers"]; ok {
 		request.ActionOffers = make([]ReviewActionOffer, 0, len(rawActionOffers.([]any)))
 		for _, item := range rawActionOffers.([]any) {
@@ -3186,6 +3230,25 @@ func parseReviewDecision(raw map[string]any) ReviewDecision {
 	}
 
 	return decision
+}
+
+func parseProjectedChildReviewGroup(raw map[string]any) ProjectedChildReviewGroup {
+	return ProjectedChildReviewGroup{
+		DelegatedApplyGroup:         raw["delegated_apply_group"].(string),
+		ParentOperationID:           raw["parent_operation_id"].(string),
+		ChildOperationID:            raw["child_operation_id"].(string),
+		DelegatedRuntimeSurfacePath: raw["delegated_runtime_surface_path"].(string),
+		CaseIDs:                     parseStringSlice(raw["case_ids"].([]any)),
+		DelegatedCaseIDs:            parseStringSlice(raw["delegated_case_ids"].([]any)),
+	}
+}
+
+func parseStringSlice(raw []any) []string {
+	values := make([]string, 0, len(raw))
+	for _, item := range raw {
+		values = append(values, item.(string))
+	}
+	return values
 }
 
 func parseReviewReplayBundle(raw map[string]any) ReviewReplayBundle {

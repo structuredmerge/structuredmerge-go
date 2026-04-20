@@ -23,6 +23,61 @@ func readRubyFixture(t *testing.T, parts ...string) map[string]any {
 	return fixture
 }
 
+func parseProjectedChildReviewGroup(raw map[string]any) astmerge.ProjectedChildReviewGroup {
+	return astmerge.ProjectedChildReviewGroup{
+		DelegatedApplyGroup:         raw["delegated_apply_group"].(string),
+		ParentOperationID:           raw["parent_operation_id"].(string),
+		ChildOperationID:            raw["child_operation_id"].(string),
+		DelegatedRuntimeSurfacePath: raw["delegated_runtime_surface_path"].(string),
+		CaseIDs:                     parseStringSlice(raw["case_ids"].([]any)),
+		DelegatedCaseIDs:            parseStringSlice(raw["delegated_case_ids"].([]any)),
+	}
+}
+
+func parseReviewRequest(raw map[string]any) astmerge.ReviewRequest {
+	request := astmerge.ReviewRequest{
+		ID:           raw["id"].(string),
+		Kind:         astmerge.ReviewRequestKind(raw["kind"].(string)),
+		Family:       raw["family"].(string),
+		Message:      raw["message"].(string),
+		Blocking:     raw["blocking"].(bool),
+		ActionOffers: []astmerge.ReviewActionOffer{},
+	}
+	if rawDelegatedGroup, ok := raw["delegated_group"]; ok {
+		group := parseProjectedChildReviewGroup(rawDelegatedGroup.(map[string]any))
+		request.DelegatedGroup = &group
+	}
+	if rawActionOffers, ok := raw["action_offers"]; ok {
+		request.ActionOffers = make([]astmerge.ReviewActionOffer, 0, len(rawActionOffers.([]any)))
+		for _, item := range rawActionOffers.([]any) {
+			offer := item.(map[string]any)
+			request.ActionOffers = append(request.ActionOffers, astmerge.ReviewActionOffer{
+				Action:          astmerge.ReviewDecisionAction(offer["action"].(string)),
+				RequiresContext: offer["requires_context"].(bool),
+			})
+		}
+	}
+	if rawDefaultAction, ok := raw["default_action"]; ok {
+		request.DefaultAction = astmerge.ReviewDecisionAction(rawDefaultAction.(string))
+	}
+	return request
+}
+
+func parseReviewDecision(raw map[string]any) astmerge.ReviewDecision {
+	return astmerge.ReviewDecision{
+		RequestID: raw["request_id"].(string),
+		Action:    astmerge.ReviewDecisionAction(raw["action"].(string)),
+	}
+}
+
+func parseStringSlice(raw []any) []string {
+	values := make([]string, 0, len(raw))
+	for _, item := range raw {
+		values = append(values, item.(string))
+	}
+	return values
+}
+
 func TestRubyFixtures(t *testing.T) {
 	profileFixture := readRubyFixture(t, "diagnostics", "slice-214-ruby-family-feature-profile", "ruby-feature-profile.json")
 	if RubyFeatureProfileInfo().Family != profileFixture["feature_profile"].(map[string]any)["family"].(string) {
@@ -151,6 +206,36 @@ func TestRubyFixtures(t *testing.T) {
 	}
 	if !deepEqualJSON(decodedReady, readyFixture["expected_ready_groups"]) {
 		t.Fatalf("unexpected ready groups: %+v", decodedReady)
+	}
+
+	transportFixture := readRubyFixture(t, "ruby", "slice-239-delegated-child-review-transport", "yard-example-review-transport.json")
+	transportGroup := parseProjectedChildReviewGroup(transportFixture["group"].(map[string]any))
+	expectedRequest := parseReviewRequest(transportFixture["expected_request"].(map[string]any))
+	if actual := astmerge.ProjectedChildGroupReviewRequest(transportGroup, transportFixture["family"].(string)); !deepEqualJSON(actual, expectedRequest) {
+		t.Fatalf("unexpected delegated child review request: %+v", actual)
+	}
+	transportSource, err := json.Marshal(transportFixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal transport groups: %v", err)
+	}
+	var transportGroups []astmerge.ProjectedChildReviewGroup
+	if err := json.Unmarshal(transportSource, &transportGroups); err != nil {
+		t.Fatalf("unmarshal transport groups: %v", err)
+	}
+	transportDecisions := make([]astmerge.ReviewDecision, 0, len(transportFixture["decisions"].([]any)))
+	for _, item := range transportFixture["decisions"].([]any) {
+		transportDecisions = append(transportDecisions, parseReviewDecision(item.(map[string]any)))
+	}
+	acceptedValue, err := json.Marshal(astmerge.SelectProjectedChildReviewGroupsAcceptedForApply(transportGroups, transportFixture["family"].(string), transportDecisions))
+	if err != nil {
+		t.Fatalf("marshal accepted groups: %v", err)
+	}
+	var decodedAccepted any
+	if err := json.Unmarshal(acceptedValue, &decodedAccepted); err != nil {
+		t.Fatalf("unmarshal accepted groups: %v", err)
+	}
+	if !deepEqualJSON(decodedAccepted, transportFixture["expected_accepted_groups"]) {
+		t.Fatalf("unexpected accepted groups: %+v", decodedAccepted)
 	}
 }
 

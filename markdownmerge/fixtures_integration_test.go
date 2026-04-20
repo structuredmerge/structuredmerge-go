@@ -41,6 +41,61 @@ func jsonReadyMarkdown(t *testing.T, value any) any {
 	return normalized
 }
 
+func parseProjectedChildReviewGroup(raw map[string]any) astmerge.ProjectedChildReviewGroup {
+	return astmerge.ProjectedChildReviewGroup{
+		DelegatedApplyGroup:         raw["delegated_apply_group"].(string),
+		ParentOperationID:           raw["parent_operation_id"].(string),
+		ChildOperationID:            raw["child_operation_id"].(string),
+		DelegatedRuntimeSurfacePath: raw["delegated_runtime_surface_path"].(string),
+		CaseIDs:                     parseStringSlice(raw["case_ids"].([]any)),
+		DelegatedCaseIDs:            parseStringSlice(raw["delegated_case_ids"].([]any)),
+	}
+}
+
+func parseReviewRequest(raw map[string]any) astmerge.ReviewRequest {
+	request := astmerge.ReviewRequest{
+		ID:           raw["id"].(string),
+		Kind:         astmerge.ReviewRequestKind(raw["kind"].(string)),
+		Family:       raw["family"].(string),
+		Message:      raw["message"].(string),
+		Blocking:     raw["blocking"].(bool),
+		ActionOffers: []astmerge.ReviewActionOffer{},
+	}
+	if rawDelegatedGroup, ok := raw["delegated_group"]; ok {
+		group := parseProjectedChildReviewGroup(rawDelegatedGroup.(map[string]any))
+		request.DelegatedGroup = &group
+	}
+	if rawActionOffers, ok := raw["action_offers"]; ok {
+		request.ActionOffers = make([]astmerge.ReviewActionOffer, 0, len(rawActionOffers.([]any)))
+		for _, item := range rawActionOffers.([]any) {
+			offer := item.(map[string]any)
+			request.ActionOffers = append(request.ActionOffers, astmerge.ReviewActionOffer{
+				Action:          astmerge.ReviewDecisionAction(offer["action"].(string)),
+				RequiresContext: offer["requires_context"].(bool),
+			})
+		}
+	}
+	if rawDefaultAction, ok := raw["default_action"]; ok {
+		request.DefaultAction = astmerge.ReviewDecisionAction(rawDefaultAction.(string))
+	}
+	return request
+}
+
+func parseReviewDecision(raw map[string]any) astmerge.ReviewDecision {
+	return astmerge.ReviewDecision{
+		RequestID: raw["request_id"].(string),
+		Action:    astmerge.ReviewDecisionAction(raw["action"].(string)),
+	}
+}
+
+func parseStringSlice(raw []any) []string {
+	values := make([]string, 0, len(raw))
+	for _, item := range raw {
+		values = append(values, item.(string))
+	}
+	return values
+}
+
 func TestSharedFixtureMarkdownFeatureProfile(t *testing.T) {
 	fixture := readMarkdownFixture(t, "diagnostics", "slice-194-markdown-family-feature-profile", "markdown-feature-profile.json")
 	profile := MarkdownFeatureProfileInfo()
@@ -234,5 +289,31 @@ func TestSharedFixtureMarkdownProjectedChildReviewGroupsReadyForApply(t *testing
 	}
 	if actual := jsonReadyMarkdown(t, astmerge.SelectProjectedChildReviewGroupsReadyForApply(groups, resolvedCaseIDs)); !reflect.DeepEqual(actual, fixture["expected_ready_groups"]) {
 		t.Fatalf("unexpected ready projected child review groups: %+v", actual)
+	}
+}
+
+func TestSharedFixtureMarkdownDelegatedChildReviewTransport(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-238-delegated-child-review-transport", "fenced-code-review-transport.json")
+	group := parseProjectedChildReviewGroup(fixture["group"].(map[string]any))
+	expectedRequest := parseReviewRequest(fixture["expected_request"].(map[string]any))
+
+	if actual := astmerge.ProjectedChildGroupReviewRequest(group, fixture["family"].(string)); !reflect.DeepEqual(actual, expectedRequest) {
+		t.Fatalf("unexpected delegated child review request: %+v", actual)
+	}
+
+	groupSource, err := json.Marshal(fixture["groups"])
+	if err != nil {
+		t.Fatalf("marshal projected groups: %v", err)
+	}
+	var groups []astmerge.ProjectedChildReviewGroup
+	if err := json.Unmarshal(groupSource, &groups); err != nil {
+		t.Fatalf("unmarshal projected groups: %v", err)
+	}
+	decisions := make([]astmerge.ReviewDecision, 0, len(fixture["decisions"].([]any)))
+	for _, item := range fixture["decisions"].([]any) {
+		decisions = append(decisions, parseReviewDecision(item.(map[string]any)))
+	}
+	if actual := jsonReadyMarkdown(t, astmerge.SelectProjectedChildReviewGroupsAcceptedForApply(groups, fixture["family"].(string), decisions)); !reflect.DeepEqual(actual, fixture["expected_accepted_groups"]) {
+		t.Fatalf("unexpected accepted projected child review groups: %+v", actual)
 	}
 }
