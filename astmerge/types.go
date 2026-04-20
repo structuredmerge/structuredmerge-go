@@ -35,14 +35,16 @@ const (
 )
 
 type Diagnostic struct {
-	Severity    DiagnosticSeverity
-	Category    DiagnosticCategory
-	Message     string
-	Path        string
-	RequestID   string
-	Action      ReviewDecisionAction
-	Reason      ReviewDiagnosticReason
-	PayloadKind string
+	Severity       DiagnosticSeverity
+	Category       DiagnosticCategory
+	Message        string
+	Path           string
+	RequestID      string
+	Action         ReviewDecisionAction
+	Reason         ReviewDiagnosticReason
+	PayloadKind    string
+	ExpectedFamily string
+	ProvidedFamily string
 }
 
 type ParseResult[T any] struct {
@@ -606,12 +608,14 @@ func reviewDecisionForFamilyContext(
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context != nil {
 			if decision.Context.FamilyProfile.Family != family {
 				return nil, nil, false, []Diagnostic{{
-					Severity:  SeverityError,
-					Category:  CategoryConfigurationError,
-					Message:   "review decision " + requestID + " provided context for " + decision.Context.FamilyProfile.Family + ", expected " + family + ".",
-					RequestID: requestID,
-					Action:    ReviewDecisionProvideExplicitContext,
-					Reason:    ReasonFamilyMismatch,
+					Severity:       SeverityError,
+					Category:       CategoryConfigurationError,
+					Message:        "review decision " + requestID + " provided context for " + decision.Context.FamilyProfile.Family + ", expected " + family + ".",
+					RequestID:      requestID,
+					Action:         ReviewDecisionProvideExplicitContext,
+					Reason:         ReasonFamilyMismatch,
+					ExpectedFamily: family,
+					ProvidedFamily: decision.Context.FamilyProfile.Family,
 				}}
 			}
 			copyDecision := decision

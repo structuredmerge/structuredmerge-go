@@ -1712,6 +1712,12 @@ func parseDiagnostic(raw map[string]any) Diagnostic {
 	if payloadKind, ok := raw["payload_kind"]; ok {
 		diagnostic.PayloadKind = payloadKind.(string)
 	}
+	if expectedFamily, ok := raw["expected_family"]; ok {
+		diagnostic.ExpectedFamily = expectedFamily.(string)
+	}
+	if providedFamily, ok := raw["provided_family"]; ok {
+		diagnostic.ProvidedFamily = providedFamily.(string)
+	}
 
 	return diagnostic
 }
