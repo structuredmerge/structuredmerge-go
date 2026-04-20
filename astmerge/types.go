@@ -35,13 +35,14 @@ const (
 )
 
 type Diagnostic struct {
-	Severity  DiagnosticSeverity
-	Category  DiagnosticCategory
-	Message   string
-	Path      string
-	RequestID string
-	Action    ReviewDecisionAction
-	Reason    ReviewDiagnosticReason
+	Severity    DiagnosticSeverity
+	Category    DiagnosticCategory
+	Message     string
+	Path        string
+	RequestID   string
+	Action      ReviewDecisionAction
+	Reason      ReviewDiagnosticReason
+	PayloadKind string
 }
 
 type ParseResult[T any] struct {
@@ -593,12 +594,13 @@ func reviewDecisionForFamilyContext(
 		}
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context == nil {
 			return nil, nil, false, []Diagnostic{{
-				Severity:  SeverityError,
-				Category:  CategoryConfigurationError,
-				Message:   "review decision " + requestID + " requires explicit context payload.",
-				RequestID: requestID,
-				Action:    ReviewDecisionProvideExplicitContext,
-				Reason:    ReasonMissingRequiredPayload,
+				Severity:    SeverityError,
+				Category:    CategoryConfigurationError,
+				Message:     "review decision " + requestID + " requires explicit context payload.",
+				RequestID:   requestID,
+				Action:      ReviewDecisionProvideExplicitContext,
+				Reason:      ReasonMissingRequiredPayload,
+				PayloadKind: "conformance_family_context",
 			}}
 		}
 		if decision.Action == ReviewDecisionProvideExplicitContext && decision.Context != nil {

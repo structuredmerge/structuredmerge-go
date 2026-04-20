@@ -1709,6 +1709,9 @@ func parseDiagnostic(raw map[string]any) Diagnostic {
 	if reason, ok := raw["reason"]; ok {
 		diagnostic.Reason = ReviewDiagnosticReason(reason.(string))
 	}
+	if payloadKind, ok := raw["payload_kind"]; ok {
+		diagnostic.PayloadKind = payloadKind.(string)
+	}
 
 	return diagnostic
 }
