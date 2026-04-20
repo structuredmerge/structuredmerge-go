@@ -1950,6 +1950,36 @@ func TestBackendSensitiveAggregateFixtures(t *testing.T) {
 			t.Fatalf("unexpected backend-sensitive aggregate report: %+v", report)
 		}
 	}
+
+	for _, relative := range []string{
+		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-192-backend-sensitive-aggregate-tree-sitter-review-state", "backend-sensitive-aggregate-tree-sitter-review-state.json"),
+		filepath.Join("..", "..", "fixtures", "diagnostics", "slice-193-backend-sensitive-aggregate-native-review-state", "backend-sensitive-aggregate-native-review-state.json"),
+	} {
+		fixture := readDiagnosticFixtureFromPath(t, relative)
+		var manifest ConformanceManifest
+		if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+			t.Fatalf("marshal manifest: %v", err)
+		} else if err := json.Unmarshal(raw, &manifest); err != nil {
+			t.Fatalf("unmarshal manifest: %v", err)
+		}
+		options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+		expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+		executionsRaw := fixture["executions"].(map[string]any)
+		state := ReviewConformanceManifest(
+			manifest,
+			options,
+			func(run ConformanceCaseRun) ConformanceCaseExecution {
+				key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+				if raw, ok := executionsRaw[key]; ok {
+					return parseConformanceCaseExecution(raw.(map[string]any))
+				}
+				return ConformanceCaseExecution{Outcome: ConformanceFailed, Messages: []string{"missing execution"}}
+			},
+		)
+		if !reflect.DeepEqual(state, expected) {
+			t.Fatalf("unexpected backend-sensitive aggregate review state: %+v", state)
+		}
+	}
 }
 
 func TestSharedFixturePlannedNamedConformanceSuiteReports(t *testing.T) {
