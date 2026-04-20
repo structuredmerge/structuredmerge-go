@@ -175,13 +175,14 @@ const (
 )
 
 type ReviewRequest struct {
-	ID               string                 `json:"id"`
-	Kind             ReviewRequestKind      `json:"kind"`
-	Family           string                 `json:"family"`
-	Message          string                 `json:"message"`
-	Blocking         bool                   `json:"blocking"`
-	AvailableActions []ReviewDecisionAction `json:"available_actions"`
-	DefaultAction    ReviewDecisionAction   `json:"default_action,omitempty"`
+	ID               string                        `json:"id"`
+	Kind             ReviewRequestKind             `json:"kind"`
+	Family           string                        `json:"family"`
+	Message          string                        `json:"message"`
+	Blocking         bool                          `json:"blocking"`
+	ProposedContext  *ConformanceFamilyPlanContext `json:"proposed_context,omitempty"`
+	AvailableActions []ReviewDecisionAction        `json:"available_actions"`
+	DefaultAction    ReviewDecisionAction          `json:"default_action,omitempty"`
 }
 
 type ReviewDecision struct {
@@ -615,6 +616,7 @@ func ReviewConformanceFamilyContext(
 			Family:           family,
 			Message:          "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
 			Blocking:         true,
+			ProposedContext:  &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
 			AvailableActions: []ReviewDecisionAction{ReviewDecisionAcceptDefaultContext},
 			DefaultAction:    ReviewDecisionAcceptDefaultContext,
 		}}, nil

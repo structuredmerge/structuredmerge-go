@@ -1136,6 +1136,18 @@ func TestSharedFixtureFamilyContextReviewRequest(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFamilyContextReviewProposal(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "family_context_review_proposal"))
+	family := fixture["family"].(string)
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expectedRequest := parseReviewRequest(fixture["expected_request"].(map[string]any))
+
+	_, _, requests, _ := ReviewConformanceFamilyContext(family, options)
+	if !reflect.DeepEqual(requests, []ReviewRequest{expectedRequest}) {
+		t.Fatalf("unexpected family-context proposal requests: %+v", requests)
+	}
+}
+
 func TestSharedFixtureConformanceManifestReviewState(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "conformance_manifest_review_state"))
 	var manifest ConformanceManifest
@@ -1693,6 +1705,10 @@ func parseReviewRequest(raw map[string]any) ReviewRequest {
 		Message:          raw["message"].(string),
 		Blocking:         raw["blocking"].(bool),
 		AvailableActions: []ReviewDecisionAction{},
+	}
+	if rawProposedContext, ok := raw["proposed_context"]; ok {
+		context := parseConformanceFamilyPlanContext(rawProposedContext.(map[string]any))
+		request.ProposedContext = &context
 	}
 	if rawAvailableActions, ok := raw["available_actions"]; ok {
 		request.AvailableActions = make([]ReviewDecisionAction, 0, len(rawAvailableActions.([]any)))
