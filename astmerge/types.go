@@ -186,6 +186,11 @@ type ReviewDecision struct {
 	Action    ReviewDecisionAction `json:"action"`
 }
 
+type ReviewReplayBundle struct {
+	ReplayContext ReviewReplayContext `json:"replay_context"`
+	Decisions     []ReviewDecision    `json:"decisions"`
+}
+
 type ReviewHostHints struct {
 	Interactive             bool `json:"interactive"`
 	RequireExplicitContexts bool `json:"require_explicit_contexts"`
@@ -203,6 +208,7 @@ type ConformanceManifestReviewOptions struct {
 	RequireExplicitContexts bool                                    `json:"require_explicit_contexts,omitempty"`
 	ReviewDecisions         []ReviewDecision                        `json:"review_decisions,omitempty"`
 	ReviewReplayContext     *ReviewReplayContext                    `json:"review_replay_context,omitempty"`
+	ReviewReplayBundle      *ReviewReplayBundle                     `json:"review_replay_bundle,omitempty"`
 	Interactive             bool                                    `json:"interactive,omitempty"`
 }
 
@@ -407,6 +413,16 @@ func ConformanceManifestReviewRequestIDs(
 	}
 
 	return requestIDs
+}
+
+func ReviewReplayBundleInputs(
+	options ConformanceManifestReviewOptions,
+) (*ReviewReplayContext, []ReviewDecision) {
+	if options.ReviewReplayBundle != nil {
+		return &options.ReviewReplayBundle.ReplayContext, options.ReviewReplayBundle.Decisions
+	}
+
+	return options.ReviewReplayContext, options.ReviewDecisions
 }
 
 func ResolveConformanceFamilyContext(
@@ -804,28 +820,33 @@ func ReviewConformanceManifest(
 	requests := make([]ReviewRequest, 0)
 	appliedDecisions := make([]ReviewDecision, 0)
 	effectiveOptions := options
-	if len(options.ReviewDecisions) > 0 {
-		if options.ReviewReplayContext == nil {
+	replayInputContext, replayInputDecisions := ReviewReplayBundleInputs(options)
+	if len(replayInputDecisions) > 0 {
+		if replayInputContext == nil {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Category: CategoryReplayRejected,
 				Message:  "review decisions were provided without replay context.",
 			})
+			effectiveOptions.ReviewReplayBundle = nil
+			effectiveOptions.ReviewReplayContext = nil
 			effectiveOptions.ReviewDecisions = nil
-		} else if !ReviewReplayContextCompatible(replayContext, options.ReviewReplayContext) {
+		} else if !ReviewReplayContextCompatible(replayContext, replayInputContext) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Category: CategoryReplayRejected,
 				Message:  "review replay context does not match the current conformance manifest state.",
 			})
+			effectiveOptions.ReviewReplayBundle = nil
+			effectiveOptions.ReviewReplayContext = nil
 			effectiveOptions.ReviewDecisions = nil
 		} else {
 			allowedRequestIDs := make(map[string]bool)
 			for _, requestID := range ConformanceManifestReviewRequestIDs(manifest, options) {
 				allowedRequestIDs[requestID] = true
 			}
-			acceptedDecisions := make([]ReviewDecision, 0, len(options.ReviewDecisions))
-			for _, decision := range options.ReviewDecisions {
+			acceptedDecisions := make([]ReviewDecision, 0, len(replayInputDecisions))
+			for _, decision := range replayInputDecisions {
 				if allowedRequestIDs[decision.RequestID] {
 					acceptedDecisions = append(acceptedDecisions, decision)
 				} else {
@@ -836,6 +857,8 @@ func ReviewConformanceManifest(
 					})
 				}
 			}
+			effectiveOptions.ReviewReplayBundle = nil
+			effectiveOptions.ReviewReplayContext = replayInputContext
 			effectiveOptions.ReviewDecisions = acceptedDecisions
 		}
 	}

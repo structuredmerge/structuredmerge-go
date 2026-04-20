@@ -1309,6 +1309,55 @@ func TestSharedFixtureStaleReviewDecision(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewReplayBundle(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle"))
+	bundle := parseReviewReplayBundle(fixture["replay_bundle"].(map[string]any))
+
+	replayContext, decisions := ReviewReplayBundleInputs(ConformanceManifestReviewOptions{
+		ReviewReplayBundle: &bundle,
+	})
+
+	if replayContext == nil || !reflect.DeepEqual(*replayContext, bundle.ReplayContext) {
+		t.Fatalf("unexpected replay bundle context: %+v", replayContext)
+	}
+	if !reflect.DeepEqual(decisions, bundle.Decisions) {
+		t.Fatalf("unexpected replay bundle decisions: %+v", decisions)
+	}
+}
+
+func TestSharedFixtureReviewReplayBundleApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_application"))
+	var manifest ConformanceManifest
+	if raw, err := json.Marshal(fixture["manifest"]); err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	} else if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+
+	state := ReviewConformanceManifest(
+		manifest,
+		options,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected review replay bundle application state: %+v", state)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -1514,6 +1563,10 @@ func parseConformanceManifestReviewOptions(raw map[string]any) ConformanceManife
 		context := parseReviewReplayContext(rawReviewReplayContext.(map[string]any))
 		options.ReviewReplayContext = &context
 	}
+	if rawReviewReplayBundle, ok := raw["review_replay_bundle"]; ok {
+		bundle := parseReviewReplayBundle(rawReviewReplayBundle.(map[string]any))
+		options.ReviewReplayBundle = &bundle
+	}
 
 	return options
 }
@@ -1558,6 +1611,20 @@ func parseReviewDecision(raw map[string]any) ReviewDecision {
 	return ReviewDecision{
 		RequestID: raw["request_id"].(string),
 		Action:    ReviewDecisionAction(raw["action"].(string)),
+	}
+}
+
+func parseReviewReplayBundle(raw map[string]any) ReviewReplayBundle {
+	return ReviewReplayBundle{
+		ReplayContext: parseReviewReplayContext(raw["replay_context"].(map[string]any)),
+		Decisions: func() []ReviewDecision {
+			decisionsRaw := raw["decisions"].([]any)
+			decisions := make([]ReviewDecision, 0, len(decisionsRaw))
+			for _, item := range decisionsRaw {
+				decisions = append(decisions, parseReviewDecision(item.(map[string]any)))
+			}
+			return decisions
+		}(),
 	}
 }
 
