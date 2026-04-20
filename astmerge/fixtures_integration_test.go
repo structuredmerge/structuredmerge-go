@@ -1792,21 +1792,25 @@ func parseConformanceManifestReport(raw map[string]any) ConformanceManifestRepor
 
 func parseReviewRequest(raw map[string]any) ReviewRequest {
 	request := ReviewRequest{
-		ID:               raw["id"].(string),
-		Kind:             ReviewRequestKind(raw["kind"].(string)),
-		Family:           raw["family"].(string),
-		Message:          raw["message"].(string),
-		Blocking:         raw["blocking"].(bool),
-		AvailableActions: []ReviewDecisionAction{},
+		ID:           raw["id"].(string),
+		Kind:         ReviewRequestKind(raw["kind"].(string)),
+		Family:       raw["family"].(string),
+		Message:      raw["message"].(string),
+		Blocking:     raw["blocking"].(bool),
+		ActionOffers: []ReviewActionOffer{},
 	}
 	if rawProposedContext, ok := raw["proposed_context"]; ok {
 		context := parseConformanceFamilyPlanContext(rawProposedContext.(map[string]any))
 		request.ProposedContext = &context
 	}
-	if rawAvailableActions, ok := raw["available_actions"]; ok {
-		request.AvailableActions = make([]ReviewDecisionAction, 0, len(rawAvailableActions.([]any)))
-		for _, item := range rawAvailableActions.([]any) {
-			request.AvailableActions = append(request.AvailableActions, ReviewDecisionAction(item.(string)))
+	if rawActionOffers, ok := raw["action_offers"]; ok {
+		request.ActionOffers = make([]ReviewActionOffer, 0, len(rawActionOffers.([]any)))
+		for _, item := range rawActionOffers.([]any) {
+			offer := item.(map[string]any)
+			request.ActionOffers = append(request.ActionOffers, ReviewActionOffer{
+				Action:          ReviewDecisionAction(offer["action"].(string)),
+				RequiresContext: offer["requires_context"].(bool),
+			})
 		}
 	}
 	if rawDefaultAction, ok := raw["default_action"]; ok {

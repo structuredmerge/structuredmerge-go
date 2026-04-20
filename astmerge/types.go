@@ -175,15 +175,20 @@ const (
 	ReviewDecisionProvideExplicitContext ReviewDecisionAction = "provide_explicit_context"
 )
 
+type ReviewActionOffer struct {
+	Action          ReviewDecisionAction `json:"action"`
+	RequiresContext bool                 `json:"requires_context"`
+}
+
 type ReviewRequest struct {
-	ID               string                        `json:"id"`
-	Kind             ReviewRequestKind             `json:"kind"`
-	Family           string                        `json:"family"`
-	Message          string                        `json:"message"`
-	Blocking         bool                          `json:"blocking"`
-	ProposedContext  *ConformanceFamilyPlanContext `json:"proposed_context,omitempty"`
-	AvailableActions []ReviewDecisionAction        `json:"available_actions"`
-	DefaultAction    ReviewDecisionAction          `json:"default_action,omitempty"`
+	ID              string                        `json:"id"`
+	Kind            ReviewRequestKind             `json:"kind"`
+	Family          string                        `json:"family"`
+	Message         string                        `json:"message"`
+	Blocking        bool                          `json:"blocking"`
+	ProposedContext *ConformanceFamilyPlanContext `json:"proposed_context,omitempty"`
+	ActionOffers    []ReviewActionOffer           `json:"action_offers"`
+	DefaultAction   ReviewDecisionAction          `json:"default_action,omitempty"`
 }
 
 type ReviewDecision struct {
@@ -638,14 +643,17 @@ func ReviewConformanceFamilyContext(
 		return context, diagnostics, nil, []ReviewDecision{*decision}
 	} else if len(decisionDiagnostics) > 0 {
 		return nil, decisionDiagnostics, []ReviewRequest{{
-			ID:               ReviewRequestIDForFamilyContext(family),
-			Kind:             ReviewRequestFamilyContext,
-			Family:           family,
-			Message:          "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
-			Blocking:         true,
-			ProposedContext:  &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
-			AvailableActions: []ReviewDecisionAction{ReviewDecisionAcceptDefaultContext, ReviewDecisionProvideExplicitContext},
-			DefaultAction:    ReviewDecisionAcceptDefaultContext,
+			ID:              ReviewRequestIDForFamilyContext(family),
+			Kind:            ReviewRequestFamilyContext,
+			Family:          family,
+			Message:         "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
+			Blocking:        true,
+			ProposedContext: &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
+			ActionOffers: []ReviewActionOffer{
+				{Action: ReviewDecisionAcceptDefaultContext, RequiresContext: false},
+				{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true},
+			},
+			DefaultAction: ReviewDecisionAcceptDefaultContext,
 		}}, nil
 	}
 
@@ -654,14 +662,17 @@ func ReviewConformanceFamilyContext(
 			Category: CategoryConfigurationError,
 			Message:  "missing explicit family context for " + family + ".",
 		}}, []ReviewRequest{{
-			ID:               ReviewRequestIDForFamilyContext(family),
-			Kind:             ReviewRequestFamilyContext,
-			Family:           family,
-			Message:          "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
-			Blocking:         true,
-			ProposedContext:  &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
-			AvailableActions: []ReviewDecisionAction{ReviewDecisionAcceptDefaultContext, ReviewDecisionProvideExplicitContext},
-			DefaultAction:    ReviewDecisionAcceptDefaultContext,
+			ID:              ReviewRequestIDForFamilyContext(family),
+			Kind:            ReviewRequestFamilyContext,
+			Family:          family,
+			Message:         "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
+			Blocking:        true,
+			ProposedContext: &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
+			ActionOffers: []ReviewActionOffer{
+				{Action: ReviewDecisionAcceptDefaultContext, RequiresContext: false},
+				{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true},
+			},
+			DefaultAction: ReviewDecisionAcceptDefaultContext,
 		}}, nil
 }
 
