@@ -38,6 +38,15 @@ func TestSharedFixtureTOMLFeatureProfile(t *testing.T) {
 	if len(profile.SupportedPolicies) != 1 || profile.SupportedPolicies[0].Name != "destination_wins_array" {
 		t.Fatalf("unexpected policies: %+v", profile.SupportedPolicies)
 	}
+
+	nativeProfile := TOMLBackendFeatureProfileInfo(BackendNative)
+	if nativeProfile.Backend != "go-toml-v2" || nativeProfile.BackendRef == nil || nativeProfile.BackendRef.Family != "builtin" {
+		t.Fatalf("unexpected native backend profile: %+v", nativeProfile)
+	}
+	pigeonProfile := TOMLBackendFeatureProfileInfo(BackendPigeon)
+	if pigeonProfile.Backend != "pigeon" || pigeonProfile.BackendRef == nil || pigeonProfile.BackendRef.Family != "peg" {
+		t.Fatalf("unexpected pigeon backend profile: %+v", pigeonProfile)
+	}
 }
 
 func TestSharedFixtureTOMLParse(t *testing.T) {
@@ -57,6 +66,15 @@ func TestSharedFixtureTOMLParse(t *testing.T) {
 	}
 	if len(invalidResult.Diagnostics) != 1 || string(invalidResult.Diagnostics[0].Category) != "parse_error" {
 		t.Fatalf("unexpected invalid diagnostics: %+v", invalidResult.Diagnostics)
+	}
+
+	pigeonValid := ParseTOMLWithBackend(valid["source"].(string), DialectTOML, BackendPigeon)
+	if !pigeonValid.OK || pigeonValid.Analysis == nil {
+		t.Fatalf("unexpected pigeon parse success result: %+v", pigeonValid)
+	}
+	pigeonInvalid := ParseTOMLWithBackend(invalid["source"].(string), DialectTOML, BackendPigeon)
+	if pigeonInvalid.OK || len(pigeonInvalid.Diagnostics) != 1 || string(pigeonInvalid.Diagnostics[0].Category) != "parse_error" {
+		t.Fatalf("unexpected pigeon parse failure result: %+v", pigeonInvalid)
 	}
 }
 
@@ -111,6 +129,14 @@ func TestSharedFixtureTOMLMerge(t *testing.T) {
 		t.Fatalf("unexpected merge output:\n%s", *mergeResult.Output)
 	}
 
+	pigeonMergeResult := MergeTOMLWithBackend(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectTOML, BackendPigeon)
+	if !pigeonMergeResult.OK || pigeonMergeResult.Output == nil {
+		t.Fatalf("expected pigeon merge success: %+v", pigeonMergeResult)
+	}
+	if *pigeonMergeResult.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected pigeon merge output:\n%s", *pigeonMergeResult.Output)
+	}
+
 	invalidTemplate := readTOMLFixture(t, "toml", "slice-94-merge", "invalid-template.json")
 	invalidTemplateResult := MergeTOML(invalidTemplate["template"].(string), invalidTemplate["destination"].(string), DialectTOML)
 	if invalidTemplateResult.OK || len(invalidTemplateResult.Diagnostics) != 1 || string(invalidTemplateResult.Diagnostics[0].Category) != "parse_error" {
@@ -121,5 +147,10 @@ func TestSharedFixtureTOMLMerge(t *testing.T) {
 	invalidDestinationResult := MergeTOML(invalidDestination["template"].(string), invalidDestination["destination"].(string), DialectTOML)
 	if invalidDestinationResult.OK || len(invalidDestinationResult.Diagnostics) != 1 || string(invalidDestinationResult.Diagnostics[0].Category) != "destination_parse_error" {
 		t.Fatalf("unexpected invalid destination result: %+v", invalidDestinationResult)
+	}
+
+	pigeonInvalidDestinationResult := MergeTOMLWithBackend(invalidDestination["template"].(string), invalidDestination["destination"].(string), DialectTOML, BackendPigeon)
+	if pigeonInvalidDestinationResult.OK || len(pigeonInvalidDestinationResult.Diagnostics) != 1 || string(pigeonInvalidDestinationResult.Diagnostics[0].Category) != "destination_parse_error" {
+		t.Fatalf("unexpected pigeon invalid destination result: %+v", pigeonInvalidDestinationResult)
 	}
 }

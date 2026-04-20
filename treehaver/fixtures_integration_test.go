@@ -192,6 +192,20 @@ func TestSharedFixtureBackendRegistry(t *testing.T) {
 	}
 }
 
+func TestPigeonBackendReference(t *testing.T) {
+	if backend := BackendReferenceByID("pigeon"); backend == nil || backend.ID != "pigeon" || backend.Family != "peg" {
+		t.Fatalf("unexpected pigeon backend: %+v", backend)
+	}
+	info := PigeonAdapterInfo()
+	if info.Backend != "pigeon" || info.BackendRef == nil || info.BackendRef.Family != "peg" {
+		t.Fatalf("unexpected pigeon adapter info: %+v", info)
+	}
+	profile := PigeonFeatureProfile()
+	if profile.Backend != "pigeon" || profile.BackendRef == nil || profile.BackendRef.Family != "peg" {
+		t.Fatalf("unexpected pigeon feature profile: %+v", profile)
+	}
+}
+
 func TestSharedFixtureProcessBaseline(t *testing.T) {
 	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "process_baseline"))
 	requestFixture := fixture["request"].(map[string]any)

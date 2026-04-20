@@ -1,0 +1,47 @@
+{
+package pigeontoml
+}
+
+Input <- Spacing Document EOF
+
+Document <- (BlankLine / CommentLine / Table / KeyValue)*
+
+Table <- "[" Spacing KeyPath Spacing "]" EntryEnd
+
+KeyValue <- KeyPath Spacing "=" Spacing Value EntryEnd
+
+Value <- String / Boolean / Float / Integer / Array
+
+Array <- "[" Spacing ValueList? Spacing "]"
+
+ValueList <- Value (Spacing "," Spacing Value)*
+
+KeyPath <- BareKey (Spacing "." Spacing BareKey)*
+
+BareKey <- [A-Za-z0-9_-]+
+
+String <- "\"" Char* "\""
+
+Char <- Escape / !("\"" / "\n" / "\r") .
+
+Escape <- "\\" .
+
+Boolean <- "true" / "false"
+
+Float <- "-"? [0-9]+ "." [0-9]+
+
+Integer <- "-"? [0-9]+
+
+CommentLine <- Spacing Comment Newline?
+
+Comment <- "#" (!Newline .)*
+
+BlankLine <- Spacing Newline
+
+EntryEnd <- Spacing Comment? (Newline / EOF)
+
+Spacing "spacing" <- [ \t]*
+
+Newline <- "\r\n" / "\n" / "\r"
+
+EOF <- !.

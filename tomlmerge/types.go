@@ -8,12 +8,18 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/tomlmerge/internal/pigeontoml"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 type TOMLDialect string
+type TOMLBackend string
 
 const (
 	DialectTOML TOMLDialect = "toml"
+
+	BackendNative TOMLBackend = "native"
+	BackendPigeon TOMLBackend = "pigeon"
 )
 
 type TOMLRootKind string
@@ -68,6 +74,13 @@ type TOMLFeatureProfile struct {
 	SupportedPolicies []astmerge.PolicyReference
 }
 
+type TOMLBackendFeatureProfile struct {
+	Backend           string
+	BackendRef        *treehaver.BackendReference
+	SupportsDialects  bool
+	SupportedPolicies []astmerge.PolicyReference
+}
+
 func parseError(message string) astmerge.Diagnostic {
 	return astmerge.Diagnostic{
 		Severity: astmerge.SeverityError,
@@ -110,6 +123,29 @@ func TOMLFeatureProfileInfo() TOMLFeatureProfile {
 		Family:            shared.Family,
 		SupportedDialects: []TOMLDialect{DialectTOML},
 		SupportedPolicies: shared.SupportedPolicies,
+	}
+}
+
+func AvailableTOMLBackends() []TOMLBackend {
+	return []TOMLBackend{BackendNative, BackendPigeon}
+}
+
+func TOMLBackendFeatureProfileInfo(backend TOMLBackend) TOMLBackendFeatureProfile {
+	switch backend {
+	case BackendPigeon:
+		return TOMLBackendFeatureProfile{
+			Backend:           treehaver.PigeonAdapterInfo().Backend,
+			BackendRef:        treehaver.PigeonAdapterInfo().BackendRef,
+			SupportsDialects:  false,
+			SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+		}
+	default:
+		return TOMLBackendFeatureProfile{
+			Backend:           "go-toml-v2",
+			BackendRef:        &treehaver.BackendReference{ID: "go-toml-v2", Family: "builtin"},
+			SupportsDialects:  true,
+			SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+		}
 	}
 }
 
@@ -293,10 +329,21 @@ func parseTOMLTable(source string) (map[string]any, error) {
 }
 
 func ParseTOML(source string, dialect TOMLDialect) astmerge.ParseResult[TOMLAnalysis] {
+	return ParseTOMLWithBackend(source, dialect, BackendNative)
+}
+
+func ParseTOMLWithBackend(source string, dialect TOMLDialect, backend TOMLBackend) astmerge.ParseResult[TOMLAnalysis] {
 	if dialect != DialectTOML {
 		return astmerge.ParseResult[TOMLAnalysis]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{unsupportedFeature("Unsupported TOML dialect.")},
+		}
+	}
+
+	if diagnostic := validateTOMLSyntax(source, backend); diagnostic != nil {
+		return astmerge.ParseResult[TOMLAnalysis]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{*diagnostic},
 		}
 	}
 
@@ -326,6 +373,22 @@ func ParseTOML(source string, dialect TOMLDialect) astmerge.ParseResult[TOMLAnal
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},
 		Analysis:    &analysis,
+	}
+}
+
+func validateTOMLSyntax(source string, backend TOMLBackend) *astmerge.Diagnostic {
+	switch backend {
+	case BackendPigeon:
+		if _, err := pigeontoml.Parse("", []byte(source)); err != nil {
+			diagnostic := parseError(err.Error())
+			return &diagnostic
+		}
+		return nil
+	case BackendNative:
+		return nil
+	default:
+		diagnostic := unsupportedFeature("Unsupported TOML backend.")
+		return &diagnostic
 	}
 }
 
@@ -404,7 +467,11 @@ func mergeTOMLTables(template map[string]any, destination map[string]any) map[st
 }
 
 func MergeTOML(templateSource string, destinationSource string, dialect TOMLDialect) astmerge.MergeResult[string] {
-	template := ParseTOML(templateSource, dialect)
+	return MergeTOMLWithBackend(templateSource, destinationSource, dialect, BackendNative)
+}
+
+func MergeTOMLWithBackend(templateSource string, destinationSource string, dialect TOMLDialect, backend TOMLBackend) astmerge.MergeResult[string] {
+	template := ParseTOMLWithBackend(templateSource, dialect, backend)
 	if !template.OK || template.Analysis == nil {
 		return astmerge.MergeResult[string]{
 			OK:          false,
@@ -412,7 +479,7 @@ func MergeTOML(templateSource string, destinationSource string, dialect TOMLDial
 		}
 	}
 
-	destination := ParseTOML(destinationSource, dialect)
+	destination := ParseTOMLWithBackend(destinationSource, dialect, backend)
 	if !destination.OK || destination.Analysis == nil {
 		diagnostics := make([]astmerge.Diagnostic, 0, len(destination.Diagnostics))
 		for _, diagnostic := range destination.Diagnostics {

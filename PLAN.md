@@ -32,7 +32,7 @@ Deferred:
 - `kettle-jem`-style scaffolding
 - full merge-family parity beyond MVP
 - non-tree-sitter native parser experiments
-- PEG-backend parity beyond the first tree-sitter and native adapter slices
+- PEG-backend parity beyond the initial TOML family slice
 
 ## Proposed Module Family
 
@@ -78,6 +78,9 @@ Current host constraint:
   requires Go `1.26` and its published module payload omits the `include/` and
   `lib/` artifacts referenced by its own CGO bindings
 - first PEG candidate for a second backend path: `pigeon`
+- current TOML family backend plurality:
+  - semantic parser: `go-toml/v2`
+  - PEG syntax-validation parser: `pigeon`
 
 Requirements:
 
@@ -137,6 +140,8 @@ Requirements:
   and `pigeon`.
 - Keep one-trick parser integrations such as `go/parser` inside merge-family
   packages, not in `tree-haver`.
+- Use the same family-facing TOML fixtures across both `go-toml/v2` and
+  `pigeon` backend paths unless a backend restriction is declared explicitly.
 
 ## First Implementation Sequence
 

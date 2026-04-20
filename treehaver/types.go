@@ -110,10 +110,42 @@ var KreuzbergLanguagePackBackend = BackendReference{
 	Family: "tree-sitter",
 }
 
+var PigeonBackend = BackendReference{
+	ID:     "pigeon",
+	Family: "peg",
+}
+
+func BackendReferenceByID(id string) *BackendReference {
+	switch id {
+	case KreuzbergLanguagePackBackend.ID:
+		return &KreuzbergLanguagePackBackend
+	case PigeonBackend.ID:
+		return &PigeonBackend
+	default:
+		return nil
+	}
+}
+
 func LanguagePackAdapterInfo() AdapterInfo {
 	return AdapterInfo{
 		Backend:          KreuzbergLanguagePackBackend.ID,
 		BackendRef:       &KreuzbergLanguagePackBackend,
+		SupportsDialects: false,
+	}
+}
+
+func PigeonAdapterInfo() AdapterInfo {
+	return AdapterInfo{
+		Backend:          PigeonBackend.ID,
+		BackendRef:       &PigeonBackend,
+		SupportsDialects: false,
+	}
+}
+
+func PigeonFeatureProfile() FeatureProfile {
+	return FeatureProfile{
+		Backend:          PigeonBackend.ID,
+		BackendRef:       &PigeonBackend,
 		SupportsDialects: false,
 	}
 }
