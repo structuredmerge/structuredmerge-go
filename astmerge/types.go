@@ -1,8 +1,10 @@
 package astmerge
 
 import (
+	"encoding/json"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 type DiagnosticSeverity string
@@ -140,14 +142,14 @@ const (
 )
 
 type PolicyReference struct {
-	Surface PolicySurface
-	Name    string
+	Surface PolicySurface `json:"surface"`
+	Name    string        `json:"name"`
 }
 
 type FamilyFeatureProfile struct {
-	Family            string
-	SupportedDialects []string
-	SupportedPolicies []PolicyReference
+	Family            string            `json:"family"`
+	SupportedDialects []string          `json:"supported_dialects"`
+	SupportedPolicies []PolicyReference `json:"supported_policies"`
 }
 
 type ConformanceOutcome string
@@ -159,15 +161,15 @@ const (
 )
 
 type ConformanceCaseRef struct {
-	Family string
-	Role   string
-	Case   string
+	Family string `json:"family"`
+	Role   string `json:"role"`
+	Case   string `json:"case"`
 }
 
 type ConformanceCaseResult struct {
-	Ref      ConformanceCaseRef
-	Outcome  ConformanceOutcome
-	Messages []string
+	Ref      ConformanceCaseRef `json:"ref"`
+	Outcome  ConformanceOutcome `json:"outcome"`
+	Messages []string           `json:"messages"`
 }
 
 type ConformanceCaseRequirements struct {
@@ -203,18 +205,29 @@ type ConformanceFamilyFeatureProfileEntry struct {
 
 type ConformanceManifest struct {
 	FamilyFeatureProfiles []ConformanceFamilyFeatureProfileEntry `json:"family_feature_profiles"`
-	Suites                map[string]ConformanceSuiteDefinition  `json:"suites,omitempty"`
+	SuiteDescriptors      []ConformanceSuiteDefinition           `json:"suite_descriptors,omitempty"`
 	Families              map[string][]ConformanceManifestEntry  `json:"families"`
 }
 
+type ConformanceSuiteSubject struct {
+	Grammar string `json:"grammar"`
+	Variant string `json:"variant,omitempty"`
+}
+
+type ConformanceSuiteSelector struct {
+	Kind    string                   `json:"kind"`
+	Subject ConformanceSuiteSubject  `json:"subject"`
+}
+
 type ConformanceSuiteDefinition struct {
-	Family string   `json:"family"`
-	Roles  []string `json:"roles"`
+	Kind    string                  `json:"kind"`
+	Subject ConformanceSuiteSubject `json:"subject"`
+	Roles   []string                `json:"roles"`
 }
 
 type NamedConformanceSuiteReport struct {
-	Suite  string                 `json:"suite"`
-	Report ConformanceSuiteReport `json:"report"`
+	Suite  ConformanceSuiteDefinition `json:"suite"`
+	Report ConformanceSuiteReport     `json:"report"`
 }
 
 type ConformanceFamilyPlanContext struct {
@@ -223,13 +236,13 @@ type ConformanceFamilyPlanContext struct {
 }
 
 type NamedConformanceSuitePlan struct {
-	Suite string               `json:"suite"`
-	Plan  ConformanceSuitePlan `json:"plan"`
+	Suite ConformanceSuiteDefinition `json:"suite"`
+	Plan  ConformanceSuitePlan       `json:"plan"`
 }
 
 type NamedConformanceSuiteResults struct {
-	Suite   string                  `json:"suite"`
-	Results []ConformanceCaseResult `json:"results"`
+	Suite   ConformanceSuiteDefinition `json:"suite"`
+	Results []ConformanceCaseResult    `json:"results"`
 }
 
 type NamedConformanceSuiteReportEnvelope struct {
@@ -396,9 +409,9 @@ type ConformanceSuitePlan struct {
 }
 
 type ConformanceFeatureProfileView struct {
-	Backend           string
-	SupportsDialects  bool
-	SupportedPolicies []PolicyReference
+	Backend           string            `json:"backend"`
+	SupportsDialects  bool              `json:"supports_dialects"`
+	SupportedPolicies []PolicyReference `json:"supported_policies"`
 }
 
 type ConformanceCaseRun struct {
@@ -455,28 +468,57 @@ func ConformanceFamilyFeatureProfilePath(manifest ConformanceManifest, family st
 	return nil
 }
 
-func ConformanceSuiteDefinitionByName(
-	manifest ConformanceManifest,
-	suiteName string,
-) *ConformanceSuiteDefinition {
-	if manifest.Suites == nil {
-		return nil
-	}
+func conformanceSuiteSelectorsEqual(left ConformanceSuiteSelector, right ConformanceSuiteSelector) bool {
+	return left.Kind == right.Kind &&
+		left.Subject.Grammar == right.Subject.Grammar &&
+		left.Subject.Variant == right.Subject.Variant
+}
 
-	if definition, ok := manifest.Suites[suiteName]; ok {
-		return &definition
+func compareConformanceSuiteSelectors(left ConformanceSuiteSelector, right ConformanceSuiteSelector) int {
+	if compared := strings.Compare(left.Kind, right.Kind); compared != 0 {
+		return compared
+	}
+	if compared := strings.Compare(left.Subject.Grammar, right.Subject.Grammar); compared != 0 {
+		return compared
+	}
+	return strings.Compare(left.Subject.Variant, right.Subject.Variant)
+}
+
+func ConformanceSuiteSelectors(manifest ConformanceManifest) []ConformanceSuiteSelector {
+	selectors := make([]ConformanceSuiteSelector, 0, len(manifest.SuiteDescriptors))
+	for _, definition := range manifest.SuiteDescriptors {
+		selectors = append(selectors, ConformanceSuiteSelector{
+			Kind:    definition.Kind,
+			Subject: definition.Subject,
+		})
+	}
+	slices.SortFunc(selectors, compareConformanceSuiteSelectors)
+	return selectors
+}
+
+func ConformanceSuiteDefinitionForSelector(
+	manifest ConformanceManifest,
+	selector ConformanceSuiteSelector,
+) *ConformanceSuiteDefinition {
+	for _, definition := range manifest.SuiteDescriptors {
+		if conformanceSuiteSelectorsEqual(
+			ConformanceSuiteSelector{Kind: definition.Kind, Subject: definition.Subject},
+			selector,
+		) {
+			matched := definition
+			return &matched
+		}
 	}
 
 	return nil
 }
 
-func ConformanceSuiteNames(manifest ConformanceManifest) []string {
-	names := make([]string, 0, len(manifest.Suites))
-	for name := range manifest.Suites {
-		names = append(names, name)
+func conformanceSuiteDescriptorString(definition ConformanceSuiteDefinition) string {
+	encoded, err := json.Marshal(definition)
+	if err != nil {
+		return "<invalid suite descriptor>"
 	}
-	slices.Sort(names)
-	return names
+	return string(encoded)
 }
 
 func GroupProjectedChildReviewCases(cases []ProjectedChildReviewCase) []ProjectedChildReviewGroup {
@@ -694,15 +736,15 @@ func ConformanceManifestReplayContext(
 	manifest ConformanceManifest,
 	options ConformanceManifestReviewOptions,
 ) ReviewReplayContext {
-	families := make([]string, 0, len(manifest.Suites))
+	families := make([]string, 0, len(manifest.SuiteDescriptors))
 	seen := make(map[string]bool)
-	for _, suiteName := range ConformanceSuiteNames(manifest) {
-		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
-		if definition == nil || seen[definition.Family] {
+	for _, selector := range ConformanceSuiteSelectors(manifest) {
+		definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
+		if definition == nil || seen[definition.Subject.Grammar] {
 			continue
 		}
-		seen[definition.Family] = true
-		families = append(families, definition.Family)
+		seen[definition.Subject.Grammar] = true
+		families = append(families, definition.Subject.Grammar)
 	}
 
 	return ReviewReplayContext{
@@ -733,19 +775,19 @@ func ConformanceManifestReviewRequestIDs(
 		return []string{}
 	}
 
-	requestIDs := make([]string, 0, len(manifest.Suites))
+	requestIDs := make([]string, 0, len(manifest.SuiteDescriptors))
 	seen := make(map[string]bool)
-	for _, suiteName := range ConformanceSuiteNames(manifest) {
-		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
-		if definition == nil || seen[definition.Family] {
+	for _, selector := range ConformanceSuiteSelectors(manifest) {
+		definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
+		if definition == nil || seen[definition.Subject.Grammar] {
 			continue
 		}
-		seen[definition.Family] = true
-		if _, ok := options.Contexts[definition.Family]; ok {
+		seen[definition.Subject.Grammar] = true
+		if _, ok := options.Contexts[definition.Subject.Grammar]; ok {
 			continue
 		}
-		if _, ok := options.FamilyProfiles[definition.Family]; ok {
-			requestIDs = append(requestIDs, ReviewRequestIDForFamilyContext(definition.Family))
+		if _, ok := options.FamilyProfiles[definition.Subject.Grammar]; ok {
+			requestIDs = append(requestIDs, ReviewRequestIDForFamilyContext(definition.Subject.Grammar))
 		}
 	}
 
@@ -1109,14 +1151,14 @@ func RunPlannedConformanceSuite(
 
 func RunNamedConformanceSuite(
 	manifest ConformanceManifest,
-	suiteName string,
+	selector ConformanceSuiteSelector,
 	familyProfile FamilyFeatureProfile,
 	execute func(ConformanceCaseRun) ConformanceCaseExecution,
 	featureProfile *ConformanceFeatureProfileView,
 ) []ConformanceCaseResult {
 	plan := PlanNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		familyProfile,
 		featureProfile,
 	)
@@ -1129,14 +1171,14 @@ func RunNamedConformanceSuite(
 
 func RunNamedConformanceSuiteEntry(
 	manifest ConformanceManifest,
-	suiteName string,
+	selector ConformanceSuiteSelector,
 	familyProfile FamilyFeatureProfile,
 	execute func(ConformanceCaseRun) ConformanceCaseExecution,
 	featureProfile *ConformanceFeatureProfileView,
 ) *NamedConformanceSuiteResults {
 	results := RunNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		familyProfile,
 		execute,
 		featureProfile,
@@ -1144,9 +1186,13 @@ func RunNamedConformanceSuiteEntry(
 	if results == nil {
 		return nil
 	}
+	definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
+	if definition == nil {
+		return nil
+	}
 
 	return &NamedConformanceSuiteResults{
-		Suite:   suiteName,
+		Suite:   *definition,
 		Results: results,
 	}
 }
@@ -1175,14 +1221,14 @@ func ReportPlannedConformanceSuite(
 
 func ReportNamedConformanceSuite(
 	manifest ConformanceManifest,
-	suiteName string,
+	selector ConformanceSuiteSelector,
 	familyProfile FamilyFeatureProfile,
 	execute func(ConformanceCaseRun) ConformanceCaseExecution,
 	featureProfile *ConformanceFeatureProfileView,
 ) *ConformanceSuiteReport {
 	plan := PlanNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		familyProfile,
 		featureProfile,
 	)
@@ -1196,14 +1242,14 @@ func ReportNamedConformanceSuite(
 
 func ReportNamedConformanceSuiteEntry(
 	manifest ConformanceManifest,
-	suiteName string,
+	selector ConformanceSuiteSelector,
 	familyProfile FamilyFeatureProfile,
 	execute func(ConformanceCaseRun) ConformanceCaseExecution,
 	featureProfile *ConformanceFeatureProfileView,
 ) *NamedConformanceSuiteReport {
 	report := ReportNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		familyProfile,
 		execute,
 		featureProfile,
@@ -1211,9 +1257,13 @@ func ReportNamedConformanceSuiteEntry(
 	if report == nil {
 		return nil
 	}
+	definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
+	if definition == nil {
+		return nil
+	}
 
 	return &NamedConformanceSuiteReport{
-		Suite:  suiteName,
+		Suite:  *definition,
 		Report: *report,
 	}
 }
@@ -1289,7 +1339,7 @@ func ReviewConformanceManifest(
 	execute func(ConformanceCaseRun) ConformanceCaseExecution,
 ) ConformanceManifestReviewState {
 	replayContext := ConformanceManifestReplayContext(manifest, options)
-	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.Suites))
+	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.SuiteDescriptors))
 	diagnostics := make([]Diagnostic, 0)
 	requests := make([]ReviewRequest, 0)
 	appliedDecisions := make([]ReviewDecision, 0)
@@ -1344,31 +1394,31 @@ func ReviewConformanceManifest(
 	resolvedContexts := make(map[string]*ConformanceFamilyPlanContext)
 	resolvedFamilies := make(map[string]bool)
 
-	for _, suiteName := range ConformanceSuiteNames(manifest) {
-		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+	for _, selector := range ConformanceSuiteSelectors(manifest) {
+		definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
 		if definition == nil {
 			continue
 		}
 
 		var context *ConformanceFamilyPlanContext
-		if resolvedFamilies[definition.Family] {
-			context = resolvedContexts[definition.Family]
+		if resolvedFamilies[definition.Subject.Grammar] {
+			context = resolvedContexts[definition.Subject.Grammar]
 		} else {
 			var resolvedDiagnostics []Diagnostic
 			var resolvedRequests []ReviewRequest
 			var resolvedDecisions []ReviewDecision
-			context, resolvedDiagnostics, resolvedRequests, resolvedDecisions = ReviewConformanceFamilyContext(definition.Family, effectiveOptions)
+			context, resolvedDiagnostics, resolvedRequests, resolvedDecisions = ReviewConformanceFamilyContext(definition.Subject.Grammar, effectiveOptions)
 			diagnostics = append(diagnostics, resolvedDiagnostics...)
 			requests = append(requests, resolvedRequests...)
 			appliedDecisions = append(appliedDecisions, resolvedDecisions...)
-			resolvedFamilies[definition.Family] = true
-			resolvedContexts[definition.Family] = context
+			resolvedFamilies[definition.Subject.Grammar] = true
+			resolvedContexts[definition.Subject.Grammar] = context
 		}
 		if context == nil {
 			continue
 		}
 
-		entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, *context)
+		entry := PlanNamedConformanceSuiteEntry(manifest, selector, *context)
 		if entry == nil {
 			continue
 		}
@@ -1377,7 +1427,7 @@ func ReviewConformanceManifest(
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Category: CategoryConfigurationError,
-				Message:  "suite " + suiteName + " declares missing roles: " + joinComma(entry.Plan.MissingRoles) + ".",
+				Message:  "suite " + conformanceSuiteDescriptorString(entry.Suite) + " declares missing roles: " + joinComma(entry.Plan.MissingRoles) + ".",
 			})
 			continue
 		}
@@ -1452,18 +1502,18 @@ func PlanConformanceSuite(
 
 func PlanNamedConformanceSuite(
 	manifest ConformanceManifest,
-	suiteName string,
+	selector ConformanceSuiteSelector,
 	familyProfile FamilyFeatureProfile,
 	featureProfile *ConformanceFeatureProfileView,
 ) *ConformanceSuitePlan {
-	definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+	definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
 	if definition == nil {
 		return nil
 	}
 
 	plan := PlanConformanceSuite(
 		manifest,
-		definition.Family,
+		definition.Subject.Grammar,
 		definition.Roles,
 		familyProfile,
 		featureProfile,
@@ -1473,21 +1523,25 @@ func PlanNamedConformanceSuite(
 
 func PlanNamedConformanceSuiteEntry(
 	manifest ConformanceManifest,
-	suiteName string,
+	selector ConformanceSuiteSelector,
 	context ConformanceFamilyPlanContext,
 ) *NamedConformanceSuitePlan {
 	plan := PlanNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		context.FamilyProfile,
 		context.FeatureProfile,
 	)
 	if plan == nil {
 		return nil
 	}
+	definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
+	if definition == nil {
+		return nil
+	}
 
 	return &NamedConformanceSuitePlan{
-		Suite: suiteName,
+		Suite: *definition,
 		Plan:  *plan,
 	}
 }
@@ -1496,19 +1550,19 @@ func PlanNamedConformanceSuites(
 	manifest ConformanceManifest,
 	contexts map[string]ConformanceFamilyPlanContext,
 ) []NamedConformanceSuitePlan {
-	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.Suites))
-	for _, suiteName := range ConformanceSuiteNames(manifest) {
-		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.SuiteDescriptors))
+	for _, selector := range ConformanceSuiteSelectors(manifest) {
+		definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
 		if definition == nil {
 			continue
 		}
 
-		context, ok := contexts[definition.Family]
+		context, ok := contexts[definition.Subject.Grammar]
 		if !ok {
 			continue
 		}
 
-		entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, context)
+		entry := PlanNamedConformanceSuiteEntry(manifest, selector, context)
 		if entry != nil {
 			entries = append(entries, *entry)
 		}
@@ -1521,33 +1575,33 @@ func PlanNamedConformanceSuitesWithDiagnostics(
 	manifest ConformanceManifest,
 	options ConformanceManifestPlanningOptions,
 ) ConformanceManifestPlan {
-	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.Suites))
+	entries := make([]NamedConformanceSuitePlan, 0, len(manifest.SuiteDescriptors))
 	diagnostics := make([]Diagnostic, 0)
 	resolvedContexts := make(map[string]*ConformanceFamilyPlanContext)
 	resolvedFamilies := make(map[string]bool)
 
-	for _, suiteName := range ConformanceSuiteNames(manifest) {
-		definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+	for _, selector := range ConformanceSuiteSelectors(manifest) {
+		definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
 		if definition == nil {
 			continue
 		}
 
 		var context *ConformanceFamilyPlanContext
-		if resolvedFamilies[definition.Family] {
-			context = resolvedContexts[definition.Family]
+		if resolvedFamilies[definition.Subject.Grammar] {
+			context = resolvedContexts[definition.Subject.Grammar]
 		} else {
 			context, diagnostics = func() (*ConformanceFamilyPlanContext, []Diagnostic) {
-				resolved, resolvedDiagnostics := ResolveConformanceFamilyContext(definition.Family, options)
+				resolved, resolvedDiagnostics := ResolveConformanceFamilyContext(definition.Subject.Grammar, options)
 				return resolved, append(diagnostics, resolvedDiagnostics...)
 			}()
-			resolvedFamilies[definition.Family] = true
-			resolvedContexts[definition.Family] = context
+			resolvedFamilies[definition.Subject.Grammar] = true
+			resolvedContexts[definition.Subject.Grammar] = context
 		}
 		if context == nil {
 			continue
 		}
 
-		entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, *context)
+		entry := PlanNamedConformanceSuiteEntry(manifest, selector, *context)
 		if entry == nil {
 			continue
 		}
@@ -1556,7 +1610,7 @@ func PlanNamedConformanceSuitesWithDiagnostics(
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Category: CategoryConfigurationError,
-				Message:  "suite " + suiteName + " declares missing roles: " + joinComma(entry.Plan.MissingRoles) + ".",
+				Message:  "suite " + conformanceSuiteDescriptorString(entry.Suite) + " declares missing roles: " + joinComma(entry.Plan.MissingRoles) + ".",
 			})
 			continue
 		}

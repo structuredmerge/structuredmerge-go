@@ -107,11 +107,8 @@ func TestSharedFixtureMarkdownFeatureProfile(t *testing.T) {
 func TestSharedFixtureMarkdownBackendFeatureProfiles(t *testing.T) {
 	fixture := readMarkdownFixture(t, "diagnostics", "slice-195-markdown-family-backend-feature-profiles", "go-markdown-backend-feature-profiles.json")
 	backends := AvailableMarkdownBackends()
-	if len(backends) != 2 || backends[0] != BackendGoldmark || backends[1] != BackendKreuzberg {
+	if len(backends) != 1 || backends[0] != BackendKreuzberg {
 		t.Fatalf("unexpected backends: %+v", backends)
-	}
-	if native := MarkdownBackendFeatureProfileInfo(BackendGoldmark); native.Backend != fixture["native"].(map[string]any)["backend"].(string) {
-		t.Fatalf("unexpected native backend profile: %+v", native)
 	}
 	if treeSitter := MarkdownBackendFeatureProfileInfo(BackendKreuzberg); treeSitter.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeSitter)
@@ -120,14 +117,6 @@ func TestSharedFixtureMarkdownBackendFeatureProfiles(t *testing.T) {
 
 func TestSharedFixtureMarkdownPlanContexts(t *testing.T) {
 	fixture := readMarkdownFixture(t, "diagnostics", "slice-196-markdown-family-plan-contexts", "go-markdown-plan-contexts.json")
-	native := MarkdownPlanContextWithBackend(BackendGoldmark)
-	if native.FamilyProfile.Family != fixture["native"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
-		t.Fatalf("unexpected native family profile: %+v", native)
-	}
-	if native.FeatureProfile == nil || native.FeatureProfile.Backend != fixture["native"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
-		t.Fatalf("unexpected native feature profile: %+v", native.FeatureProfile)
-	}
-
 	treeSitter := MarkdownPlanContextWithBackend(BackendKreuzberg)
 	if treeSitter.FamilyProfile.Family != fixture["tree_sitter"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
 		t.Fatalf("unexpected tree-sitter family profile: %+v", treeSitter)
@@ -161,55 +150,49 @@ func TestSharedFixtureMarkdownAnalysis(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-198-analysis", "headings-and-code-fences.json")
 	expectedOwners := fixture["expected"].(map[string]any)["owners"].([]any)
 
-	for _, backend := range []MarkdownBackend{BackendGoldmark, BackendKreuzberg} {
-		result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, backend)
-		if !result.OK || result.Analysis == nil {
-			t.Fatalf("expected parse success for %s: %+v", backend, result)
-		}
-		if result.Analysis.RootKind != RootDocument {
-			t.Fatalf("unexpected root kind for %s: %+v", backend, result.Analysis.RootKind)
-		}
-		if len(result.Analysis.Owners) != len(expectedOwners) {
-			t.Fatalf("unexpected owner count for %s: %+v", backend, result.Analysis.Owners)
-		}
+	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendKreuzberg)
+	if !result.OK || result.Analysis == nil {
+		t.Fatalf("expected parse success: %+v", result)
+	}
+	if result.Analysis.RootKind != RootDocument {
+		t.Fatalf("unexpected root kind: %+v", result.Analysis.RootKind)
+	}
+	if len(result.Analysis.Owners) != len(expectedOwners) {
+		t.Fatalf("unexpected owner count: %+v", result.Analysis.Owners)
 	}
 }
 
 func TestSharedFixtureMarkdownMatching(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-199-matching", "path-equality.json")
-	for _, backend := range []MarkdownBackend{BackendGoldmark, BackendKreuzberg} {
-		template := ParseMarkdownWithBackend(fixture["template"].(string), DialectMarkdown, backend)
-		destination := ParseMarkdownWithBackend(fixture["destination"].(string), DialectMarkdown, backend)
-		if !template.OK || template.Analysis == nil || !destination.OK || destination.Analysis == nil {
-			t.Fatalf("expected parse success for %s", backend)
-		}
+	template := ParseMarkdownWithBackend(fixture["template"].(string), DialectMarkdown, BackendKreuzberg)
+	destination := ParseMarkdownWithBackend(fixture["destination"].(string), DialectMarkdown, BackendKreuzberg)
+	if !template.OK || template.Analysis == nil || !destination.OK || destination.Analysis == nil {
+		t.Fatalf("expected parse success")
+	}
 
-		result := MatchMarkdownOwners(*template.Analysis, *destination.Analysis)
-		if len(result.Matched) != len(fixture["expected"].(map[string]any)["matched"].([]any)) {
-			t.Fatalf("unexpected matches for %s: %+v", backend, result.Matched)
-		}
-		if len(result.UnmatchedTemplate) != len(fixture["expected"].(map[string]any)["unmatched_template"].([]any)) {
-			t.Fatalf("unexpected unmatched template for %s: %+v", backend, result.UnmatchedTemplate)
-		}
+	result := MatchMarkdownOwners(*template.Analysis, *destination.Analysis)
+	if len(result.Matched) != len(fixture["expected"].(map[string]any)["matched"].([]any)) {
+		t.Fatalf("unexpected matches: %+v", result.Matched)
+	}
+	if len(result.UnmatchedTemplate) != len(fixture["expected"].(map[string]any)["unmatched_template"].([]any)) {
+		t.Fatalf("unexpected unmatched template: %+v", result.UnmatchedTemplate)
 	}
 }
 
 func TestSharedFixtureMarkdownEmbeddedFamilies(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-208-embedded-families", "code-fence-families.json")
-	for _, backend := range []MarkdownBackend{BackendGoldmark, BackendKreuzberg} {
-		result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, backend)
-		if !result.OK || result.Analysis == nil {
-			t.Fatalf("expected parse success for %s: %+v", backend, result)
-		}
-		if actual := jsonReadyMarkdown(t, MarkdownEmbeddedFamilies(*result.Analysis)); !reflect.DeepEqual(actual, fixture["expected"]) {
-			t.Fatalf("unexpected embedded families for %s: %+v", backend, actual)
-		}
+	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendKreuzberg)
+	if !result.OK || result.Analysis == nil {
+		t.Fatalf("expected parse success: %+v", result)
+	}
+	if actual := jsonReadyMarkdown(t, MarkdownEmbeddedFamilies(*result.Analysis)); !reflect.DeepEqual(actual, fixture["expected"]) {
+		t.Fatalf("unexpected embedded families: %+v", actual)
 	}
 }
 
 func TestSharedFixtureMarkdownDiscoveredSurfaces(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-212-discovered-surfaces", "fenced-code-surfaces.json")
-	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendGoldmark)
+	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendKreuzberg)
 	if !result.OK || result.Analysis == nil {
 		t.Fatalf("expected parse success: %+v", result)
 	}
@@ -221,7 +204,7 @@ func TestSharedFixtureMarkdownDiscoveredSurfaces(t *testing.T) {
 
 func TestSharedFixtureMarkdownDelegatedChildOperations(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-213-delegated-child-operations", "fenced-code-child-operations.json")
-	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendGoldmark)
+	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendKreuzberg)
 	if !result.OK || result.Analysis == nil {
 		t.Fatalf("expected parse success: %+v", result)
 	}

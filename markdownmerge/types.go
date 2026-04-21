@@ -8,8 +8,6 @@ import (
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/text"
 )
 
 type MarkdownDialect string
@@ -21,7 +19,6 @@ const (
 type MarkdownBackend string
 
 const (
-	BackendGoldmark  MarkdownBackend = "goldmark"
 	BackendKreuzberg MarkdownBackend = "kreuzberg-language-pack"
 )
 
@@ -190,11 +187,6 @@ func CollectMarkdownOwners(source string) []MarkdownOwner {
 	return owners
 }
 
-func validateNativeMarkdown(source string) {
-	parser := goldmark.DefaultParser()
-	_ = parser.Parse(text.NewReader([]byte(source)))
-}
-
 func MarkdownFeatureProfileInfo() MarkdownFeatureProfile {
 	return MarkdownFeatureProfile{
 		Family:            "markdown",
@@ -204,7 +196,7 @@ func MarkdownFeatureProfileInfo() MarkdownFeatureProfile {
 }
 
 func AvailableMarkdownBackends() []MarkdownBackend {
-	return []MarkdownBackend{BackendGoldmark, BackendKreuzberg}
+	return []MarkdownBackend{BackendKreuzberg}
 }
 
 func MarkdownBackendFeatureProfileInfo(backend MarkdownBackend) MarkdownBackendFeatureProfile {
@@ -217,7 +209,7 @@ func MarkdownBackendFeatureProfileInfo(backend MarkdownBackend) MarkdownBackendF
 }
 
 func MarkdownPlanContext() astmerge.ConformanceFamilyPlanContext {
-	return MarkdownPlanContextWithBackend(BackendGoldmark)
+	return MarkdownPlanContextWithBackend(BackendKreuzberg)
 }
 
 func MarkdownPlanContextWithBackend(backend MarkdownBackend) astmerge.ConformanceFamilyPlanContext {
@@ -229,14 +221,14 @@ func MarkdownPlanContextWithBackend(backend MarkdownBackend) astmerge.Conformanc
 		},
 		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
 			Backend:           string(backend),
-			SupportsDialects:  backend != BackendKreuzberg,
+			SupportsDialects:  false,
 			SupportedPolicies: []astmerge.PolicyReference{},
 		},
 	}
 }
 
 func ParseMarkdown(source string, dialect MarkdownDialect) astmerge.ParseResult[MarkdownAnalysis] {
-	return ParseMarkdownWithBackend(source, dialect, BackendGoldmark)
+	return ParseMarkdownWithBackend(source, dialect, BackendKreuzberg)
 }
 
 func ParseMarkdownWithBackend(source string, dialect MarkdownDialect, backend MarkdownBackend) astmerge.ParseResult[MarkdownAnalysis] {
@@ -248,8 +240,6 @@ func ParseMarkdownWithBackend(source string, dialect MarkdownDialect, backend Ma
 	}
 
 	switch backend {
-	case BackendGoldmark:
-		validateNativeMarkdown(source)
 	case BackendKreuzberg:
 		result := treehaver.ParseWithLanguagePack(treehaver.ParserRequest{
 			Source:   source,

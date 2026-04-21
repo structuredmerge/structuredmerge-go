@@ -55,6 +55,14 @@ type RubyFeatureProfile struct {
 	SupportedPolicies []astmerge.PolicyReference
 }
 
+type RubyBackendFeatureProfile struct {
+	Family            string
+	SupportedDialects []RubyDialect
+	SupportedPolicies []astmerge.PolicyReference
+	Backend           string
+	SupportsDialects  bool
+}
+
 type commentEntry struct {
 	Line int
 	Raw  string
@@ -280,6 +288,36 @@ func RubyFeatureProfileInfo() RubyFeatureProfile {
 		Family:            "ruby",
 		SupportedDialects: []RubyDialect{DialectRuby},
 		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+	}
+}
+
+func AvailableRubyBackends() []string {
+	return []string{"kreuzberg-language-pack"}
+}
+
+func RubyBackendFeatureProfileInfo() RubyBackendFeatureProfile {
+	return RubyBackendFeatureProfile{
+		Family:            "ruby",
+		SupportedDialects: []RubyDialect{DialectRuby},
+		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+		Backend:           "kreuzberg-language-pack",
+		SupportsDialects:  true,
+	}
+}
+
+func RubyPlanContext() astmerge.ConformanceFamilyPlanContext {
+	backendProfile := RubyBackendFeatureProfileInfo()
+	return astmerge.ConformanceFamilyPlanContext{
+		FamilyProfile: astmerge.FamilyFeatureProfile{
+			Family:            "ruby",
+			SupportedDialects: []string{"ruby"},
+			SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+		},
+		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
+			Backend:           backendProfile.Backend,
+			SupportsDialects:  backendProfile.SupportsDialects,
+			SupportedPolicies: backendProfile.SupportedPolicies,
+		},
 	}
 }
 

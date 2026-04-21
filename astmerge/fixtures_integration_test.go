@@ -1,6 +1,7 @@
 package astmerge
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -23,6 +24,52 @@ func readDiagnosticFixtureFromPath(t *testing.T, path string) map[string]any {
 	}
 
 	return fixture
+}
+
+func decodeFixtureValue[T any](t *testing.T, raw any) T {
+	t.Helper()
+
+	data, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("marshal fixture value: %v", err)
+	}
+
+	var decoded T
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal fixture value: %v", err)
+	}
+
+	return decoded
+}
+
+func decodeFixtureValueUntyped[T any](raw any) T {
+	data, err := json.Marshal(raw)
+	if err != nil {
+		panic(err)
+	}
+
+	var decoded T
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		panic(err)
+	}
+
+	return decoded
+}
+
+func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
+	t.Helper()
+
+	actualJSON, err := json.Marshal(actual)
+	if err != nil {
+		t.Fatalf("marshal actual fixture value: %v", err)
+	}
+
+	expectedJSON, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatalf("marshal expected fixture value: %v", err)
+	}
+
+	return bytes.Equal(actualJSON, expectedJSON)
 }
 
 func readManifest(t *testing.T) ConformanceManifest {
@@ -665,24 +712,17 @@ func TestSharedFixtureManifestBackendReport(t *testing.T) {
 func TestSharedFixtureConformanceSuiteDefinitions(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "suite_definitions"))
 	manifest := readManifest(t)
-	suiteName := fixture["suite_name"].(string)
-	expectedRaw := fixture["expected"].(map[string]any)
-	expected := ConformanceSuiteDefinition{
-		Family: expectedRaw["family"].(string),
-		Roles:  make([]string, 0, len(expectedRaw["roles"].([]any))),
-	}
-	for _, role := range expectedRaw["roles"].([]any) {
-		expected.Roles = append(expected.Roles, role.(string))
-	}
+	selector := parseConformanceSuiteSelector(fixture["suite_selector"].(map[string]any))
+	expected := parseConformanceSuiteDefinition(fixture["expected"].(map[string]any))
 
-	definition := ConformanceSuiteDefinitionByName(manifest, suiteName)
+	definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
 	if definition == nil || !reflect.DeepEqual(*definition, expected) {
 		t.Fatalf("unexpected suite definition: %+v", definition)
 	}
 
 	planned := PlanNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		FamilyFeatureProfile{
 			Family:            "json",
 			SupportedDialects: []string{"json", "jsonc"},
@@ -695,7 +735,7 @@ func TestSharedFixtureConformanceSuiteDefinitions(t *testing.T) {
 	)
 	explicit := PlanConformanceSuite(
 		manifest,
-		expected.Family,
+		expected.Subject.Grammar,
 		expected.Roles,
 		FamilyFeatureProfile{
 			Family:            "json",
@@ -715,13 +755,13 @@ func TestSharedFixtureConformanceSuiteDefinitions(t *testing.T) {
 func TestSharedFixtureNamedConformanceSuiteReport(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_report"))
 	manifest := readManifest(t)
-	suiteName := fixture["suite_name"].(string)
+	selector := parseConformanceSuiteSelector(fixture["suite_selector"].(map[string]any))
 	executionsRaw := fixture["executions"].(map[string]any)
 	expected := fixture["expected_report"].(map[string]any)
 
 	report := ReportNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
 		func(run ConformanceCaseRun) ConformanceCaseExecution {
 			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
@@ -768,13 +808,13 @@ func TestSharedFixtureNamedConformanceSuiteReport(t *testing.T) {
 func TestSharedFixtureNamedConformanceSuiteRunner(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_runner"))
 	manifest := readManifest(t)
-	suiteName := fixture["suite_name"].(string)
+	selector := parseConformanceSuiteSelector(fixture["suite_selector"].(map[string]any))
 	executionsRaw := fixture["executions"].(map[string]any)
 	expectedResults := fixture["expected_results"].([]any)
 
 	results := RunNamedConformanceSuite(
 		manifest,
-		suiteName,
+		selector,
 		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
 		func(run ConformanceCaseRun) ConformanceCaseExecution {
 			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
@@ -809,14 +849,14 @@ func TestSharedFixtureConformanceSuiteNames(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "suite_names"))
 	manifest := readManifest(t)
 
-	expectedRaw := fixture["suite_names"].([]any)
-	expected := make([]string, 0, len(expectedRaw))
-	for _, name := range expectedRaw {
-		expected = append(expected, name.(string))
+	expectedRaw := fixture["suite_selectors"].([]any)
+	expected := make([]ConformanceSuiteSelector, 0, len(expectedRaw))
+	for _, selector := range expectedRaw {
+		expected = append(expected, parseConformanceSuiteSelector(selector.(map[string]any)))
 	}
 
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expected) {
-		t.Fatalf("unexpected suite names: %+v", names)
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expected) {
+		t.Fatalf("unexpected suite selectors: %+v", selectors)
 	}
 }
 
@@ -829,21 +869,21 @@ func TestSlice125SourceFamilySuiteDefinitions(t *testing.T) {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
 
-	expectedRaw := fixture["suite_names"].([]any)
-	expectedNames := make([]string, 0, len(expectedRaw))
-	for _, name := range expectedRaw {
-		expectedNames = append(expectedNames, name.(string))
+	expectedRaw := fixture["suite_selectors"].([]any)
+	expectedSelectors := make([]ConformanceSuiteSelector, 0, len(expectedRaw))
+	for _, selector := range expectedRaw {
+		expectedSelectors = append(expectedSelectors, parseConformanceSuiteSelector(selector.(map[string]any)))
 	}
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
-		t.Fatalf("unexpected source suite names: %+v", names)
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
+		t.Fatalf("unexpected source suite selectors: %+v", selectors)
 	}
 
-	definitions := fixture["definitions"].(map[string]any)
-	for suiteName, raw := range definitions {
+	definitionsRaw := fixture["suite_definitions"].([]any)
+	for index, raw := range definitionsRaw {
 		expected := parseConformanceSuiteDefinition(raw.(map[string]any))
-		actual := ConformanceSuiteDefinitionByName(manifest, suiteName)
+		actual := ConformanceSuiteDefinitionForSelector(manifest, expectedSelectors[index])
 		if actual == nil || !reflect.DeepEqual(*actual, expected) {
-			t.Fatalf("unexpected source suite definition for %s: %+v", suiteName, actual)
+			t.Fatalf("unexpected source suite definition at %d: %+v", index, actual)
 		}
 	}
 }
@@ -851,13 +891,13 @@ func TestSlice125SourceFamilySuiteDefinitions(t *testing.T) {
 func TestSharedFixtureNamedConformanceSuiteEntry(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_entry"))
 	manifest := readManifest(t)
-	suiteName := fixture["suite_name"].(string)
+	selector := parseConformanceSuiteSelector(fixture["suite_selector"].(map[string]any))
 	executionsRaw := fixture["executions"].(map[string]any)
 	expectedRaw := fixture["expected_entry"].(map[string]any)
 
 	entry := ReportNamedConformanceSuiteEntry(
 		manifest,
-		suiteName,
+		selector,
 		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
 		func(run ConformanceCaseRun) ConformanceCaseExecution {
 			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
@@ -880,7 +920,7 @@ func TestSharedFixtureNamedConformanceSuiteEntry(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected named suite entry")
 	}
-	if entry.Suite != expectedRaw["suite"].(string) {
+	if !reflect.DeepEqual(entry.Suite, parseConformanceSuiteDefinition(expectedRaw["suite"].(map[string]any))) {
 		t.Fatalf("unexpected named suite entry suite: %+v", entry)
 	}
 
@@ -908,16 +948,16 @@ func TestSharedFixtureNamedConformanceSuiteEntry(t *testing.T) {
 func TestSharedFixtureNamedConformanceSuitePlanEntry(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_plan_entry"))
 	manifest := readManifest(t)
-	suiteName := fixture["suite_name"].(string)
+	selector := parseConformanceSuiteSelector(fixture["suite_selector"].(map[string]any))
 
 	context := parseConformanceFamilyPlanContext(fixture["context"].(map[string]any))
-	entry := PlanNamedConformanceSuiteEntry(manifest, suiteName, context)
+	entry := PlanNamedConformanceSuiteEntry(manifest, selector, context)
 	if entry == nil {
 		t.Fatalf("expected named suite plan entry")
 	}
 
 	expected := parseNamedConformanceSuitePlan(t, fixture["expected_entry"].(map[string]any))
-	if !reflect.DeepEqual(*entry, expected) {
+	if !fixtureJSONEqual(t, *entry, expected) {
 		t.Fatalf("unexpected named suite plan entry: %+v", entry)
 	}
 }
@@ -962,7 +1002,7 @@ func TestSharedFixtureNamedConformanceSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected named suite plans: %+v", plans)
 	}
 }
@@ -988,7 +1028,7 @@ func TestSlice126SourceFamilyNamedSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected source named suite plans: %+v", plans)
 	}
 }
@@ -1014,7 +1054,7 @@ func TestSlice127SourceFamilyNativeSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected source native named suite plans: %+v", plans)
 	}
 }
@@ -1028,12 +1068,12 @@ func TestSlice138TOMLFamilySuiteDefinitions(t *testing.T) {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
 
-	expectedNames := []string{"toml_portable"}
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
-		t.Fatalf("unexpected TOML suite names: %+v", names)
+	expectedSelectors := []ConformanceSuiteSelector{{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "toml"}}}
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
+		t.Fatalf("unexpected TOML suite selectors: %+v", selectors)
 	}
-	expectedDefinition := ConformanceSuiteDefinition{Family: "toml", Roles: []string{"analysis", "matching", "merge"}}
-	if definition := ConformanceSuiteDefinitionByName(manifest, "toml_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+	expectedDefinition := ConformanceSuiteDefinition{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "toml"}, Roles: []string{"analysis", "matching", "merge"}}
+	if definition := ConformanceSuiteDefinitionForSelector(manifest, expectedSelectors[0]); !reflect.DeepEqual(definition, &expectedDefinition) {
 		t.Fatalf("unexpected TOML suite definition: %+v", definition)
 	}
 }
@@ -1059,7 +1099,7 @@ func TestSlice139TOMLFamilyNamedSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected TOML named suite plans: %+v", plans)
 	}
 }
@@ -1073,12 +1113,12 @@ func TestSlice200MarkdownFamilySuiteDefinitions(t *testing.T) {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
 
-	expectedNames := []string{"markdown_portable"}
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
-		t.Fatalf("unexpected Markdown suite names: %+v", names)
+	expectedSelectors := []ConformanceSuiteSelector{{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "markdown"}}}
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
+		t.Fatalf("unexpected Markdown suite selectors: %+v", selectors)
 	}
-	expectedDefinition := ConformanceSuiteDefinition{Family: "markdown", Roles: []string{"analysis", "matching"}}
-	if definition := ConformanceSuiteDefinitionByName(manifest, "markdown_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+	expectedDefinition := ConformanceSuiteDefinition{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "markdown"}, Roles: []string{"analysis", "matching"}}
+	if definition := ConformanceSuiteDefinitionForSelector(manifest, expectedSelectors[0]); !reflect.DeepEqual(definition, &expectedDefinition) {
 		t.Fatalf("unexpected Markdown suite definition: %+v", definition)
 	}
 }
@@ -1104,7 +1144,7 @@ func TestSlice201MarkdownFamilyNamedSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected Markdown named suite plans: %+v", plans)
 	}
 }
@@ -1146,12 +1186,12 @@ func TestSlice246MarkdownNestedSuiteDefinitions(t *testing.T) {
 	} else if err := json.Unmarshal(raw, &manifest); err != nil {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
-	expectedNames := []string{"markdown_nested_portable"}
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
-		t.Fatalf("unexpected Markdown nested suite names: %+v", names)
+	expectedSelectors := []ConformanceSuiteSelector{{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "markdown", Variant: "nested"}}}
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
+		t.Fatalf("unexpected Markdown nested suite selectors: %+v", selectors)
 	}
-	expectedDefinition := ConformanceSuiteDefinition{Family: "markdown", Roles: []string{"analysis", "matching", "embedded_families", "discovered_surfaces", "delegated_child_operations", "delegated_child_review_transport", "delegated_child_review_state", "delegated_child_apply_plan"}}
-	if definition := ConformanceSuiteDefinitionByName(manifest, "markdown_nested_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+	expectedDefinition := ConformanceSuiteDefinition{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "markdown", Variant: "nested"}, Roles: []string{"analysis", "matching", "embedded_families", "discovered_surfaces", "delegated_child_operations", "delegated_child_review_transport", "delegated_child_review_state", "delegated_child_apply_plan"}}
+	if definition := ConformanceSuiteDefinitionForSelector(manifest, expectedSelectors[0]); !reflect.DeepEqual(definition, &expectedDefinition) {
 		t.Fatalf("unexpected Markdown nested suite definition: %+v", definition)
 	}
 }
@@ -1174,7 +1214,7 @@ func TestSlice247MarkdownNestedNamedSuitePlans(t *testing.T) {
 	for _, raw := range expectedRaw {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected Markdown nested named suite plans: %+v", plans)
 	}
 }
@@ -1214,12 +1254,12 @@ func TestSlice249RubyNestedSuiteDefinitions(t *testing.T) {
 	} else if err := json.Unmarshal(raw, &manifest); err != nil {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
-	expectedNames := []string{"ruby_nested_portable"}
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
-		t.Fatalf("unexpected Ruby nested suite names: %+v", names)
+	expectedSelectors := []ConformanceSuiteSelector{{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "ruby", Variant: "nested"}}}
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
+		t.Fatalf("unexpected Ruby nested suite selectors: %+v", selectors)
 	}
-	expectedDefinition := ConformanceSuiteDefinition{Family: "ruby", Roles: []string{"analysis", "matching", "discovered_surfaces", "delegated_child_operations", "delegated_child_review_transport", "delegated_child_review_state", "delegated_child_apply_plan"}}
-	if definition := ConformanceSuiteDefinitionByName(manifest, "ruby_nested_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+	expectedDefinition := ConformanceSuiteDefinition{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "ruby", Variant: "nested"}, Roles: []string{"analysis", "matching", "discovered_surfaces", "delegated_child_operations", "delegated_child_review_transport", "delegated_child_review_state", "delegated_child_apply_plan"}}
+	if definition := ConformanceSuiteDefinitionForSelector(manifest, expectedSelectors[0]); !reflect.DeepEqual(definition, &expectedDefinition) {
 		t.Fatalf("unexpected Ruby nested suite definition: %+v", definition)
 	}
 }
@@ -1242,7 +1282,7 @@ func TestSlice250RubyNestedNamedSuitePlans(t *testing.T) {
 	for _, raw := range expectedRaw {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected Ruby nested named suite plans: %+v", plans)
 	}
 }
@@ -1312,12 +1352,12 @@ func TestSlice144YAMLFamilySuiteDefinitions(t *testing.T) {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
 
-	expectedNames := []string{"yaml_portable"}
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
-		t.Fatalf("unexpected YAML suite names: %+v", names)
+	expectedSelectors := []ConformanceSuiteSelector{{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "yaml"}}}
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
+		t.Fatalf("unexpected YAML suite selectors: %+v", selectors)
 	}
-	expectedDefinition := ConformanceSuiteDefinition{Family: "yaml", Roles: []string{"analysis", "matching", "merge"}}
-	if definition := ConformanceSuiteDefinitionByName(manifest, "yaml_portable"); !reflect.DeepEqual(definition, &expectedDefinition) {
+	expectedDefinition := ConformanceSuiteDefinition{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "yaml"}, Roles: []string{"analysis", "matching", "merge"}}
+	if definition := ConformanceSuiteDefinitionForSelector(manifest, expectedSelectors[0]); !reflect.DeepEqual(definition, &expectedDefinition) {
 		t.Fatalf("unexpected YAML suite definition: %+v", definition)
 	}
 }
@@ -1343,7 +1383,7 @@ func TestSlice145YAMLFamilyNamedSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected YAML named suite plans: %+v", plans)
 	}
 }
@@ -1398,7 +1438,7 @@ func TestSlice173YAMLFamilyBackendNamedSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected backend YAML named suite plans: %+v", plans)
 	}
 }
@@ -1453,7 +1493,7 @@ func TestSlice185YAMLFamilyPolyglotBackendNamedSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected polyglot YAML named suite plans: %+v", plans)
 	}
 }
@@ -1496,9 +1536,14 @@ func TestSlice148ConfigFamilyAggregateManifest(t *testing.T) {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
 
-	expectedNames := []string{"json_portable", "text_portable", "toml_portable", "yaml_portable"}
-	if names := ConformanceSuiteNames(manifest); !reflect.DeepEqual(names, expectedNames) {
-		t.Fatalf("unexpected aggregate suite names: %+v", names)
+	expectedSelectors := []ConformanceSuiteSelector{
+		{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "json"}},
+		{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "text"}},
+		{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "toml"}},
+		{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "yaml"}},
+	}
+	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
+		t.Fatalf("unexpected aggregate suite selectors: %+v", selectors)
 	}
 }
 
@@ -1523,7 +1568,7 @@ func TestSlice149ConfigFamilyAggregateSuitePlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected aggregate named suite plans: %+v", plans)
 	}
 }
@@ -1610,7 +1655,7 @@ func TestCanonicalStableSuitePlanningAndReviewFixtures(t *testing.T) {
 	for _, raw := range expectedPlansRaw {
 		expectedPlans = append(expectedPlans, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expectedPlans) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expectedPlans) {
 		t.Fatalf("unexpected canonical stable suite plans: %+v", plans)
 	}
 
@@ -1671,7 +1716,7 @@ func TestCanonicalStableSuiteBackendFixtures(t *testing.T) {
 	for _, raw := range expectedPlansRaw {
 		expectedPlans = append(expectedPlans, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expectedPlans) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expectedPlans) {
 		t.Fatalf("unexpected canonical stable suite backend plans: %+v", plans)
 	}
 
@@ -1756,7 +1801,7 @@ func TestCanonicalWidenedSuiteBackendFixtures(t *testing.T) {
 		for _, raw := range expectedPlansRaw {
 			expectedPlans = append(expectedPlans, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 		}
-		if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expectedPlans) {
+		if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expectedPlans) {
 			t.Fatalf("unexpected canonical widened suite backend plans: %+v", plans)
 		}
 
@@ -1805,12 +1850,12 @@ func TestCanonicalWidenedSuiteBackendFixtures(t *testing.T) {
 func TestSharedFixtureNamedConformanceSuiteResults(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "named_suite_results"))
 	manifest := readManifest(t)
-	suiteName := fixture["suite_name"].(string)
+	selector := parseConformanceSuiteSelector(fixture["suite_selector"].(map[string]any))
 	executionsRaw := fixture["executions"].(map[string]any)
 
 	entry := RunNamedConformanceSuiteEntry(
 		manifest,
-		suiteName,
+		selector,
 		parseFamilyFeatureProfile(fixture["family_profile"].(map[string]any)),
 		func(run ConformanceCaseRun) ConformanceCaseExecution {
 			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
@@ -1835,7 +1880,7 @@ func TestSharedFixtureNamedConformanceSuiteResults(t *testing.T) {
 	}
 
 	expected := parseNamedConformanceSuiteResults(fixture["expected_entry"].(map[string]any))
-	if !reflect.DeepEqual(*entry, expected) {
+	if !fixtureJSONEqual(t, *entry, expected) {
 		t.Fatalf("unexpected named suite results entry: %+v", entry)
 	}
 }
@@ -1930,7 +1975,7 @@ func TestSlice129SourceFamilyBackendRestrictedPlans(t *testing.T) {
 		expected = append(expected, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
 
-	if plans := PlanNamedConformanceSuites(manifest, contexts); !reflect.DeepEqual(plans, expected) {
+	if plans := PlanNamedConformanceSuites(manifest, contexts); !fixtureJSONEqual(t, plans, expected) {
 		t.Fatalf("unexpected backend-restricted source plans: %+v", plans)
 	}
 }
@@ -2048,7 +2093,7 @@ func TestCanonicalWidenedSuiteFixtures(t *testing.T) {
 	for _, raw := range expectedEntriesRaw {
 		expectedEntries = append(expectedEntries, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
-	if plans := PlanNamedConformanceSuites(plansManifest, planContexts); !reflect.DeepEqual(plans, expectedEntries) {
+	if plans := PlanNamedConformanceSuites(plansManifest, planContexts); !fixtureJSONEqual(t, plans, expectedEntries) {
 		t.Fatalf("unexpected canonical widened suite plans: %+v", plans)
 	}
 
@@ -2127,7 +2172,7 @@ func TestBackendSensitiveAggregateFixtures(t *testing.T) {
 	for _, raw := range expectedEntriesRaw {
 		expectedEntries = append(expectedEntries, parseNamedConformanceSuitePlan(t, raw.(map[string]any)))
 	}
-	if plans := PlanNamedConformanceSuites(plansManifest, planContexts); !reflect.DeepEqual(plans, expectedEntries) {
+	if plans := PlanNamedConformanceSuites(plansManifest, planContexts); !fixtureJSONEqual(t, plans, expectedEntries) {
 		t.Fatalf("unexpected backend-sensitive aggregate plans: %+v", plans)
 	}
 
@@ -3124,15 +3169,23 @@ func parseConformanceCaseRun(t *testing.T, raw map[string]any) ConformanceCaseRu
 }
 
 func parseConformanceSuiteDefinition(raw map[string]any) ConformanceSuiteDefinition {
-	rolesRaw := raw["roles"].([]any)
-	roles := make([]string, 0, len(rolesRaw))
-	for _, role := range rolesRaw {
-		roles = append(roles, role.(string))
-	}
+	return decodeFixtureValueUntyped[ConformanceSuiteDefinition](raw)
+}
 
-	return ConformanceSuiteDefinition{
-		Family: raw["family"].(string),
-		Roles:  roles,
+func parseConformanceSuiteSubject(raw map[string]any) ConformanceSuiteSubject {
+	subject := ConformanceSuiteSubject{
+		Grammar: raw["grammar"].(string),
+	}
+	if variant, ok := raw["variant"]; ok {
+		subject.Variant = variant.(string)
+	}
+	return subject
+}
+
+func parseConformanceSuiteSelector(raw map[string]any) ConformanceSuiteSelector {
+	return ConformanceSuiteSelector{
+		Kind:    raw["kind"].(string),
+		Subject: parseConformanceSuiteSubject(raw["subject"].(map[string]any)),
 	}
 }
 
@@ -3161,30 +3214,15 @@ func parseConformanceFamilyPlanContext(raw map[string]any) ConformanceFamilyPlan
 }
 
 func parseNamedConformanceSuitePlan(t *testing.T, raw map[string]any) NamedConformanceSuitePlan {
-	return NamedConformanceSuitePlan{
-		Suite: raw["suite"].(string),
-		Plan:  parseConformanceSuitePlan(t, raw["plan"].(map[string]any)),
-	}
+	return decodeFixtureValue[NamedConformanceSuitePlan](t, raw)
 }
 
 func parseNamedConformanceSuiteResults(raw map[string]any) NamedConformanceSuiteResults {
-	resultsRaw := raw["results"].([]any)
-	results := make([]ConformanceCaseResult, 0, len(resultsRaw))
-	for _, item := range resultsRaw {
-		results = append(results, parseConformanceCaseResult(item.(map[string]any)))
-	}
-
-	return NamedConformanceSuiteResults{
-		Suite:   raw["suite"].(string),
-		Results: results,
-	}
+	return decodeFixtureValueUntyped[NamedConformanceSuiteResults](raw)
 }
 
 func parseNamedConformanceSuiteReport(raw map[string]any) NamedConformanceSuiteReport {
-	return NamedConformanceSuiteReport{
-		Suite:  raw["suite"].(string),
-		Report: parseConformanceSuiteReport(raw["report"].(map[string]any)),
-	}
+	return decodeFixtureValueUntyped[NamedConformanceSuiteReport](raw)
 }
 
 func parseConformanceSuiteReport(raw map[string]any) ConformanceSuiteReport {

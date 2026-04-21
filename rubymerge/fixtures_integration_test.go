@@ -84,6 +84,24 @@ func TestRubyFixtures(t *testing.T) {
 		t.Fatal("unexpected profile family")
 	}
 
+	backendFixture := readRubyFixture(t, "diagnostics", "slice-215-ruby-family-backend-feature-profiles", "ruby-ruby-backend-feature-profiles.json")
+	backends := AvailableRubyBackends()
+	if len(backends) != 1 || backends[0] != "kreuzberg-language-pack" {
+		t.Fatalf("unexpected backends: %+v", backends)
+	}
+	if backend := RubyBackendFeatureProfileInfo(); backend.Backend != backendFixture["tree_sitter"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected backend profile: %+v", backend)
+	}
+
+	planFixture := readRubyFixture(t, "diagnostics", "slice-216-ruby-family-plan-contexts", "ruby-ruby-plan-contexts.json")
+	planContext := RubyPlanContext()
+	if planContext.FamilyProfile.Family != planFixture["tree_sitter"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected plan family profile: %+v", planContext)
+	}
+	if planContext.FeatureProfile == nil || planContext.FeatureProfile.Backend != planFixture["tree_sitter"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected plan feature profile: %+v", planContext.FeatureProfile)
+	}
+
 	analysisFixture := readRubyFixture(t, "ruby", "slice-218-analysis", "module-owners.json")
 	analysis := ParseRuby(analysisFixture["source"].(string), DialectRuby)
 	if !analysis.OK || analysis.Analysis == nil {
