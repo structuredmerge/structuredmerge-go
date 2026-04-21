@@ -44,7 +44,16 @@ func readFixture(t *testing.T, parts ...string) map[string]any {
 }
 
 func TestSharedFixtureGoProviderFeatureProfile(t *testing.T) {
+	familyFixture := readFixture(t, "diagnostics", "slice-109-go-family-feature-profile", "go-feature-profile.json")
 	fixture := readFixture(t, "diagnostics", "slice-281-go-provider-feature-profiles", "go-go-provider-feature-profiles.json")
+	familyProfile := gomerge.GoFeatureProfileInfo()
+	if actual := jsonReady(t, map[string]any{
+		"family":             familyProfile.Family,
+		"supported_dialects": familyProfile.SupportedDialects,
+		"supported_policies": familyProfile.SupportedPolicies,
+	}); !reflect.DeepEqual(actual, familyFixture["feature_profile"]) {
+		t.Fatalf("unexpected family profile: %+v", actual)
+	}
 	if len(AvailableGoBackends()) != 1 || AvailableGoBackends()[0] != BackendGoParser {
 		t.Fatalf("unexpected backends: %+v", AvailableGoBackends())
 	}
