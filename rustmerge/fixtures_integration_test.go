@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readRustFixture(t *testing.T, parts ...string) map[string]any {
@@ -77,5 +79,49 @@ func TestRustFixtures(t *testing.T) {
 	planContextFixture := readRustFixture(t, "diagnostics", "slice-123-source-family-plan-contexts", "rust-plan-contexts.json")
 	if !reflect.DeepEqual(jsonReadyRust(RustPlanContext(BackendTreeSitter)), planContextFixture["tree_sitter"]) {
 		t.Fatalf("unexpected plan context: %+v", RustPlanContext(BackendTreeSitter))
+	}
+
+	sourceManifestFixture := readRustFixture(t, "conformance", "slice-124-source-family-manifest", "source-family-manifest.json")
+	sourceManifestSource, err := json.Marshal(sourceManifestFixture)
+	if err != nil {
+		t.Fatalf("marshal source manifest: %v", err)
+	}
+	var sourceManifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(sourceManifestSource, &sourceManifest); err != nil {
+		t.Fatalf("decode source manifest: %v", err)
+	}
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(sourceManifest, "rust"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-105-rust-family-feature-profile", "rust-feature-profile.json") {
+		t.Fatalf("unexpected source family profile path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(sourceManifest, "rust", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("rust", "slice-106-analysis", "module-owners.json") {
+		t.Fatalf("unexpected source analysis path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(sourceManifest, "rust", "matching"); path == nil || filepath.Join(path...) != filepath.Join("rust", "slice-107-matching", "path-equality.json") {
+		t.Fatalf("unexpected source matching path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(sourceManifest, "rust", "merge"); path == nil || filepath.Join(path...) != filepath.Join("rust", "slice-108-merge", "module-merge.json") {
+		t.Fatalf("unexpected source merge path: %+v", path)
+	}
+
+	canonicalManifestFixture := readRustFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
+	canonicalManifestSource, err := json.Marshal(canonicalManifestFixture)
+	if err != nil {
+		t.Fatalf("marshal canonical manifest: %v", err)
+	}
+	var canonicalManifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(canonicalManifestSource, &canonicalManifest); err != nil {
+		t.Fatalf("decode canonical manifest: %v", err)
+	}
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(canonicalManifest, "rust"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-105-rust-family-feature-profile", "rust-feature-profile.json") {
+		t.Fatalf("unexpected canonical family profile path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(canonicalManifest, "rust", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("rust", "slice-106-analysis", "module-owners.json") {
+		t.Fatalf("unexpected canonical analysis path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(canonicalManifest, "rust", "matching"); path == nil || filepath.Join(path...) != filepath.Join("rust", "slice-107-matching", "path-equality.json") {
+		t.Fatalf("unexpected canonical matching path: %+v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(canonicalManifest, "rust", "merge"); path == nil || filepath.Join(path...) != filepath.Join("rust", "slice-108-merge", "module-merge.json") {
+		t.Fatalf("unexpected canonical merge path: %+v", path)
 	}
 }
