@@ -15,18 +15,8 @@ func TestYAMLFeatureProfileInfo(t *testing.T) {
 	}
 
 	backends := AvailableYAMLBackends()
-	if len(backends) != 3 || backends[0] != BackendYAMLV3 || backends[1] != BackendGoccyGoYAML || backends[2] != BackendKreuzberg {
+	if len(backends) != 1 || backends[0] != BackendKreuzberg {
 		t.Fatalf("unexpected backends: %+v", backends)
-	}
-
-	yamlV3Profile := YAMLBackendFeatureProfileInfo(BackendYAMLV3)
-	if yamlV3Profile.Backend != "yaml-v3" {
-		t.Fatalf("unexpected yaml-v3 backend profile: %+v", yamlV3Profile)
-	}
-
-	goccyProfile := YAMLBackendFeatureProfileInfo(BackendGoccyGoYAML)
-	if goccyProfile.Backend != "goccy-go-yaml" {
-		t.Fatalf("unexpected goccy backend profile: %+v", goccyProfile)
 	}
 
 	kreuzbergProfile := YAMLBackendFeatureProfileInfo(BackendKreuzberg)

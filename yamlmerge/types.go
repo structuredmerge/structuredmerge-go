@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/goccy/go-yaml"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 	yamlv3 "gopkg.in/yaml.v3"
@@ -21,9 +20,7 @@ const (
 type YAMLBackend string
 
 const (
-	BackendYAMLV3      YAMLBackend = "yaml-v3"
-	BackendGoccyGoYAML YAMLBackend = "goccy-go-yaml"
-	BackendKreuzberg   YAMLBackend = "kreuzberg-language-pack"
+	BackendKreuzberg YAMLBackend = "kreuzberg-language-pack"
 )
 
 type YAMLRootKind string
@@ -119,7 +116,7 @@ func YAMLFeatureProfileInfo() YAMLFeatureProfile {
 }
 
 func AvailableYAMLBackends() []YAMLBackend {
-	return []YAMLBackend{BackendYAMLV3, BackendGoccyGoYAML, BackendKreuzberg}
+	return []YAMLBackend{BackendKreuzberg}
 }
 
 func YAMLBackendFeatureProfileInfo(backend YAMLBackend) YAMLBackendFeatureProfile {
@@ -132,7 +129,7 @@ func YAMLBackendFeatureProfileInfo(backend YAMLBackend) YAMLBackendFeatureProfil
 }
 
 func YAMLPlanContext() astmerge.ConformanceFamilyPlanContext {
-	return YAMLPlanContextWithBackend(BackendYAMLV3)
+	return YAMLPlanContextWithBackend(BackendKreuzberg)
 }
 
 func YAMLPlanContextWithBackend(backend YAMLBackend) astmerge.ConformanceFamilyPlanContext {
@@ -378,19 +375,11 @@ func collectYAMLOwners(mapping map[string]any, prefix string) []YAMLOwner {
 
 func parseYAMLMapping(source string, backend YAMLBackend) (map[string]any, error) {
 	var parsed any
-	switch backend {
-	case BackendGoccyGoYAML:
-		if err := yaml.Unmarshal([]byte(source), &parsed); err != nil {
-			return nil, err
-		}
-	case BackendKreuzberg:
-		if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
-			return nil, err
-		}
-	default:
-		if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
-			return nil, err
-		}
+	if backend != BackendKreuzberg {
+		return nil, fmt.Errorf("unsupported YAML backend %s", backend)
+	}
+	if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
+		return nil, err
 	}
 
 	normalized, ok := normalizeYAMLValue(parsed).(map[string]any)
@@ -401,7 +390,7 @@ func parseYAMLMapping(source string, backend YAMLBackend) (map[string]any, error
 }
 
 func ParseYAML(source string, dialect YAMLDialect) astmerge.ParseResult[YAMLAnalysis] {
-	return ParseYAMLWithBackend(source, dialect, BackendYAMLV3)
+	return ParseYAMLWithBackend(source, dialect, BackendKreuzberg)
 }
 
 func ParseYAMLWithBackend(source string, dialect YAMLDialect, backend YAMLBackend) astmerge.ParseResult[YAMLAnalysis] {
@@ -412,17 +401,22 @@ func ParseYAMLWithBackend(source string, dialect YAMLDialect, backend YAMLBacken
 		}
 	}
 
-	if backend == BackendKreuzberg {
-		backendResult := treehaver.ParseWithLanguagePack(treehaver.ParserRequest{
-			Source:   source,
-			Language: "yaml",
-			Dialect:  "yaml",
-		})
-		if !backendResult.OK {
-			return astmerge.ParseResult[YAMLAnalysis]{
-				OK:          false,
-				Diagnostics: backendResult.Diagnostics,
-			}
+	if backend != BackendKreuzberg {
+		return astmerge.ParseResult[YAMLAnalysis]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported YAML backend %s.", backend))},
+		}
+	}
+
+	backendResult := treehaver.ParseWithLanguagePack(treehaver.ParserRequest{
+		Source:   source,
+		Language: "yaml",
+		Dialect:  "yaml",
+	})
+	if !backendResult.OK {
+		return astmerge.ParseResult[YAMLAnalysis]{
+			OK:          false,
+			Diagnostics: backendResult.Diagnostics,
 		}
 	}
 
@@ -434,7 +428,26 @@ func ParseYAMLWithBackend(source string, dialect YAMLDialect, backend YAMLBacken
 		}
 	}
 
-	if diagnostic := validateYAMLNode(parsed, ""); diagnostic != nil {
+	return AnalyzeYAMLParsedDocument(parsed, dialect)
+}
+
+func AnalyzeYAMLParsedDocument(parsed any, dialect YAMLDialect) astmerge.ParseResult[YAMLAnalysis] {
+	if dialect != DialectYAML {
+		return astmerge.ParseResult[YAMLAnalysis]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature("Unsupported YAML dialect.")},
+		}
+	}
+
+	normalized, ok := normalizeYAMLValue(parsed).(map[string]any)
+	if !ok {
+		return astmerge.ParseResult[YAMLAnalysis]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{parseError("YAML documents must parse to a mapping root")},
+		}
+	}
+
+	if diagnostic := validateYAMLNode(normalized, ""); diagnostic != nil {
 		return astmerge.ParseResult[YAMLAnalysis]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{*diagnostic},
@@ -443,15 +456,84 @@ func ParseYAMLWithBackend(source string, dialect YAMLDialect, backend YAMLBacken
 
 	analysis := YAMLAnalysis{
 		Dialect:          DialectYAML,
-		NormalizedSource: canonicalYAML(parsed),
+		NormalizedSource: canonicalYAML(normalized),
 		RootKind:         RootMapping,
-		Owners:           collectYAMLOwners(parsed, ""),
+		Owners:           collectYAMLOwners(normalized, ""),
 	}
 
 	return astmerge.ParseResult[YAMLAnalysis]{
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},
 		Analysis:    &analysis,
+	}
+}
+
+func ParseYAMLWithParser(source string, dialect YAMLDialect, parser func(string, YAMLDialect) astmerge.ParseResult[YAMLAnalysis]) astmerge.ParseResult[YAMLAnalysis] {
+	return parser(source, dialect)
+}
+
+func parseCanonicalYAMLMapping(source string) (map[string]any, error) {
+	var parsed any
+	if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
+		return nil, err
+	}
+
+	normalized, ok := normalizeYAMLValue(parsed).(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("YAML documents must parse to a mapping root")
+	}
+	return normalized, nil
+}
+
+func MergeYAMLWithParser(templateSource string, destinationSource string, dialect YAMLDialect, parser func(string, YAMLDialect) astmerge.ParseResult[YAMLAnalysis]) astmerge.MergeResult[string] {
+	template := ParseYAMLWithParser(templateSource, dialect, parser)
+	if !template.OK || template.Analysis == nil {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: template.Diagnostics,
+		}
+	}
+
+	destination := ParseYAMLWithParser(destinationSource, dialect, parser)
+	if !destination.OK || destination.Analysis == nil {
+		diagnostics := make([]astmerge.Diagnostic, 0, len(destination.Diagnostics))
+		for _, diagnostic := range destination.Diagnostics {
+			if diagnostic.Category == astmerge.CategoryParseError {
+				diagnostic.Category = astmerge.CategoryDestinationParseError
+			}
+			diagnostics = append(diagnostics, diagnostic)
+		}
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: diagnostics,
+		}
+	}
+
+	templateMapping, err := parseCanonicalYAMLMapping(template.Analysis.NormalizedSource)
+	if err != nil {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{parseError(err.Error())},
+		}
+	}
+	destinationMapping, err := parseCanonicalYAMLMapping(destination.Analysis.NormalizedSource)
+	if err != nil {
+		return astmerge.MergeResult[string]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.CategoryDestinationParseError,
+				Message:  err.Error(),
+			}},
+		}
+	}
+
+	output := canonicalYAML(mergeYAMLMappings(templateMapping, destinationMapping))
+	return astmerge.MergeResult[string]{
+		OK:          true,
+		Diagnostics: []astmerge.Diagnostic{},
+		Output:      &output,
+		Policies:    []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 	}
 }
 
@@ -530,57 +612,18 @@ func mergeYAMLMappings(template map[string]any, destination map[string]any) map[
 }
 
 func MergeYAML(templateSource string, destinationSource string, dialect YAMLDialect) astmerge.MergeResult[string] {
-	return MergeYAMLWithBackend(templateSource, destinationSource, dialect, BackendYAMLV3)
+	return MergeYAMLWithBackend(templateSource, destinationSource, dialect, BackendKreuzberg)
 }
 
 func MergeYAMLWithBackend(templateSource string, destinationSource string, dialect YAMLDialect, backend YAMLBackend) astmerge.MergeResult[string] {
-	template := ParseYAMLWithBackend(templateSource, dialect, backend)
-	if !template.OK || template.Analysis == nil {
+	if backend != BackendKreuzberg {
 		return astmerge.MergeResult[string]{
 			OK:          false,
-			Diagnostics: template.Diagnostics,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported YAML backend %s.", backend))},
 		}
 	}
 
-	destination := ParseYAMLWithBackend(destinationSource, dialect, backend)
-	if !destination.OK || destination.Analysis == nil {
-		diagnostics := make([]astmerge.Diagnostic, 0, len(destination.Diagnostics))
-		for _, diagnostic := range destination.Diagnostics {
-			if diagnostic.Category == astmerge.CategoryParseError {
-				diagnostic.Category = astmerge.CategoryDestinationParseError
-			}
-			diagnostics = append(diagnostics, diagnostic)
-		}
-		return astmerge.MergeResult[string]{
-			OK:          false,
-			Diagnostics: diagnostics,
-		}
-	}
-
-	templateMapping, err := parseYAMLMapping(template.Analysis.NormalizedSource, backend)
-	if err != nil {
-		return astmerge.MergeResult[string]{
-			OK:          false,
-			Diagnostics: []astmerge.Diagnostic{parseError(err.Error())},
-		}
-	}
-	destinationMapping, err := parseYAMLMapping(destination.Analysis.NormalizedSource, backend)
-	if err != nil {
-		return astmerge.MergeResult[string]{
-			OK: false,
-			Diagnostics: []astmerge.Diagnostic{{
-				Severity: astmerge.SeverityError,
-				Category: astmerge.CategoryDestinationParseError,
-				Message:  err.Error(),
-			}},
-		}
-	}
-
-	output := canonicalYAML(mergeYAMLMappings(templateMapping, destinationMapping))
-	return astmerge.MergeResult[string]{
-		OK:          true,
-		Diagnostics: []astmerge.Diagnostic{},
-		Output:      &output,
-		Policies:    []astmerge.PolicyReference{destinationWinsArrayPolicy()},
-	}
+	return MergeYAMLWithParser(templateSource, destinationSource, dialect, func(source string, parseDialect YAMLDialect) astmerge.ParseResult[YAMLAnalysis] {
+		return ParseYAMLWithBackend(source, parseDialect, backend)
+	})
 }
