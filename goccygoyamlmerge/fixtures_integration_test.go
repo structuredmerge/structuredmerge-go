@@ -47,7 +47,19 @@ func TestSharedFixtureYAMLProviderFeatureProfile(t *testing.T) {
 	if len(AvailableYAMLBackends()) != 1 || AvailableYAMLBackends()[0] != BackendGoccyGoYAML {
 		t.Fatalf("unexpected backends: %+v", AvailableYAMLBackends())
 	}
-	if profile := YAMLBackendFeatureProfileInfo(); profile.Backend != fixture["providers"].(map[string]any)["goccy_go_yaml"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+	expected := fixture["providers"].(map[string]any)["goccy_go_yaml"].(map[string]any)["feature_profile"]
+	profile := YAMLBackendFeatureProfileInfo()
+	actual := jsonReady(t, map[string]any{
+		"family":             profile.Family,
+		"supported_dialects": profile.SupportedDialects,
+		"supported_policies": profile.SupportedPolicies,
+		"backend":            profile.Backend,
+		"backend_ref": map[string]any{
+			"id":     profile.BackendRef.ID,
+			"family": profile.BackendRef.Family,
+		},
+	})
+	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("unexpected provider profile: %+v", profile)
 	}
 }

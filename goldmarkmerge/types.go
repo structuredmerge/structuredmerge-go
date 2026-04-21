@@ -38,6 +38,7 @@ func MarkdownBackendFeatureProfileInfo() markdownmerge.MarkdownBackendFeaturePro
 		SupportedDialects: []markdownmerge.MarkdownDialect{markdownmerge.DialectMarkdown},
 		SupportedPolicies: []astmerge.PolicyReference{},
 		Backend:           BackendGoldmark,
+		BackendRef:        &treehaver.BackendReference{ID: BackendGoldmark, Family: "native"},
 	}
 }
 

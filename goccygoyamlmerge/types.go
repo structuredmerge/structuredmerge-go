@@ -45,6 +45,7 @@ func YAMLBackendFeatureProfileInfo() yamlmerge.YAMLBackendFeatureProfile {
 		SupportedDialects: []yamlmerge.YAMLDialect{yamlmerge.DialectYAML},
 		SupportedPolicies: yamlmerge.YAMLFeatureProfileInfo().SupportedPolicies,
 		Backend:           BackendGoccyGoYAML,
+		BackendRef:        &treehaver.BackendReference{ID: BackendGoccyGoYAML, Family: "native"},
 	}
 }
 

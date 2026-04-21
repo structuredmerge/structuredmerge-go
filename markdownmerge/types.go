@@ -83,6 +83,7 @@ type MarkdownBackendFeatureProfile struct {
 	SupportedDialects []MarkdownDialect
 	SupportedPolicies []astmerge.PolicyReference
 	Backend           string
+	BackendRef        *treehaver.BackendReference
 }
 
 func unsupportedFeature(message string) astmerge.Diagnostic {
@@ -205,6 +206,7 @@ func MarkdownBackendFeatureProfileInfo(backend MarkdownBackend) MarkdownBackendF
 		SupportedDialects: []MarkdownDialect{DialectMarkdown},
 		SupportedPolicies: []astmerge.PolicyReference{},
 		Backend:           string(backend),
+		BackendRef:        treehaver.BackendReferenceByID(string(backend)),
 	}
 }
 

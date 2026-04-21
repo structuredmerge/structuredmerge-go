@@ -76,6 +76,7 @@ type YAMLBackendFeatureProfile struct {
 	SupportedDialects []YAMLDialect
 	SupportedPolicies []astmerge.PolicyReference
 	Backend           string
+	BackendRef        *treehaver.BackendReference
 }
 
 func parseError(message string) astmerge.Diagnostic {
@@ -125,6 +126,7 @@ func YAMLBackendFeatureProfileInfo(backend YAMLBackend) YAMLBackendFeatureProfil
 		SupportedDialects: YAMLFeatureProfileInfo().SupportedDialects,
 		SupportedPolicies: YAMLFeatureProfileInfo().SupportedPolicies,
 		Backend:           string(backend),
+		BackendRef:        treehaver.BackendReferenceByID(string(backend)),
 	}
 }
 

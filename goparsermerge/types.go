@@ -21,6 +21,7 @@ type GoBackendFeatureProfile struct {
 	SupportedDialects []gomerge.GoDialect
 	SupportedPolicies []astmerge.PolicyReference
 	Backend           string
+	BackendRef        *treehaver.BackendReference
 }
 
 func init() {
@@ -61,6 +62,7 @@ func GoBackendFeatureProfileInfo() GoBackendFeatureProfile {
 		SupportedDialects: []gomerge.GoDialect{gomerge.DialectGo},
 		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 		Backend:           BackendGoParser,
+		BackendRef:        &treehaver.BackendReference{ID: BackendGoParser, Family: "native"},
 	}
 }
 

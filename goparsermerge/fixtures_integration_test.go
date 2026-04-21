@@ -47,7 +47,19 @@ func TestSharedFixtureGoProviderFeatureProfile(t *testing.T) {
 	if len(AvailableGoBackends()) != 1 || AvailableGoBackends()[0] != BackendGoParser {
 		t.Fatalf("unexpected backends: %+v", AvailableGoBackends())
 	}
-	if profile := GoBackendFeatureProfileInfo(); profile.Backend != fixture["providers"].(map[string]any)["go_parser"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+	expected := fixture["providers"].(map[string]any)["go_parser"].(map[string]any)["feature_profile"]
+	profile := GoBackendFeatureProfileInfo()
+	actual := jsonReady(t, map[string]any{
+		"family":             profile.Family,
+		"supported_dialects": profile.SupportedDialects,
+		"supported_policies": profile.SupportedPolicies,
+		"backend":            profile.Backend,
+		"backend_ref": map[string]any{
+			"id":     profile.BackendRef.ID,
+			"family": profile.BackendRef.Family,
+		},
+	})
+	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("unexpected provider profile: %+v", profile)
 	}
 }

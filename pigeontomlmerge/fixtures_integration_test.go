@@ -47,7 +47,19 @@ func TestSharedFixtureTOMLProviderFeatureProfile(t *testing.T) {
 	if len(AvailableTOMLBackends()) != 1 || AvailableTOMLBackends()[0] != BackendPigeon {
 		t.Fatalf("unexpected backends: %+v", AvailableTOMLBackends())
 	}
-	if profile := TOMLBackendFeatureProfileInfo(); profile.Family != fixture["providers"].(map[string]any)["pigeon"].(map[string]any)["feature_profile"].(map[string]any)["family"].(string) {
+	expected := fixture["providers"].(map[string]any)["pigeon"].(map[string]any)["feature_profile"]
+	profile := TOMLBackendFeatureProfileInfo()
+	actual := jsonReady(t, map[string]any{
+		"family":             profile.Family,
+		"supported_dialects": profile.SupportedDialects,
+		"supported_policies": profile.SupportedPolicies,
+		"backend":            profile.Backend,
+		"backend_ref": map[string]any{
+			"id":     profile.BackendRef.ID,
+			"family": profile.BackendRef.Family,
+		},
+	})
+	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("unexpected provider profile: %+v", profile)
 	}
 }

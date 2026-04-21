@@ -5,9 +5,22 @@ import (
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/tomlmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 const BackendPigeon = "pigeon"
+
+type TOMLBackendFeatureProfile struct {
+	Family            string
+	SupportedDialects []tomlmerge.TOMLDialect
+	SupportedPolicies []astmerge.PolicyReference
+	Backend           string
+	BackendRef        *treehaver.BackendReference
+}
+
+func init() {
+	treehaver.RegisterBackend(treehaver.BackendReference{ID: BackendPigeon, Family: "peg"})
+}
 
 func unsupportedFeature(message string) astmerge.Diagnostic {
 	return astmerge.Diagnostic{
@@ -25,11 +38,13 @@ func AvailableTOMLBackends() []string {
 	return []string{BackendPigeon}
 }
 
-func TOMLBackendFeatureProfileInfo() tomlmerge.TOMLFeatureProfile {
-	return tomlmerge.TOMLFeatureProfile{
+func TOMLBackendFeatureProfileInfo() TOMLBackendFeatureProfile {
+	return TOMLBackendFeatureProfile{
 		Family:            "toml",
 		SupportedDialects: []tomlmerge.TOMLDialect{tomlmerge.DialectTOML},
 		SupportedPolicies: []astmerge.PolicyReference{{Surface: astmerge.PolicySurfaceArray, Name: "destination_wins_array"}},
+		Backend:           BackendPigeon,
+		BackendRef:        &treehaver.BackendReference{ID: BackendPigeon, Family: "peg"},
 	}
 }
 
