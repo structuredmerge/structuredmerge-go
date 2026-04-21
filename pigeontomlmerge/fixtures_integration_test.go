@@ -117,8 +117,18 @@ func TestSharedFixtureTOMLProviderParseAndMerge(t *testing.T) {
 		t.Fatalf("expected matching parse success")
 	}
 	result := MatchTOMLOwners(*template.Analysis, *destination.Analysis)
-	if len(result.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
-		t.Fatalf("unexpected matches: %+v", result.Matched)
+	matched := make([][]string, 0, len(result.Matched))
+	for _, match := range result.Matched {
+		matched = append(matched, []string{match.TemplatePath, match.DestinationPath})
+	}
+	if actual := jsonReady(t, matched); !reflect.DeepEqual(actual, matchingFixture["expected"].(map[string]any)["matched"]) {
+		t.Fatalf("unexpected matches: %+v", actual)
+	}
+	if actual := jsonReady(t, result.UnmatchedTemplate); !reflect.DeepEqual(actual, matchingFixture["expected"].(map[string]any)["unmatched_template"]) {
+		t.Fatalf("unexpected unmatched template owners: %+v", actual)
+	}
+	if actual := jsonReady(t, result.UnmatchedDestination); !reflect.DeepEqual(actual, matchingFixture["expected"].(map[string]any)["unmatched_destination"]) {
+		t.Fatalf("unexpected unmatched destination owners: %+v", actual)
 	}
 
 	mergeFixture := readFixture(t, "toml", "slice-94-merge", "table-merge.json")

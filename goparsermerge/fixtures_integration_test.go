@@ -90,8 +90,16 @@ func TestSharedFixtureGoProviderParseAndMerge(t *testing.T) {
 	if !parseResult.OK || parseResult.Analysis == nil {
 		t.Fatalf("expected parse success: %+v", parseResult)
 	}
-	if len(parseResult.Analysis.Owners) != len(parityFixture["expected"].(map[string]any)["owners"].([]any)) {
-		t.Fatalf("unexpected owners: %+v", parseResult.Analysis.Owners)
+	owners := make([]map[string]any, 0, len(parseResult.Analysis.Owners))
+	for _, owner := range parseResult.Analysis.Owners {
+		owners = append(owners, map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+			"match_key":  owner.MatchKey,
+		})
+	}
+	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, parityFixture["expected"].(map[string]any)["owners"]) {
+		t.Fatalf("unexpected owners: %+v", actual)
 	}
 
 	mergeResult := MergeGo(parityFixture["template"].(string), parityFixture["destination"].(string), gomerge.DialectGo)
