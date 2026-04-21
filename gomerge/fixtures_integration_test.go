@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -24,6 +25,19 @@ func readGoFixture(t *testing.T, parts ...string) map[string]any {
 	return fixture
 }
 
+func jsonReadyGo(t *testing.T, value any) any {
+	t.Helper()
+	source, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal value: %v", err)
+	}
+	var normalized any
+	if err := json.Unmarshal(source, &normalized); err != nil {
+		t.Fatalf("decode value: %v", err)
+	}
+	return normalized
+}
+
 func TestGoFixtures(t *testing.T) {
 	profileFixture := readGoFixture(t, "diagnostics", "slice-109-go-family-feature-profile", "go-feature-profile.json")
 	if GoFeatureProfileInfo().Family != profileFixture["feature_profile"].(map[string]any)["family"].(string) {
@@ -35,6 +49,19 @@ func TestGoFixtures(t *testing.T) {
 	if treeProfile.Backend != backendProfileFixture["tree_sitter"].(map[string]any)["backend"].(string) ||
 		treeProfile.SupportsDialects != backendProfileFixture["tree_sitter"].(map[string]any)["supports_dialects"].(bool) {
 		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeProfile)
+	}
+	if actual := jsonReadyGo(t, map[string]any{
+		"backend":            treeProfile.Backend,
+		"supports_dialects":  treeProfile.SupportsDialects,
+		"supported_policies": treeProfile.SupportedPolicies,
+		"backend_ref": map[string]any{
+			"id":     treeProfile.BackendRef.ID,
+			"family": treeProfile.BackendRef.Family,
+		},
+	}); actual == nil {
+		t.Fatal("unexpected nil backend projection")
+	} else if expected := backendProfileFixture["tree_sitter"]; !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("unexpected tree-sitter backend fixture projection: %+v", actual)
 	}
 	if backend := treehaver.BackendReferenceByID(string(BackendTreeSitter)); backend == nil || backend.ID != string(BackendTreeSitter) || backend.Family != "tree-sitter" {
 		t.Fatalf("unexpected registered backend: %+v", backend)

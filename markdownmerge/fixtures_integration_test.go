@@ -114,6 +114,16 @@ func TestSharedFixtureMarkdownBackendFeatureProfiles(t *testing.T) {
 	if treeSitter := MarkdownBackendFeatureProfileInfo(BackendKreuzberg); treeSitter.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeSitter)
 	}
+	if actual := jsonReadyMarkdown(t, map[string]any{
+		"backend":            MarkdownBackendFeatureProfileInfo(BackendKreuzberg).Backend,
+		"supported_policies": MarkdownBackendFeatureProfileInfo(BackendKreuzberg).SupportedPolicies,
+		"backend_ref": map[string]any{
+			"id":     MarkdownBackendFeatureProfileInfo(BackendKreuzberg).BackendRef.ID,
+			"family": MarkdownBackendFeatureProfileInfo(BackendKreuzberg).BackendRef.Family,
+		},
+	}); !reflect.DeepEqual(actual, fixture["tree_sitter"]) {
+		t.Fatalf("unexpected tree-sitter backend fixture projection: %+v", actual)
+	}
 	if backend := treehaver.BackendReferenceByID(string(BackendKreuzberg)); backend == nil || backend.ID != string(BackendKreuzberg) || backend.Family != "tree-sitter" {
 		t.Fatalf("unexpected registered backend: %+v", backend)
 	}

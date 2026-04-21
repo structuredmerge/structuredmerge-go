@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -21,6 +22,19 @@ func readRubyFixture(t *testing.T, parts ...string) map[string]any {
 		t.Fatalf("parse fixture: %v", err)
 	}
 	return fixture
+}
+
+func jsonReadyRuby(t *testing.T, value any) any {
+	t.Helper()
+	source, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal value: %v", err)
+	}
+	var normalized any
+	if err := json.Unmarshal(source, &normalized); err != nil {
+		t.Fatalf("decode value: %v", err)
+	}
+	return normalized
 }
 
 func parseProjectedChildReviewGroup(raw map[string]any) astmerge.ProjectedChildReviewGroup {
@@ -91,6 +105,17 @@ func TestRubyFixtures(t *testing.T) {
 	}
 	if backend := RubyBackendFeatureProfileInfo(); backend.Backend != backendFixture["tree_sitter"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected backend profile: %+v", backend)
+	}
+	if actual := jsonReadyRuby(t, map[string]any{
+		"backend":            RubyBackendFeatureProfileInfo().Backend,
+		"supports_dialects":  RubyBackendFeatureProfileInfo().SupportsDialects,
+		"supported_policies": RubyBackendFeatureProfileInfo().SupportedPolicies,
+		"backend_ref": map[string]any{
+			"id":     RubyBackendFeatureProfileInfo().BackendRef.ID,
+			"family": RubyBackendFeatureProfileInfo().BackendRef.Family,
+		},
+	}); !reflect.DeepEqual(actual, backendFixture["tree_sitter"]) {
+		t.Fatalf("unexpected backend fixture projection: %+v", actual)
 	}
 
 	planFixture := readRubyFixture(t, "diagnostics", "slice-216-ruby-family-plan-contexts", "ruby-ruby-plan-contexts.json")

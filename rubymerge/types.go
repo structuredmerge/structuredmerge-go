@@ -60,6 +60,7 @@ type RubyBackendFeatureProfile struct {
 	SupportedDialects []RubyDialect
 	SupportedPolicies []astmerge.PolicyReference
 	Backend           string
+	BackendRef        *treehaver.BackendReference
 	SupportsDialects  bool
 }
 
@@ -301,6 +302,7 @@ func RubyBackendFeatureProfileInfo() RubyBackendFeatureProfile {
 		SupportedDialects: []RubyDialect{DialectRuby},
 		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 		Backend:           "kreuzberg-language-pack",
+		BackendRef:        &treehaver.KreuzbergLanguagePackBackend,
 		SupportsDialects:  true,
 	}
 }

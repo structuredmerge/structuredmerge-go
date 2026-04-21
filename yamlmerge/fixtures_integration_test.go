@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -25,6 +26,19 @@ func readYAMLFixture(t *testing.T, parts ...string) map[string]any {
 	}
 
 	return fixture
+}
+
+func jsonReadyYAML(t *testing.T, value any) any {
+	t.Helper()
+	source, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal value: %v", err)
+	}
+	var normalized any
+	if err := json.Unmarshal(source, &normalized); err != nil {
+		t.Fatalf("decode value: %v", err)
+	}
+	return normalized
 }
 
 func TestSharedFixtureYAMLFeatureProfile(t *testing.T) {
@@ -53,6 +67,17 @@ func TestSharedFixtureYAMLBackendFeatureProfiles(t *testing.T) {
 	treeSitter := YAMLBackendFeatureProfileInfo(BackendKreuzberg)
 	if treeSitter.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeSitter)
+	}
+	if actual, expected := jsonReadyYAML(t, map[string]any{
+		"backend":            treeSitter.Backend,
+		"supports_dialects":  false,
+		"supported_policies": treeSitter.SupportedPolicies,
+		"backend_ref": map[string]any{
+			"id":     treeSitter.BackendRef.ID,
+			"family": treeSitter.BackendRef.Family,
+		},
+	}), fixture["tree_sitter"]; !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("unexpected tree-sitter backend fixture projection: %+v", actual)
 	}
 	if backend := treehaver.BackendReferenceByID(string(BackendKreuzberg)); backend == nil || backend.ID != string(BackendKreuzberg) || backend.Family != "tree-sitter" {
 		t.Fatalf("unexpected registered backend: %+v", backend)

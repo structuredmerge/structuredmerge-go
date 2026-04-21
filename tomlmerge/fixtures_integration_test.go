@@ -71,6 +71,16 @@ func TestSharedFixtureTOMLBackendFeatureProfiles(t *testing.T) {
 	if treeSitterProfile.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected tree-sitter backend feature profile: %+v", treeSitterProfile)
 	}
+	if actual := jsonReady(t, map[string]any{
+		"backend":            treeSitterProfile.Backend,
+		"supported_policies": treeSitterProfile.SupportedPolicies,
+		"backend_ref": map[string]any{
+			"id":     treeSitterProfile.BackendRef.ID,
+			"family": treeSitterProfile.BackendRef.Family,
+		},
+	}); !reflect.DeepEqual(actual, fixture["tree_sitter"]) {
+		t.Fatalf("unexpected tree-sitter backend fixture projection: %+v", actual)
+	}
 	if backend := treehaver.BackendReferenceByID(string(BackendTreeSitter)); backend == nil || backend.ID != string(BackendTreeSitter) || backend.Family != "tree-sitter" {
 		t.Fatalf("unexpected registered backend: %+v", backend)
 	}
