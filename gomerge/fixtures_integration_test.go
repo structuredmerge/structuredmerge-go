@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 func readGoFixture(t *testing.T, parts ...string) map[string]any {
@@ -34,6 +35,9 @@ func TestGoFixtures(t *testing.T) {
 	if treeProfile.Backend != backendProfileFixture["tree_sitter"].(map[string]any)["backend"].(string) ||
 		treeProfile.SupportsDialects != backendProfileFixture["tree_sitter"].(map[string]any)["supports_dialects"].(bool) {
 		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeProfile)
+	}
+	if backend := treehaver.BackendReferenceByID(string(BackendTreeSitter)); backend == nil || backend.ID != string(BackendTreeSitter) || backend.Family != "tree-sitter" {
+		t.Fatalf("unexpected registered backend: %+v", backend)
 	}
 
 	planContextFixture := readGoFixture(t, "diagnostics", "slice-123-source-family-plan-contexts", "go-plan-contexts.json")

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 func readYAMLFixture(t *testing.T, parts ...string) map[string]any {
@@ -52,6 +53,9 @@ func TestSharedFixtureYAMLBackendFeatureProfiles(t *testing.T) {
 	treeSitter := YAMLBackendFeatureProfileInfo(BackendKreuzberg)
 	if treeSitter.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeSitter)
+	}
+	if backend := treehaver.BackendReferenceByID(string(BackendKreuzberg)); backend == nil || backend.ID != string(BackendKreuzberg) || backend.Family != "tree-sitter" {
+		t.Fatalf("unexpected registered backend: %+v", backend)
 	}
 }
 

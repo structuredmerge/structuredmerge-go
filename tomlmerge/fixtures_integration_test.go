@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 func readTOMLFixture(t *testing.T, parts ...string) map[string]any {
@@ -69,6 +70,9 @@ func TestSharedFixtureTOMLBackendFeatureProfiles(t *testing.T) {
 	treeSitterProfile := TOMLBackendFeatureProfileInfo(BackendTreeSitter)
 	if treeSitterProfile.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
 		t.Fatalf("unexpected tree-sitter backend feature profile: %+v", treeSitterProfile)
+	}
+	if backend := treehaver.BackendReferenceByID(string(BackendTreeSitter)); backend == nil || backend.ID != string(BackendTreeSitter) || backend.Family != "tree-sitter" {
+		t.Fatalf("unexpected registered backend: %+v", backend)
 	}
 }
 
