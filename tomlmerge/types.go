@@ -18,8 +18,7 @@ type TOMLBackend string
 const (
 	DialectTOML TOMLDialect = "toml"
 
-	BackendNative TOMLBackend = "native"
-	BackendPigeon TOMLBackend = "pigeon"
+	BackendTreeSitter TOMLBackend = "kreuzberg-language-pack"
 )
 
 type TOMLRootKind string
@@ -127,25 +126,25 @@ func TOMLFeatureProfileInfo() TOMLFeatureProfile {
 }
 
 func AvailableTOMLBackends() []TOMLBackend {
-	return []TOMLBackend{BackendNative, BackendPigeon}
+	return []TOMLBackend{BackendTreeSitter}
 }
 
 func TOMLBackendFeatureProfileInfo(backend TOMLBackend) TOMLBackendFeatureProfile {
-	switch backend {
-	case BackendPigeon:
+	resolved := resolveBackend(backend)
+	if resolved != BackendTreeSitter {
 		return TOMLBackendFeatureProfile{
-			Backend:           treehaver.PigeonAdapterInfo().Backend,
-			BackendRef:        treehaver.PigeonAdapterInfo().BackendRef,
+			Backend:           string(resolved),
+			BackendRef:        nil,
 			SupportsDialects:  false,
 			SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 		}
-	default:
-		return TOMLBackendFeatureProfile{
-			Backend:           "go-toml-v2",
-			BackendRef:        &treehaver.BackendReference{ID: "go-toml-v2", Family: "builtin"},
-			SupportsDialects:  true,
-			SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
-		}
+	}
+
+	return TOMLBackendFeatureProfile{
+		Backend:           treehaver.KreuzbergLanguagePackBackend.ID,
+		BackendRef:        &treehaver.KreuzbergLanguagePackBackend,
+		SupportsDialects:  false,
+		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 	}
 }
 
@@ -344,22 +343,18 @@ func parseTOMLTable(source string) (map[string]any, error) {
 	return parsed, nil
 }
 
-func ParseTOML(source string, dialect TOMLDialect) astmerge.ParseResult[TOMLAnalysis] {
-	return ParseTOMLWithBackend(source, dialect, BackendNative)
+func resolveBackend(backend TOMLBackend) TOMLBackend {
+	if backend == "" {
+		return BackendTreeSitter
+	}
+	return backend
 }
 
-func ParseTOMLWithBackend(source string, dialect TOMLDialect, backend TOMLBackend) astmerge.ParseResult[TOMLAnalysis] {
+func AnalyzeTOMLSource(source string, dialect TOMLDialect) astmerge.ParseResult[TOMLAnalysis] {
 	if dialect != DialectTOML {
 		return astmerge.ParseResult[TOMLAnalysis]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{unsupportedFeature("Unsupported TOML dialect.")},
-		}
-	}
-
-	if diagnostic := validateTOMLSyntax(source, backend); diagnostic != nil {
-		return astmerge.ParseResult[TOMLAnalysis]{
-			OK:          false,
-			Diagnostics: []astmerge.Diagnostic{*diagnostic},
 		}
 	}
 
@@ -392,20 +387,40 @@ func ParseTOMLWithBackend(source string, dialect TOMLDialect, backend TOMLBacken
 	}
 }
 
-func validateTOMLSyntax(source string, backend TOMLBackend) *astmerge.Diagnostic {
-	switch backend {
-	case BackendPigeon:
-		if _, err := pigeontoml.Parse("", []byte(source)); err != nil {
-			diagnostic := parseError(err.Error())
-			return &diagnostic
-		}
-		return nil
-	case BackendNative:
-		return nil
-	default:
-		diagnostic := unsupportedFeature("Unsupported TOML backend.")
+func ValidatePigeonSyntax(source string) *astmerge.Diagnostic {
+	if _, err := pigeontoml.Parse("", []byte(source)); err != nil {
+		diagnostic := parseError(err.Error())
 		return &diagnostic
 	}
+	return nil
+}
+
+func ParseTOML(source string, dialect TOMLDialect) astmerge.ParseResult[TOMLAnalysis] {
+	return ParseTOMLWithBackend(source, dialect, BackendTreeSitter)
+}
+
+func ParseTOMLWithBackend(source string, dialect TOMLDialect, backend TOMLBackend) astmerge.ParseResult[TOMLAnalysis] {
+	resolved := resolveBackend(backend)
+	if resolved != BackendTreeSitter {
+		return astmerge.ParseResult[TOMLAnalysis]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported TOML backend %s.", resolved))},
+		}
+	}
+
+	syntax := treehaver.ParseWithLanguagePack(treehaver.ParserRequest{
+		Source:   source,
+		Language: "toml",
+		Dialect:  string(dialect),
+	})
+	if !syntax.OK {
+		return astmerge.ParseResult[TOMLAnalysis]{
+			OK:          false,
+			Diagnostics: syntax.Diagnostics,
+		}
+	}
+
+	return AnalyzeTOMLSource(source, dialect)
 }
 
 func MatchTOMLOwners(template TOMLAnalysis, destination TOMLAnalysis) TOMLOwnerMatchResult {
@@ -482,12 +497,13 @@ func mergeTOMLTables(template map[string]any, destination map[string]any) map[st
 	return merged
 }
 
-func MergeTOML(templateSource string, destinationSource string, dialect TOMLDialect) astmerge.MergeResult[string] {
-	return MergeTOMLWithBackend(templateSource, destinationSource, dialect, BackendNative)
-}
-
-func MergeTOMLWithBackend(templateSource string, destinationSource string, dialect TOMLDialect, backend TOMLBackend) astmerge.MergeResult[string] {
-	template := ParseTOMLWithBackend(templateSource, dialect, backend)
+func MergeTOMLWithParser(
+	templateSource string,
+	destinationSource string,
+	dialect TOMLDialect,
+	parser func(source string, dialect TOMLDialect) astmerge.ParseResult[TOMLAnalysis],
+) astmerge.MergeResult[string] {
+	template := parser(templateSource, dialect)
 	if !template.OK || template.Analysis == nil {
 		return astmerge.MergeResult[string]{
 			OK:          false,
@@ -495,7 +511,7 @@ func MergeTOMLWithBackend(templateSource string, destinationSource string, diale
 		}
 	}
 
-	destination := ParseTOMLWithBackend(destinationSource, dialect, backend)
+	destination := parser(destinationSource, dialect)
 	if !destination.OK || destination.Analysis == nil {
 		diagnostics := make([]astmerge.Diagnostic, 0, len(destination.Diagnostics))
 		for _, diagnostic := range destination.Diagnostics {
@@ -532,4 +548,22 @@ func MergeTOMLWithBackend(templateSource string, destinationSource string, diale
 		Output:      &output,
 		Policies:    []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 	}
+}
+
+func MergeTOML(templateSource string, destinationSource string, dialect TOMLDialect) astmerge.MergeResult[string] {
+	return MergeTOMLWithBackend(templateSource, destinationSource, dialect, BackendTreeSitter)
+}
+
+func MergeTOMLWithBackend(templateSource string, destinationSource string, dialect TOMLDialect, backend TOMLBackend) astmerge.MergeResult[string] {
+	resolved := resolveBackend(backend)
+	if resolved != BackendTreeSitter {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported TOML backend %s.", resolved))},
+		}
+	}
+
+	return MergeTOMLWithParser(templateSource, destinationSource, dialect, func(source string, parseDialect TOMLDialect) astmerge.ParseResult[TOMLAnalysis] {
+		return ParseTOMLWithBackend(source, parseDialect, resolved)
+	})
 }

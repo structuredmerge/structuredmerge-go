@@ -14,13 +14,9 @@ func TestTOMLFeatureProfileInfo(t *testing.T) {
 		t.Fatalf("unexpected policies: %+v", profile.SupportedPolicies)
 	}
 
-	nativeProfile := TOMLBackendFeatureProfileInfo(BackendNative)
-	if nativeProfile.Backend != "go-toml-v2" || nativeProfile.BackendRef == nil {
-		t.Fatalf("unexpected native backend profile: %+v", nativeProfile)
-	}
-	pigeonProfile := TOMLBackendFeatureProfileInfo(BackendPigeon)
-	if pigeonProfile.Backend != "pigeon" || pigeonProfile.BackendRef == nil {
-		t.Fatalf("unexpected pigeon backend profile: %+v", pigeonProfile)
+	treeSitterProfile := TOMLBackendFeatureProfileInfo(BackendTreeSitter)
+	if treeSitterProfile.Backend != "kreuzberg-language-pack" || treeSitterProfile.BackendRef == nil {
+		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeSitterProfile)
 	}
 }
 
@@ -41,11 +37,6 @@ func TestParseTOMLAndMatchOwners(t *testing.T) {
 	if len(result.UnmatchedDestination) != 1 || result.UnmatchedDestination[0] != "/extra" {
 		t.Fatalf("unexpected unmatched destination: %+v", result.UnmatchedDestination)
 	}
-
-	pigeonTemplate := ParseTOMLWithBackend("title = \"Structured Merge\"\ntags = [\"merge\", \"toml\"]\n\n[package]\nname = \"structuredmerge\"\nversion = \"0.1.0\"\n", DialectTOML, BackendPigeon)
-	if !pigeonTemplate.OK || pigeonTemplate.Analysis == nil {
-		t.Fatalf("expected pigeon parse success: %+v", pigeonTemplate)
-	}
 }
 
 func TestMergeTOML(t *testing.T) {
@@ -60,18 +51,5 @@ func TestMergeTOML(t *testing.T) {
 	expected := "title = \"Structured Merge\"\n\n[package]\nname = \"structuredmerge\"\ntags = [\"destination\"]\nversion = \"0.2.0\"\n\n[package.meta]\nauthors = [\"pb\"]\nenabled = false\nrelease = true\n"
 	if *result.Output != expected {
 		t.Fatalf("unexpected output:\n%s", *result.Output)
-	}
-
-	pigeonResult := MergeTOMLWithBackend(
-		"title = \"Structured Merge\"\n\n[package]\nname = \"structuredmerge\"\ntags = [\"template\"]\nversion = \"0.1.0\"\n\n[package.meta]\nenabled = false\n",
-		"[package]\ntags = [\"destination\"]\nversion = \"0.2.0\"\n\n[package.meta]\nauthors = [\"pb\"]\nrelease = true\n",
-		DialectTOML,
-		BackendPigeon,
-	)
-	if !pigeonResult.OK || pigeonResult.Output == nil {
-		t.Fatalf("expected pigeon merge success: %+v", pigeonResult)
-	}
-	if *pigeonResult.Output != expected {
-		t.Fatalf("unexpected pigeon output:\n%s", *pigeonResult.Output)
 	}
 }

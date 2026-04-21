@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -26,6 +27,21 @@ func readTOMLFixture(t *testing.T, parts ...string) map[string]any {
 	return fixture
 }
 
+func jsonReady(t *testing.T, value any) any {
+	t.Helper()
+	source, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal value: %v", err)
+	}
+
+	var normalized any
+	if err := json.Unmarshal(source, &normalized); err != nil {
+		t.Fatalf("decode value: %v", err)
+	}
+
+	return normalized
+}
+
 func TestSharedFixtureTOMLFeatureProfile(t *testing.T) {
 	fixture := readTOMLFixture(t, "diagnostics", "slice-90-toml-family-feature-profile", "toml-feature-profile.json")
 	profile := TOMLFeatureProfileInfo()
@@ -41,47 +57,30 @@ func TestSharedFixtureTOMLFeatureProfile(t *testing.T) {
 		t.Fatalf("unexpected policies: %+v", profile.SupportedPolicies)
 	}
 
-	nativeProfile := TOMLBackendFeatureProfileInfo(BackendNative)
-	if nativeProfile.Backend != "go-toml-v2" || nativeProfile.BackendRef == nil || nativeProfile.BackendRef.Family != "builtin" {
-		t.Fatalf("unexpected native backend profile: %+v", nativeProfile)
-	}
-	pigeonProfile := TOMLBackendFeatureProfileInfo(BackendPigeon)
-	if pigeonProfile.Backend != "pigeon" || pigeonProfile.BackendRef == nil || pigeonProfile.BackendRef.Family != "peg" {
-		t.Fatalf("unexpected pigeon backend profile: %+v", pigeonProfile)
+	treeSitterProfile := TOMLBackendFeatureProfileInfo(BackendTreeSitter)
+	if treeSitterProfile.Backend != "kreuzberg-language-pack" || treeSitterProfile.BackendRef == nil || treeSitterProfile.BackendRef.Family != "tree-sitter" {
+		t.Fatalf("unexpected tree-sitter backend profile: %+v", treeSitterProfile)
 	}
 }
 
 func TestSharedFixtureTOMLBackendFeatureProfiles(t *testing.T) {
 	fixture := readTOMLFixture(t, "diagnostics", "slice-135-toml-family-backend-feature-profiles", "go-toml-backend-feature-profiles.json")
 
-	nativeProfile := TOMLBackendFeatureProfileInfo(BackendNative)
-	if nativeProfile.Backend != fixture["native"].(map[string]any)["backend"].(string) {
-		t.Fatalf("unexpected native backend feature profile: %+v", nativeProfile)
-	}
-
-	pigeonProfile := TOMLBackendFeatureProfileInfo(BackendPigeon)
-	if pigeonProfile.Backend != fixture["pigeon"].(map[string]any)["backend"].(string) {
-		t.Fatalf("unexpected pigeon backend feature profile: %+v", pigeonProfile)
+	treeSitterProfile := TOMLBackendFeatureProfileInfo(BackendTreeSitter)
+	if treeSitterProfile.Backend != fixture["tree_sitter"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected tree-sitter backend feature profile: %+v", treeSitterProfile)
 	}
 }
 
 func TestSharedFixtureTOMLPlanContexts(t *testing.T) {
 	fixture := readTOMLFixture(t, "diagnostics", "slice-136-toml-family-plan-contexts", "go-toml-plan-contexts.json")
 
-	nativeContext := TOMLPlanContext(BackendNative)
-	if nativeContext.FamilyProfile.Family != fixture["native"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
-		t.Fatalf("unexpected native plan context: %+v", nativeContext)
+	context := TOMLPlanContext(BackendTreeSitter)
+	if context.FamilyProfile.Family != fixture["tree_sitter"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
+		t.Fatalf("unexpected plan context: %+v", context)
 	}
-	if nativeContext.FeatureProfile == nil || nativeContext.FeatureProfile.Backend != fixture["native"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
-		t.Fatalf("unexpected native feature profile: %+v", nativeContext.FeatureProfile)
-	}
-
-	pigeonContext := TOMLPlanContext(BackendPigeon)
-	if pigeonContext.FamilyProfile.Family != fixture["pigeon"].(map[string]any)["family_profile"].(map[string]any)["family"].(string) {
-		t.Fatalf("unexpected pigeon plan context: %+v", pigeonContext)
-	}
-	if pigeonContext.FeatureProfile == nil || pigeonContext.FeatureProfile.Backend != fixture["pigeon"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
-		t.Fatalf("unexpected pigeon feature profile: %+v", pigeonContext.FeatureProfile)
+	if context.FeatureProfile == nil || context.FeatureProfile.Backend != fixture["tree_sitter"].(map[string]any)["feature_profile"].(map[string]any)["backend"].(string) {
+		t.Fatalf("unexpected feature profile: %+v", context.FeatureProfile)
 	}
 }
 
@@ -129,12 +128,6 @@ func TestCanonicalManifestIncludesTOMLPaths(t *testing.T) {
 	if path := astmerge.ConformanceFixturePath(manifest, "toml", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-92-structure", "table-and-array.json") {
 		t.Fatalf("unexpected canonical analysis fixture path: %v", path)
 	}
-	if path := astmerge.ConformanceFixturePath(manifest, "toml", "matching"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-93-matching", "path-equality.json") {
-		t.Fatalf("unexpected canonical matching fixture path: %v", path)
-	}
-	if path := astmerge.ConformanceFixturePath(manifest, "toml", "merge"); path == nil || filepath.Join(path...) != filepath.Join("toml", "slice-94-merge", "table-merge.json") {
-		t.Fatalf("unexpected canonical merge fixture path: %v", path)
-	}
 }
 
 func TestSharedFixtureTOMLParse(t *testing.T) {
@@ -154,15 +147,6 @@ func TestSharedFixtureTOMLParse(t *testing.T) {
 	}
 	if len(invalidResult.Diagnostics) != 1 || string(invalidResult.Diagnostics[0].Category) != "parse_error" {
 		t.Fatalf("unexpected invalid diagnostics: %+v", invalidResult.Diagnostics)
-	}
-
-	pigeonValid := ParseTOMLWithBackend(valid["source"].(string), DialectTOML, BackendPigeon)
-	if !pigeonValid.OK || pigeonValid.Analysis == nil {
-		t.Fatalf("unexpected pigeon parse success result: %+v", pigeonValid)
-	}
-	pigeonInvalid := ParseTOMLWithBackend(invalid["source"].(string), DialectTOML, BackendPigeon)
-	if pigeonInvalid.OK || len(pigeonInvalid.Diagnostics) != 1 || string(pigeonInvalid.Diagnostics[0].Category) != "parse_error" {
-		t.Fatalf("unexpected pigeon parse failure result: %+v", pigeonInvalid)
 	}
 }
 
@@ -217,14 +201,6 @@ func TestSharedFixtureTOMLMerge(t *testing.T) {
 		t.Fatalf("unexpected merge output:\n%s", *mergeResult.Output)
 	}
 
-	pigeonMergeResult := MergeTOMLWithBackend(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectTOML, BackendPigeon)
-	if !pigeonMergeResult.OK || pigeonMergeResult.Output == nil {
-		t.Fatalf("expected pigeon merge success: %+v", pigeonMergeResult)
-	}
-	if *pigeonMergeResult.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
-		t.Fatalf("unexpected pigeon merge output:\n%s", *pigeonMergeResult.Output)
-	}
-
 	invalidTemplate := readTOMLFixture(t, "toml", "slice-94-merge", "invalid-template.json")
 	invalidTemplateResult := MergeTOML(invalidTemplate["template"].(string), invalidTemplate["destination"].(string), DialectTOML)
 	if invalidTemplateResult.OK || len(invalidTemplateResult.Diagnostics) != 1 || string(invalidTemplateResult.Diagnostics[0].Category) != "parse_error" {
@@ -236,9 +212,136 @@ func TestSharedFixtureTOMLMerge(t *testing.T) {
 	if invalidDestinationResult.OK || len(invalidDestinationResult.Diagnostics) != 1 || string(invalidDestinationResult.Diagnostics[0].Category) != "destination_parse_error" {
 		t.Fatalf("unexpected invalid destination result: %+v", invalidDestinationResult)
 	}
+}
 
-	pigeonInvalidDestinationResult := MergeTOMLWithBackend(invalidDestination["template"].(string), invalidDestination["destination"].(string), DialectTOML, BackendPigeon)
-	if pigeonInvalidDestinationResult.OK || len(pigeonInvalidDestinationResult.Diagnostics) != 1 || string(pigeonInvalidDestinationResult.Diagnostics[0].Category) != "destination_parse_error" {
-		t.Fatalf("unexpected pigeon invalid destination result: %+v", pigeonInvalidDestinationResult)
+func TestSharedFixtureTOMLNamedSuitePlans(t *testing.T) {
+	fixture := readTOMLFixture(t, "diagnostics", "slice-139-toml-family-named-suite-plans", "go-toml-named-suite-plans.json")
+	source, err := json.Marshal(fixture["manifest"])
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	plans := astmerge.PlanNamedConformanceSuites(manifest, map[string]astmerge.ConformanceFamilyPlanContext{
+		"toml": TOMLPlanContext(BackendTreeSitter),
+	})
+
+	projected := make([]map[string]any, 0, len(plans))
+	for _, entry := range plans {
+		planEntries := make([]map[string]any, 0, len(entry.Plan.Entries))
+		for _, planEntry := range entry.Plan.Entries {
+			run := map[string]any{
+				"ref":          map[string]any{"family": planEntry.Run.Ref.Family, "role": planEntry.Run.Ref.Role, "case": planEntry.Run.Ref.Case},
+				"requirements": map[string]any{},
+			}
+			run["family_profile"] = map[string]any{
+				"family":             planEntry.Run.FamilyProfile.Family,
+				"supported_dialects": planEntry.Run.FamilyProfile.SupportedDialects,
+				"supported_policies": planEntry.Run.FamilyProfile.SupportedPolicies,
+			}
+			run["feature_profile"] = map[string]any{
+				"backend":            planEntry.Run.FeatureProfile.Backend,
+				"supports_dialects":  planEntry.Run.FeatureProfile.SupportsDialects,
+				"supported_policies": planEntry.Run.FeatureProfile.SupportedPolicies,
+			}
+			planEntries = append(planEntries, map[string]any{
+				"ref":  map[string]any{"family": planEntry.Ref.Family, "role": planEntry.Ref.Role, "case": planEntry.Ref.Case},
+				"path": planEntry.Path,
+				"run":  run,
+			})
+		}
+
+		projected = append(projected, map[string]any{
+			"suite": entry.Suite,
+			"plan": map[string]any{
+				"family":        entry.Plan.Family,
+				"entries":       planEntries,
+				"missing_roles": entry.Plan.MissingRoles,
+			},
+		})
+	}
+
+	if actual := jsonReady(t, projected); !reflect.DeepEqual(actual, fixture["expected_entries"]) {
+		t.Fatalf("unexpected plans: %+v", actual)
+	}
+}
+
+func TestSharedFixtureTOMLManifestReport(t *testing.T) {
+	fixture := readTOMLFixture(t, "diagnostics", "slice-140-toml-family-manifest-report", "go-toml-manifest-report.json")
+	source, err := json.Marshal(fixture["manifest"])
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	executionsSource, err := json.Marshal(fixture["executions"])
+	if err != nil {
+		t.Fatalf("marshal executions: %v", err)
+	}
+
+	var executions map[string]astmerge.ConformanceCaseExecution
+	if err := json.Unmarshal(executionsSource, &executions); err != nil {
+		t.Fatalf("decode executions: %v", err)
+	}
+
+	entries := astmerge.ReportPlannedNamedConformanceSuites(
+		astmerge.PlanNamedConformanceSuites(manifest, map[string]astmerge.ConformanceFamilyPlanContext{
+			"toml": TOMLPlanContext(BackendTreeSitter),
+		}),
+		func(run astmerge.ConformanceCaseRun) astmerge.ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if result, ok := executions[key]; ok {
+				return result
+			}
+			return astmerge.ConformanceCaseExecution{Outcome: "failed", Messages: []string{"missing execution"}}
+		},
+	)
+
+	report := astmerge.ReportNamedConformanceSuiteEnvelope(entries)
+	projected := map[string]any{
+		"report": map[string]any{
+			"entries": make([]map[string]any, 0, len(report.Entries)),
+			"summary": map[string]any{
+				"total": report.Summary.Total, "passed": report.Summary.Passed,
+				"failed": report.Summary.Failed, "skipped": report.Summary.Skipped,
+			},
+		},
+		"diagnostics": []any{},
+	}
+	for _, entry := range report.Entries {
+		results := make([]map[string]any, 0, len(entry.Report.Results))
+		for _, result := range entry.Report.Results {
+			results = append(results, map[string]any{
+				"ref": map[string]any{
+					"family": result.Ref.Family,
+					"role":   result.Ref.Role,
+					"case":   result.Ref.Case,
+				},
+				"outcome":  result.Outcome,
+				"messages": result.Messages,
+			})
+		}
+		projected["report"].(map[string]any)["entries"] = append(projected["report"].(map[string]any)["entries"].([]map[string]any), map[string]any{
+			"suite": entry.Suite,
+			"report": map[string]any{
+				"results": results,
+				"summary": map[string]any{
+					"total": entry.Report.Summary.Total, "passed": entry.Report.Summary.Passed,
+					"failed": entry.Report.Summary.Failed, "skipped": entry.Report.Summary.Skipped,
+				},
+			},
+		})
+	}
+
+	if actual := jsonReady(t, projected); !reflect.DeepEqual(actual, fixture["expected_report"]) {
+		t.Fatalf("unexpected report: %+v", actual)
 	}
 }

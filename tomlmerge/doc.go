@@ -1,2 +1,2 @@
-// Package tomlmerge implements the baseline TOML family path for structured merge.
+// Package tomlmerge implements the tree-sitter TOML substrate for structured merge.
 package tomlmerge
