@@ -179,3 +179,27 @@ func TestSharedFixtureGoProviderManifestReport(t *testing.T) {
 		t.Fatalf("unexpected report: %+v", actual)
 	}
 }
+
+func TestSharedFixtureGoProviderRejectsUnsupportedBackendOverrides(t *testing.T) {
+	expectedDiagnostics := []map[string]any{{
+		"severity": "error",
+		"category": "unsupported_feature",
+		"message":  "Unsupported Go backend kreuzberg-language-pack.",
+	}}
+
+	parseResult := ParseGo("func Greet() string { return \"hi\" }\n", gomerge.DialectGo, "kreuzberg-language-pack")
+	if parseResult.OK {
+		t.Fatalf("expected parse failure: %+v", parseResult)
+	}
+	if actual := jsonReady(t, parseResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected parse diagnostics: %+v", actual)
+	}
+
+	mergeResult := MergeGo("func A() {}\n", "func B() {}\n", gomerge.DialectGo, "kreuzberg-language-pack")
+	if mergeResult.OK {
+		t.Fatalf("expected merge failure: %+v", mergeResult)
+	}
+	if actual := jsonReady(t, mergeResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected merge diagnostics: %+v", actual)
+	}
+}

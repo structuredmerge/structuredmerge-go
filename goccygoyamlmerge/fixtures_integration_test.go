@@ -209,3 +209,27 @@ func TestSharedFixtureYAMLProviderManifestReport(t *testing.T) {
 		t.Fatalf("unexpected report: %+v", actual)
 	}
 }
+
+func TestSharedFixtureYAMLProviderRejectsUnsupportedBackendOverrides(t *testing.T) {
+	expectedDiagnostics := []map[string]any{{
+		"severity": "error",
+		"category": "unsupported_feature",
+		"message":  "Unsupported YAML backend kreuzberg-language-pack.",
+	}}
+
+	parseResult := ParseYAML("name: structuredmerge\n", yamlmerge.DialectYAML, "kreuzberg-language-pack")
+	if parseResult.OK {
+		t.Fatalf("expected parse failure: %+v", parseResult)
+	}
+	if actual := jsonReady(t, parseResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected parse diagnostics: %+v", actual)
+	}
+
+	mergeResult := MergeYAML("name: a\n", "name: b\n", yamlmerge.DialectYAML, "kreuzberg-language-pack")
+	if mergeResult.OK {
+		t.Fatalf("expected merge failure: %+v", mergeResult)
+	}
+	if actual := jsonReady(t, mergeResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected merge diagnostics: %+v", actual)
+	}
+}

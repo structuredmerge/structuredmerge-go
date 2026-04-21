@@ -258,3 +258,18 @@ func TestSharedFixtureMarkdownProviderManifestReport(t *testing.T) {
 		t.Fatalf("unexpected report: %+v", actual)
 	}
 }
+
+func TestSharedFixtureMarkdownProviderRejectsUnsupportedBackendOverrides(t *testing.T) {
+	parseResult := ParseMarkdown("# Title\n", markdownmerge.DialectMarkdown, "kreuzberg-language-pack")
+	expectedDiagnostics := []map[string]any{{
+		"severity": "error",
+		"category": "unsupported_feature",
+		"message":  "Unsupported Markdown backend kreuzberg-language-pack.",
+	}}
+	if parseResult.OK {
+		t.Fatalf("expected parse failure: %+v", parseResult)
+	}
+	if actual := jsonReady(t, parseResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected parse diagnostics: %+v", actual)
+	}
+}

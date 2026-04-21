@@ -269,3 +269,27 @@ func TestSharedFixtureTOMLProviderManifestReport(t *testing.T) {
 		t.Fatalf("unexpected report: %+v", actual)
 	}
 }
+
+func TestSharedFixtureTOMLProviderRejectsUnsupportedBackendOverrides(t *testing.T) {
+	expectedDiagnostics := []map[string]any{{
+		"severity": "error",
+		"category": "unsupported_feature",
+		"message":  "Unsupported TOML backend kreuzberg-language-pack.",
+	}}
+
+	parseResult := ParseTOML("title = \"x\"\n", tomlmerge.DialectTOML, "kreuzberg-language-pack")
+	if parseResult.OK {
+		t.Fatalf("expected parse failure: %+v", parseResult)
+	}
+	if actual := jsonReady(t, parseResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected parse diagnostics: %+v", actual)
+	}
+
+	mergeResult := MergeTOML("title = \"x\"\n", "title = \"y\"\n", tomlmerge.DialectTOML, "kreuzberg-language-pack")
+	if mergeResult.OK {
+		t.Fatalf("expected merge failure: %+v", mergeResult)
+	}
+	if actual := jsonReady(t, mergeResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected merge diagnostics: %+v", actual)
+	}
+}
