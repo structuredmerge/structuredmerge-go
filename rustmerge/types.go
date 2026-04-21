@@ -10,9 +10,11 @@ import (
 )
 
 type RustDialect string
+type RustBackend string
 
 const (
 	DialectRust RustDialect = "rust"
+	BackendTreeSitter RustBackend = "kreuzberg-language-pack"
 )
 
 type RustOwnerKind string
@@ -69,6 +71,13 @@ type RustFeatureProfile struct {
 	SupportedPolicies []astmerge.PolicyReference
 }
 
+type RustBackendFeatureProfile struct {
+	Backend           string
+	BackendRef        *treehaver.BackendReference
+	SupportsDialects  bool
+	SupportedPolicies []astmerge.PolicyReference
+}
+
 func destinationWinsArrayPolicy() astmerge.PolicyReference {
 	return astmerge.PolicyReference{Surface: astmerge.PolicySurfaceArray, Name: "destination_wins_array"}
 }
@@ -79,6 +88,49 @@ func RustFeatureProfileInfo() RustFeatureProfile {
 		SupportedDialects: []RustDialect{DialectRust},
 		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 	}
+}
+
+func RustBackendFeatureProfileInfo(backend RustBackend) RustBackendFeatureProfile {
+	resolved := backend
+	if resolved == "" {
+		resolved = BackendTreeSitter
+	}
+
+	if resolved != BackendTreeSitter {
+		return RustBackendFeatureProfile{
+			Backend:           string(resolved),
+			BackendRef:        nil,
+			SupportsDialects:  false,
+			SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+		}
+	}
+
+	return RustBackendFeatureProfile{
+		Backend:           treehaver.KreuzbergLanguagePackBackend.ID,
+		BackendRef:        &treehaver.KreuzbergLanguagePackBackend,
+		SupportsDialects:  true,
+		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+	}
+}
+
+func RustPlanContext(backend RustBackend) astmerge.ConformanceFamilyPlanContext {
+	backendProfile := RustBackendFeatureProfileInfo(backend)
+	return astmerge.ConformanceFamilyPlanContext{
+		FamilyProfile: astmerge.FamilyFeatureProfile{
+			Family:            RustFeatureProfileInfo().Family,
+			SupportedDialects: []string{string(DialectRust)},
+			SupportedPolicies: RustFeatureProfileInfo().SupportedPolicies,
+		},
+		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
+			Backend:           backendProfile.Backend,
+			SupportsDialects:  backendProfile.SupportsDialects,
+			SupportedPolicies: backendProfile.SupportedPolicies,
+		},
+	}
+}
+
+func RustBackends() []RustBackend {
+	return []RustBackend{BackendTreeSitter}
 }
 
 func parseRequest(source string) treehaver.ParserRequest {

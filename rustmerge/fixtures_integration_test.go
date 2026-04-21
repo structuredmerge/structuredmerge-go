@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -19,6 +20,18 @@ func readRustFixture(t *testing.T, parts ...string) map[string]any {
 		t.Fatalf("parse fixture: %v", err)
 	}
 	return fixture
+}
+
+func jsonReadyRust(value any) any {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		panic(err)
+	}
+	return decoded
 }
 
 func TestRustFixtures(t *testing.T) {
@@ -45,5 +58,24 @@ func TestRustFixtures(t *testing.T) {
 	merge := MergeRust(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectRust)
 	if !merge.OK || merge.Output == nil || *merge.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
 		t.Fatalf("unexpected merge: %+v", merge)
+	}
+
+	backendProfileFixture := readRustFixture(t, "diagnostics", "slice-122-source-family-backend-feature-profiles", "rust-backend-feature-profiles.json")
+	treeSitterBackendProfile := RustBackendFeatureProfileInfo(BackendTreeSitter)
+	if !reflect.DeepEqual(jsonReadyRust(map[string]any{
+		"backend":            treeSitterBackendProfile.Backend,
+		"supports_dialects":  treeSitterBackendProfile.SupportsDialects,
+		"supported_policies": treeSitterBackendProfile.SupportedPolicies,
+		"backend_ref": map[string]any{
+			"id":     treeSitterBackendProfile.BackendRef.ID,
+			"family": treeSitterBackendProfile.BackendRef.Family,
+		},
+	}), backendProfileFixture["tree_sitter"]) {
+		t.Fatalf("unexpected backend profile: %+v", treeSitterBackendProfile)
+	}
+
+	planContextFixture := readRustFixture(t, "diagnostics", "slice-123-source-family-plan-contexts", "rust-plan-contexts.json")
+	if !reflect.DeepEqual(jsonReadyRust(RustPlanContext(BackendTreeSitter)), planContextFixture["tree_sitter"]) {
+		t.Fatalf("unexpected plan context: %+v", RustPlanContext(BackendTreeSitter))
 	}
 }
