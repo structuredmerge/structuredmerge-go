@@ -44,7 +44,16 @@ func readGoldmarkFixture(t *testing.T, parts ...string) map[string]any {
 }
 
 func TestSharedFixtureMarkdownProviderFeatureProfile(t *testing.T) {
+	familyFixture := readGoldmarkFixture(t, "diagnostics", "slice-194-markdown-family-feature-profile", "markdown-feature-profile.json")
 	fixture := readGoldmarkFixture(t, "diagnostics", "slice-204-markdown-provider-feature-profiles", "go-markdown-provider-feature-profiles.json")
+	familyProfile := markdownmerge.MarkdownFeatureProfileInfo()
+	if actual := jsonReady(t, map[string]any{
+		"family":             familyProfile.Family,
+		"supported_dialects": familyProfile.SupportedDialects,
+		"supported_policies": familyProfile.SupportedPolicies,
+	}); !reflect.DeepEqual(actual, familyFixture["feature_profile"]) {
+		t.Fatalf("unexpected family profile: %+v", actual)
+	}
 	expected := fixture["providers"].(map[string]any)["goldmark"].(map[string]any)["feature_profile"]
 	profile := MarkdownBackendFeatureProfileInfo()
 	actual := jsonReady(t, map[string]any{

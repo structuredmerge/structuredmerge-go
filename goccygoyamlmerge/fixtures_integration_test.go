@@ -44,7 +44,16 @@ func readFixture(t *testing.T, parts ...string) map[string]any {
 }
 
 func TestSharedFixtureYAMLProviderFeatureProfile(t *testing.T) {
+	familyFixture := readFixture(t, "diagnostics", "slice-95-yaml-family-feature-profile", "yaml-feature-profile.json")
 	fixture := readFixture(t, "diagnostics", "slice-277-yaml-provider-feature-profiles", "go-yaml-provider-feature-profiles.json")
+	familyProfile := yamlmerge.YAMLFeatureProfileInfo()
+	if actual := jsonReady(t, map[string]any{
+		"family":             familyProfile.Family,
+		"supported_dialects": familyProfile.SupportedDialects,
+		"supported_policies": familyProfile.SupportedPolicies,
+	}); !reflect.DeepEqual(actual, familyFixture["feature_profile"]) {
+		t.Fatalf("unexpected family profile: %+v", actual)
+	}
 	if len(AvailableYAMLBackends()) != 1 || AvailableYAMLBackends()[0] != BackendGoccyGoYAML {
 		t.Fatalf("unexpected backends: %+v", AvailableYAMLBackends())
 	}
@@ -80,6 +89,25 @@ func TestSharedFixtureYAMLProviderParseAndMerge(t *testing.T) {
 	validResult := ParseYAML(valid["source"].(string), yamlmerge.DialectYAML)
 	if !validResult.OK || validResult.Analysis == nil {
 		t.Fatalf("expected parse success: %+v", validResult)
+	}
+	structureFixture := readFixture(t, "yaml", "slice-97-structure", "mapping-and-sequence.json")
+	structureResult := ParseYAML(structureFixture["source"].(string), yamlmerge.DialectYAML)
+	if !structureResult.OK || structureResult.Analysis == nil {
+		t.Fatalf("expected structure parse success: %+v", structureResult)
+	}
+	owners := make([]map[string]any, 0, len(structureResult.Analysis.Owners))
+	for _, owner := range structureResult.Analysis.Owners {
+		entry := map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+		}
+		if owner.MatchKey != "" {
+			entry["match_key"] = owner.MatchKey
+		}
+		owners = append(owners, entry)
+	}
+	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, structureFixture["expected"].(map[string]any)["owners"]) {
+		t.Fatalf("unexpected structure owners: %+v", actual)
 	}
 
 	matchingFixture := readFixture(t, "yaml", "slice-98-matching", "path-equality.json")

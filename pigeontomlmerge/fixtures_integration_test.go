@@ -44,7 +44,16 @@ func readFixture(t *testing.T, parts ...string) map[string]any {
 }
 
 func TestSharedFixtureTOMLProviderFeatureProfile(t *testing.T) {
+	familyFixture := readFixture(t, "diagnostics", "slice-90-toml-family-feature-profile", "toml-feature-profile.json")
 	fixture := readFixture(t, "diagnostics", "slice-269-toml-provider-feature-profiles", "go-toml-provider-feature-profiles.json")
+	familyProfile := tomlmerge.TOMLFeatureProfileInfo()
+	if actual := jsonReady(t, map[string]any{
+		"family":             familyProfile.Family,
+		"supported_dialects": familyProfile.SupportedDialects,
+		"supported_policies": familyProfile.SupportedPolicies,
+	}); !reflect.DeepEqual(actual, familyFixture["feature_profile"]) {
+		t.Fatalf("unexpected family profile: %+v", actual)
+	}
 	if len(AvailableTOMLBackends()) != 1 || AvailableTOMLBackends()[0] != BackendPigeon {
 		t.Fatalf("unexpected backends: %+v", AvailableTOMLBackends())
 	}
@@ -80,6 +89,25 @@ func TestSharedFixtureTOMLProviderParseAndMerge(t *testing.T) {
 	validResult := ParseTOML(valid["source"].(string), tomlmerge.DialectTOML)
 	if !validResult.OK || validResult.Analysis == nil {
 		t.Fatalf("expected parse success: %+v", validResult)
+	}
+	structureFixture := readFixture(t, "toml", "slice-92-structure", "table-and-array.json")
+	structureResult := ParseTOML(structureFixture["source"].(string), tomlmerge.DialectTOML)
+	if !structureResult.OK || structureResult.Analysis == nil {
+		t.Fatalf("expected structure parse success: %+v", structureResult)
+	}
+	owners := make([]map[string]any, 0, len(structureResult.Analysis.Owners))
+	for _, owner := range structureResult.Analysis.Owners {
+		entry := map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+		}
+		if owner.MatchKey != "" {
+			entry["match_key"] = owner.MatchKey
+		}
+		owners = append(owners, entry)
+	}
+	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, structureFixture["expected"].(map[string]any)["owners"]) {
+		t.Fatalf("unexpected structure owners: %+v", actual)
 	}
 
 	matchingFixture := readFixture(t, "toml", "slice-93-matching", "path-equality.json")
