@@ -41,6 +41,22 @@ func jsonReadyYAML(t *testing.T, value any) any {
 	return normalized
 }
 
+func parseYAMLConformanceCaseExecution(t *testing.T, raw map[string]any) astmerge.ConformanceCaseExecution {
+	t.Helper()
+
+	source, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("marshal execution: %v", err)
+	}
+
+	var execution astmerge.ConformanceCaseExecution
+	if err := json.Unmarshal(source, &execution); err != nil {
+		t.Fatalf("decode execution: %v", err)
+	}
+
+	return execution
+}
+
 func TestSharedFixtureYAMLFeatureProfile(t *testing.T) {
 	fixture := readYAMLFixture(t, "diagnostics", "slice-95-yaml-family-feature-profile", "yaml-feature-profile.json")
 	profile := YAMLFeatureProfileInfo()
@@ -136,6 +152,74 @@ func TestSharedFixtureYAMLManifest(t *testing.T) {
 	}
 	if path := astmerge.ConformanceFixturePath(manifest, "yaml", "merge"); path == nil || filepath.Join(path...) != filepath.Join("yaml", "slice-99-merge", "mapping-merge.json") {
 		t.Fatalf("unexpected merge fixture path: %v", path)
+	}
+}
+
+func TestSharedFixtureYAMLBackendNamedSuitePlans(t *testing.T) {
+	fixture := readYAMLFixture(t, "diagnostics", "slice-173-yaml-family-backend-named-suite-plans", "go-yaml-backend-named-suite-plans.json")
+	source, err := json.Marshal(fixture["manifest"])
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	contextSource, err := json.Marshal(fixture["contexts"])
+	if err != nil {
+		t.Fatalf("marshal contexts: %v", err)
+	}
+	var contexts map[string]astmerge.ConformanceFamilyPlanContext
+	if err := json.Unmarshal(contextSource, &contexts); err != nil {
+		t.Fatalf("decode contexts: %v", err)
+	}
+
+	if actual := jsonReadyYAML(t, astmerge.PlanNamedConformanceSuites(manifest, contexts)); !reflect.DeepEqual(actual, fixture["expected_entries"]) {
+		t.Fatalf("unexpected backend named suite plans: %+v", actual)
+	}
+}
+
+func TestSharedFixtureYAMLBackendManifestReport(t *testing.T) {
+	fixture := readYAMLFixture(t, "diagnostics", "slice-174-yaml-family-backend-manifest-report", "go-yaml-backend-manifest-report.json")
+	source, err := json.Marshal(fixture["manifest"])
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(source, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+
+	optionsSource, err := json.Marshal(fixture["options"])
+	if err != nil {
+		t.Fatalf("marshal options: %v", err)
+	}
+	var options astmerge.ConformanceManifestPlanningOptions
+	if err := json.Unmarshal(optionsSource, &options); err != nil {
+		t.Fatalf("decode options: %v", err)
+	}
+
+	executionsRaw := fixture["executions"].(map[string]any)
+	report := astmerge.ReportConformanceManifest(
+		manifest,
+		options,
+		func(run astmerge.ConformanceCaseRun) astmerge.ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseYAMLConformanceCaseExecution(t, raw.(map[string]any))
+			}
+			return astmerge.ConformanceCaseExecution{
+				Outcome:  astmerge.ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+	)
+
+	if actual := jsonReadyYAML(t, report); !reflect.DeepEqual(actual, fixture["expected_report"]) {
+		t.Fatalf("unexpected backend manifest report: %+v", actual)
 	}
 }
 
