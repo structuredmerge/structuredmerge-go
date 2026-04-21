@@ -10,9 +10,11 @@ import (
 )
 
 type TypeScriptDialect string
+type TypeScriptBackend string
 
 const (
-	DialectTypeScript TypeScriptDialect = "typescript"
+	DialectTypeScript  TypeScriptDialect = "typescript"
+	BackendTreeSitter  TypeScriptBackend = "kreuzberg-language-pack"
 )
 
 type TypeScriptOwnerKind string
@@ -69,6 +71,13 @@ type TypeScriptFeatureProfile struct {
 	SupportedPolicies []astmerge.PolicyReference
 }
 
+type TypeScriptBackendFeatureProfile struct {
+	Backend           string
+	BackendRef        *treehaver.BackendReference
+	SupportsDialects  bool
+	SupportedPolicies []astmerge.PolicyReference
+}
+
 func destinationWinsArrayPolicy() astmerge.PolicyReference {
 	return astmerge.PolicyReference{Surface: astmerge.PolicySurfaceArray, Name: "destination_wins_array"}
 }
@@ -79,6 +88,43 @@ func TypeScriptFeatureProfileInfo() TypeScriptFeatureProfile {
 		SupportedDialects: []TypeScriptDialect{DialectTypeScript},
 		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 	}
+}
+
+func TypeScriptBackendFeatureProfileInfo(backend TypeScriptBackend) TypeScriptBackendFeatureProfile {
+	resolved := resolveBackend(backend)
+	return TypeScriptBackendFeatureProfile{
+		Backend:           string(resolved),
+		BackendRef:        &treehaver.KreuzbergLanguagePackBackend,
+		SupportsDialects:  true,
+		SupportedPolicies: []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+	}
+}
+
+func TypeScriptPlanContext(backend TypeScriptBackend) astmerge.ConformanceFamilyPlanContext {
+	backendProfile := TypeScriptBackendFeatureProfileInfo(backend)
+	return astmerge.ConformanceFamilyPlanContext{
+		FamilyProfile: astmerge.FamilyFeatureProfile{
+			Family:            TypeScriptFeatureProfileInfo().Family,
+			SupportedDialects: []string{string(DialectTypeScript)},
+			SupportedPolicies: TypeScriptFeatureProfileInfo().SupportedPolicies,
+		},
+		FeatureProfile: &astmerge.ConformanceFeatureProfileView{
+			Backend:           backendProfile.Backend,
+			SupportsDialects:  backendProfile.SupportsDialects,
+			SupportedPolicies: backendProfile.SupportedPolicies,
+		},
+	}
+}
+
+func TypeScriptBackends() []TypeScriptBackend {
+	return []TypeScriptBackend{BackendTreeSitter}
+}
+
+func resolveBackend(backend TypeScriptBackend) TypeScriptBackend {
+	if backend == "" {
+		return BackendTreeSitter
+	}
+	return backend
 }
 
 func parseRequest(source string) treehaver.ParserRequest {
@@ -104,6 +150,24 @@ func lineAnchoredSpan(source string, span treehaver.ProcessSpan) string {
 }
 
 func ParseTypeScript(source string, _dialect TypeScriptDialect) astmerge.ParseResult[TypeScriptAnalysis] {
+	return ParseTypeScriptWithBackend(source, DialectTypeScript, BackendTreeSitter)
+}
+
+func ParseTypeScriptWithBackend(source string, _dialect TypeScriptDialect, backend TypeScriptBackend) astmerge.ParseResult[TypeScriptAnalysis] {
+	resolved := resolveBackend(backend)
+	if resolved != BackendTreeSitter {
+		return astmerge.ParseResult[TypeScriptAnalysis]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{
+				{
+					Severity: astmerge.SeverityError,
+					Category: astmerge.CategoryUnsupportedFeature,
+					Message:  "Unsupported TypeScript backend " + string(resolved) + ".",
+				},
+			},
+		}
+	}
+
 	parsed := treehaver.ParseWithLanguagePack(parseRequest(source))
 	if !parsed.OK {
 		return astmerge.ParseResult[TypeScriptAnalysis]{OK: false, Diagnostics: parsed.Diagnostics}
