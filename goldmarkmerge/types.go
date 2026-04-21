@@ -5,11 +5,16 @@ import (
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/markdownmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/text"
 )
 
 const BackendGoldmark = "goldmark"
+
+func init() {
+	treehaver.RegisterBackend(treehaver.BackendReference{ID: BackendGoldmark, Family: "native"})
+}
 
 func unsupportedFeature(message string) astmerge.Diagnostic {
 	return astmerge.Diagnostic{

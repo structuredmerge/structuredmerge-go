@@ -9,6 +9,7 @@ import (
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/markdownmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 func jsonReady(t *testing.T, value any) any {
@@ -49,6 +50,9 @@ func TestSharedFixtureMarkdownProviderFeatureProfile(t *testing.T) {
 	}
 	if len(AvailableMarkdownBackends()) != 1 || AvailableMarkdownBackends()[0] != "goldmark" {
 		t.Fatalf("unexpected backends: %+v", AvailableMarkdownBackends())
+	}
+	if backend := treehaver.BackendReferenceByID(BackendGoldmark); backend == nil || backend.ID != BackendGoldmark || backend.Family != "native" {
+		t.Fatalf("unexpected registered backend: %+v", backend)
 	}
 }
 
