@@ -127,6 +127,25 @@ func TestRubyFixtures(t *testing.T) {
 		t.Fatalf("unexpected plan feature profile: %+v", planContext.FeatureProfile)
 	}
 
+	manifestFixture := readRubyFixture(t, "conformance", "slice-217-ruby-family-manifest", "ruby-family-manifest.json")
+	manifestSource, err := json.Marshal(manifestFixture)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var manifest astmerge.ConformanceManifest
+	if err := json.Unmarshal(manifestSource, &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	if path := astmerge.ConformanceFamilyFeatureProfilePath(manifest, "ruby"); path == nil || filepath.Join(path...) != filepath.Join("diagnostics", "slice-214-ruby-family-feature-profile", "ruby-feature-profile.json") {
+		t.Fatalf("unexpected ruby family profile path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "ruby", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("ruby", "slice-218-analysis", "module-owners.json") {
+		t.Fatalf("unexpected ruby analysis path: %v", path)
+	}
+	if path := astmerge.ConformanceFixturePath(manifest, "ruby", "matching"); path == nil || filepath.Join(path...) != filepath.Join("ruby", "slice-219-matching", "path-equality.json") {
+		t.Fatalf("unexpected ruby matching path: %v", path)
+	}
+
 	analysisFixture := readRubyFixture(t, "ruby", "slice-218-analysis", "module-owners.json")
 	analysis := ParseRuby(analysisFixture["source"].(string), DialectRuby)
 	if !analysis.OK || analysis.Analysis == nil {
