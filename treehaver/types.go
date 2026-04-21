@@ -115,15 +115,45 @@ var PigeonBackend = BackendReference{
 	Family: "peg",
 }
 
+var (
+	backendRegistryMu sync.RWMutex
+	backendRegistry   = map[string]BackendReference{
+		KreuzbergLanguagePackBackend.ID: KreuzbergLanguagePackBackend,
+		PigeonBackend.ID:                PigeonBackend,
+	}
+)
+
+func RegisterBackend(backend BackendReference) {
+	backendRegistryMu.Lock()
+	defer backendRegistryMu.Unlock()
+
+	backendRegistry[backend.ID] = backend
+}
+
 func BackendReferenceByID(id string) *BackendReference {
-	switch id {
-	case KreuzbergLanguagePackBackend.ID:
-		return &KreuzbergLanguagePackBackend
-	case PigeonBackend.ID:
-		return &PigeonBackend
-	default:
+	backendRegistryMu.RLock()
+	defer backendRegistryMu.RUnlock()
+
+	backend, ok := backendRegistry[id]
+	if !ok {
 		return nil
 	}
+	backendCopy := backend
+	return &backendCopy
+}
+
+func RegisteredBackends() []BackendReference {
+	backendRegistryMu.RLock()
+	defer backendRegistryMu.RUnlock()
+
+	backends := make([]BackendReference, 0, len(backendRegistry))
+	for _, backend := range backendRegistry {
+		backends = append(backends, backend)
+	}
+	slices.SortFunc(backends, func(left, right BackendReference) int {
+		return strings.Compare(left.ID, right.ID)
+	})
+	return backends
 }
 
 func LanguagePackAdapterInfo() AdapterInfo {

@@ -206,6 +206,27 @@ func TestPigeonBackendReference(t *testing.T) {
 	}
 }
 
+func TestRuntimeBackendRegistration(t *testing.T) {
+	RegisterBackend(BackendReference{ID: "custom-toml", Family: "native"})
+
+	backend := BackendReferenceByID("custom-toml")
+	if backend == nil || backend.ID != "custom-toml" || backend.Family != "native" {
+		t.Fatalf("unexpected custom backend: %+v", backend)
+	}
+
+	backends := RegisteredBackends()
+	found := false
+	for _, backend := range backends {
+		if backend.ID == "custom-toml" && backend.Family == "native" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("custom backend not present in registry: %+v", backends)
+	}
+}
+
 func TestSharedFixtureProcessBaseline(t *testing.T) {
 	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "process_baseline"))
 	requestFixture := fixture["request"].(map[string]any)
