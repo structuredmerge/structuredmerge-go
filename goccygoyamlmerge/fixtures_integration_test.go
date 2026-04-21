@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 	"github.com/structuredmerge/structuredmerge-go/yamlmerge"
 )
 
@@ -61,6 +62,9 @@ func TestSharedFixtureYAMLProviderFeatureProfile(t *testing.T) {
 	})
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("unexpected provider profile: %+v", profile)
+	}
+	if backend := treehaver.BackendReferenceByID(BackendGoccyGoYAML); backend == nil || backend.ID != BackendGoccyGoYAML || backend.Family != "native" {
+		t.Fatalf("unexpected registered backend: %+v", backend)
 	}
 }
 

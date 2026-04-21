@@ -9,6 +9,7 @@ import (
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/tomlmerge"
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 func jsonReady(t *testing.T, value any) any {
@@ -61,6 +62,9 @@ func TestSharedFixtureTOMLProviderFeatureProfile(t *testing.T) {
 	})
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("unexpected provider profile: %+v", profile)
+	}
+	if backend := treehaver.BackendReferenceByID(BackendPigeon); backend == nil || backend.ID != BackendPigeon || backend.Family != "peg" {
+		t.Fatalf("unexpected registered backend: %+v", backend)
 	}
 }
 
