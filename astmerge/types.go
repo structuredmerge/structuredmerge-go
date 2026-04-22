@@ -318,6 +318,37 @@ type TemplateTreeRunResult struct {
 	ApplyResult   TemplateApplyResult          `json:"apply_result"`
 }
 
+type TemplateTreeRunStatus string
+
+const (
+	TemplateTreeRunCreated TemplateTreeRunStatus = "created"
+	TemplateTreeRunUpdated TemplateTreeRunStatus = "updated"
+	TemplateTreeRunKept    TemplateTreeRunStatus = "kept"
+	TemplateTreeRunBlocked TemplateTreeRunStatus = "blocked"
+	TemplateTreeRunOmitted TemplateTreeRunStatus = "omitted"
+)
+
+type TemplateTreeRunReportEntry struct {
+	TemplateSourcePath     string                  `json:"template_source_path"`
+	LogicalDestinationPath string                  `json:"logical_destination_path"`
+	DestinationPath        *string                 `json:"destination_path"`
+	ExecutionAction        TemplateExecutionAction `json:"execution_action"`
+	Status                 TemplateTreeRunStatus   `json:"status"`
+}
+
+type TemplateTreeRunReportSummary struct {
+	Created int `json:"created"`
+	Updated int `json:"updated"`
+	Kept    int `json:"kept"`
+	Blocked int `json:"blocked"`
+	Omitted int `json:"omitted"`
+}
+
+type TemplateTreeRunReport struct {
+	Entries []TemplateTreeRunReportEntry `json:"entries"`
+	Summary TemplateTreeRunReportSummary `json:"summary"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -1382,6 +1413,73 @@ func RunTemplateTreeExecution(
 	}
 }
 
+func ReportTemplateTreeRun(result TemplateTreeRunResult) TemplateTreeRunReport {
+	created := make(map[string]struct{}, len(result.ApplyResult.CreatedPaths))
+	for _, path := range result.ApplyResult.CreatedPaths {
+		created[path] = struct{}{}
+	}
+	updated := make(map[string]struct{}, len(result.ApplyResult.UpdatedPaths))
+	for _, path := range result.ApplyResult.UpdatedPaths {
+		updated[path] = struct{}{}
+	}
+	kept := make(map[string]struct{}, len(result.ApplyResult.KeptPaths))
+	for _, path := range result.ApplyResult.KeptPaths {
+		kept[path] = struct{}{}
+	}
+	blocked := make(map[string]struct{}, len(result.ApplyResult.BlockedPaths))
+	for _, path := range result.ApplyResult.BlockedPaths {
+		blocked[path] = struct{}{}
+	}
+	omitted := make(map[string]struct{}, len(result.ApplyResult.OmittedPaths))
+	for _, path := range result.ApplyResult.OmittedPaths {
+		omitted[path] = struct{}{}
+	}
+
+	entries := make([]TemplateTreeRunReportEntry, 0, len(result.ExecutionPlan))
+	summary := TemplateTreeRunReportSummary{}
+	for _, entry := range result.ExecutionPlan {
+		status := TemplateTreeRunCreated
+		switch {
+		case entry.ExecutionAction == TemplateExecutionOmit:
+			status = TemplateTreeRunOmitted
+		case entry.DestinationPath != nil && containsKey(blocked, *entry.DestinationPath):
+			status = TemplateTreeRunBlocked
+		case entry.DestinationPath != nil && containsKey(kept, *entry.DestinationPath):
+			status = TemplateTreeRunKept
+		case entry.DestinationPath != nil && containsKey(updated, *entry.DestinationPath):
+			status = TemplateTreeRunUpdated
+		case containsKey(omitted, entry.LogicalDestinationPath):
+			status = TemplateTreeRunOmitted
+		}
+
+		switch status {
+		case TemplateTreeRunCreated:
+			summary.Created++
+		case TemplateTreeRunUpdated:
+			summary.Updated++
+		case TemplateTreeRunKept:
+			summary.Kept++
+		case TemplateTreeRunBlocked:
+			summary.Blocked++
+		case TemplateTreeRunOmitted:
+			summary.Omitted++
+		}
+
+		entries = append(entries, TemplateTreeRunReportEntry{
+			TemplateSourcePath:     entry.TemplateSourcePath,
+			LogicalDestinationPath: entry.LogicalDestinationPath,
+			DestinationPath:        entry.DestinationPath,
+			ExecutionAction:        entry.ExecutionAction,
+			Status:                 status,
+		})
+	}
+
+	return TemplateTreeRunReport{
+		Entries: entries,
+		Summary: summary,
+	}
+}
+
 func pathBase(path string) string {
 	idx := strings.LastIndex(path, "/")
 	if idx == -1 {
@@ -1389,6 +1487,11 @@ func pathBase(path string) string {
 	}
 
 	return path[idx+1:]
+}
+
+func containsKey[V any](input map[string]V, key string) bool {
+	_, ok := input[key]
+	return ok
 }
 
 func conformanceSuiteSelectorsEqual(left ConformanceSuiteSelector, right ConformanceSuiteSelector) bool {
