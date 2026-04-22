@@ -3029,6 +3029,50 @@ func TestSharedFixtureDelegatedChildApplyPlan(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureDelegatedChildNestedOutputResolution(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "delegated_child_nested_output_resolution"))
+	operations := decodeFixtureValue[[]DelegatedChildOperation](t, fixture["operations"])
+	nestedOutputs := decodeFixtureValue[[]DelegatedChildSurfaceOutput](t, fixture["nested_outputs"])
+	options := DelegatedChildOutputResolutionOptions{
+		DefaultFamily:   fixture["default_family"].(string),
+		RequestIDPrefix: fixture["request_id_prefix"].(string),
+	}
+
+	encoded, err := json.Marshal(ResolveDelegatedChildOutputs(operations, nestedOutputs, options))
+	if err != nil {
+		t.Fatalf("marshal delegated child nested output resolution: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal delegated child nested output resolution: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, fixture["expected"]) {
+		t.Fatalf("unexpected delegated child nested output resolution: %+v", decoded)
+	}
+}
+
+func TestSharedFixtureDelegatedChildNestedOutputRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "delegated_child_nested_output_rejection"))
+	operations := decodeFixtureValue[[]DelegatedChildOperation](t, fixture["operations"])
+	nestedOutputs := decodeFixtureValue[[]DelegatedChildSurfaceOutput](t, fixture["nested_outputs"])
+	options := DelegatedChildOutputResolutionOptions{
+		DefaultFamily:   fixture["default_family"].(string),
+		RequestIDPrefix: fixture["request_id_prefix"].(string),
+	}
+
+	encoded, err := json.Marshal(ResolveDelegatedChildOutputs(operations, nestedOutputs, options))
+	if err != nil {
+		t.Fatalf("marshal delegated child nested output rejection: %v", err)
+	}
+	var decoded any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal delegated child nested output rejection: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, fixture["expected"]) {
+		t.Fatalf("unexpected delegated child nested output rejection: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureReviewStateJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_json_roundtrip"))
 	state := parseConformanceManifestReviewState(fixture["state"].(map[string]any))

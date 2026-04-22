@@ -215,8 +215,8 @@ type ConformanceSuiteSubject struct {
 }
 
 type ConformanceSuiteSelector struct {
-	Kind    string                   `json:"kind"`
-	Subject ConformanceSuiteSubject  `json:"subject"`
+	Kind    string                  `json:"kind"`
+	Subject ConformanceSuiteSubject `json:"subject"`
 }
 
 type ConformanceSuiteDefinition struct {
@@ -316,6 +316,28 @@ type DelegatedChildApplyPlanEntry struct {
 
 type DelegatedChildApplyPlan struct {
 	Entries []DelegatedChildApplyPlanEntry `json:"entries"`
+}
+
+type DelegatedChildSurfaceOutput struct {
+	SurfaceAddress string `json:"surface_address"`
+	Output         string `json:"output"`
+}
+
+type AppliedDelegatedChildOutput struct {
+	OperationID string `json:"operation_id"`
+	Output      string `json:"output"`
+}
+
+type DelegatedChildOutputResolutionOptions struct {
+	DefaultFamily   string `json:"default_family"`
+	RequestIDPrefix string `json:"request_id_prefix"`
+}
+
+type DelegatedChildOutputResolution struct {
+	OK              bool                          `json:"ok"`
+	Diagnostics     []Diagnostic                  `json:"diagnostics"`
+	ApplyPlan       *DelegatedChildApplyPlan      `json:"apply_plan,omitempty"`
+	AppliedChildren []AppliedDelegatedChildOutput `json:"applied_children,omitempty"`
 }
 
 type ReviewReplayBundle struct {
@@ -713,6 +735,71 @@ func DelegatedChildApplyPlanForState(state DelegatedChildGroupReviewState, famil
 	return DelegatedChildApplyPlan{Entries: entries}
 }
 
+func ResolveDelegatedChildOutputs(
+	operations []DelegatedChildOperation,
+	nestedOutputs []DelegatedChildSurfaceOutput,
+	options DelegatedChildOutputResolutionOptions,
+) DelegatedChildOutputResolution {
+	operationsBySurfaceAddress := make(map[string]DelegatedChildOperation, len(operations))
+	for _, operation := range operations {
+		operationsBySurfaceAddress[operation.Surface.Address] = operation
+	}
+
+	for _, nestedOutput := range nestedOutputs {
+		if _, ok := operationsBySurfaceAddress[nestedOutput.SurfaceAddress]; ok {
+			continue
+		}
+
+		return DelegatedChildOutputResolution{
+			OK: false,
+			Diagnostics: []Diagnostic{{
+				Severity: SeverityError,
+				Category: CategoryConfigurationError,
+				Message:  "missing delegated child surface " + nestedOutput.SurfaceAddress + ".",
+			}},
+		}
+	}
+
+	entries := make([]DelegatedChildApplyPlanEntry, 0, len(nestedOutputs))
+	appliedChildren := make([]AppliedDelegatedChildOutput, 0, len(nestedOutputs))
+	for index, nestedOutput := range nestedOutputs {
+		operation := operationsBySurfaceAddress[nestedOutput.SurfaceAddress]
+		requestID := options.RequestIDPrefix + ":" + strconv.Itoa(index)
+		family := options.DefaultFamily
+		if value, ok := operation.Surface.Metadata["family"].(string); ok && value != "" {
+			family = value
+		}
+
+		entries = append(entries, DelegatedChildApplyPlanEntry{
+			RequestID: requestID,
+			Family:    family,
+			DelegatedGroup: ProjectedChildReviewGroup{
+				DelegatedApplyGroup:         requestID,
+				ParentOperationID:           operation.ParentOperationID,
+				ChildOperationID:            operation.OperationID,
+				DelegatedRuntimeSurfacePath: nestedOutput.SurfaceAddress,
+				CaseIDs:                     []string{},
+				DelegatedCaseIDs:            []string{},
+			},
+			Decision: ReviewDecision{
+				RequestID: requestID,
+				Action:    ReviewDecisionApplyDelegatedChildGroup,
+			},
+		})
+		appliedChildren = append(appliedChildren, AppliedDelegatedChildOutput{
+			OperationID: operation.OperationID,
+			Output:      nestedOutput.Output,
+		})
+	}
+
+	return DelegatedChildOutputResolution{
+		OK:              true,
+		Diagnostics:     []Diagnostic{},
+		ApplyPlan:       &DelegatedChildApplyPlan{Entries: entries},
+		AppliedChildren: appliedChildren,
+	}
+}
+
 func DefaultConformanceFamilyContext(
 	familyProfile FamilyFeatureProfile,
 ) ConformanceFamilyPlanContext {
@@ -746,7 +833,6 @@ func ConformanceManifestReplayContext(
 		seen[definition.Subject.Grammar] = true
 		families = append(families, definition.Subject.Grammar)
 	}
-	slices.Sort(families)
 
 	return ReviewReplayContext{
 		Surface:                 "conformance_manifest",

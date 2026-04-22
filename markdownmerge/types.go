@@ -573,52 +573,36 @@ func MergeMarkdownWithNestedOutputs(
 	}
 
 	operations := MarkdownDelegatedChildOperations(*analysis.Analysis, "markdown-document-0")
-	operationsBySurfaceAddress := make(map[string]astmerge.DelegatedChildOperation, len(operations))
-	for _, operation := range operations {
-		operationsBySurfaceAddress[operation.Surface.Address] = operation
-	}
+	resolutionInputs := make([]astmerge.DelegatedChildSurfaceOutput, 0, len(nestedOutputs))
 	for _, nestedOutput := range nestedOutputs {
-		if _, ok := operationsBySurfaceAddress[nestedOutput.SurfaceAddress]; !ok {
-			return astmerge.MergeResult[string]{
-				OK:          false,
-				Diagnostics: []astmerge.Diagnostic{configurationError("missing delegated child surface " + nestedOutput.SurfaceAddress + ".")},
-				Policies:    []astmerge.PolicyReference{},
-			}
-		}
-	}
-
-	planEntries := make([]astmerge.DelegatedChildApplyPlanEntry, 0, len(nestedOutputs))
-	appliedChildren := make([]AppliedChildOutput, 0, len(nestedOutputs))
-	for index, nestedOutput := range nestedOutputs {
-		operation := operationsBySurfaceAddress[nestedOutput.SurfaceAddress]
-		requestID := fmt.Sprintf("nested_markdown_child:%d", index)
-		family := "markdown"
-		if value, ok := operation.Surface.Metadata["family"].(string); ok && value != "" {
-			family = value
-		}
-		planEntries = append(planEntries, astmerge.DelegatedChildApplyPlanEntry{
-			RequestID: requestID,
-			Family:    family,
-			DelegatedGroup: astmerge.ProjectedChildReviewGroup{
-				DelegatedApplyGroup:         requestID,
-				ParentOperationID:           operation.ParentOperationID,
-				ChildOperationID:            operation.OperationID,
-				DelegatedRuntimeSurfacePath: nestedOutput.SurfaceAddress,
-				CaseIDs:                     []string{},
-				DelegatedCaseIDs:            []string{},
-			},
-			Decision: astmerge.ReviewDecision{RequestID: requestID, Action: astmerge.ReviewDecisionApplyDelegatedChildGroup},
+		resolutionInputs = append(resolutionInputs, astmerge.DelegatedChildSurfaceOutput{
+			SurfaceAddress: nestedOutput.SurfaceAddress,
+			Output:         nestedOutput.Output,
 		})
+	}
+	resolution := astmerge.ResolveDelegatedChildOutputs(
+		operations,
+		resolutionInputs,
+		astmerge.DelegatedChildOutputResolutionOptions{
+			DefaultFamily:   "markdown",
+			RequestIDPrefix: "nested_markdown_child",
+		},
+	)
+	if !resolution.OK || resolution.ApplyPlan == nil {
+		return astmerge.MergeResult[string]{OK: false, Diagnostics: resolution.Diagnostics, Policies: []astmerge.PolicyReference{}}
+	}
+	appliedChildren := make([]AppliedChildOutput, 0, len(resolution.AppliedChildren))
+	for _, entry := range resolution.AppliedChildren {
 		appliedChildren = append(appliedChildren, AppliedChildOutput{
-			OperationID: operation.OperationID,
-			Output:      nestedOutput.Output,
+			OperationID: entry.OperationID,
+			Output:      entry.Output,
 		})
 	}
 
 	return ApplyMarkdownDelegatedChildOutputs(
 		*merged.Output,
 		operations,
-		astmerge.DelegatedChildApplyPlan{Entries: planEntries},
+		*resolution.ApplyPlan,
 		appliedChildren,
 	)
 }
