@@ -353,8 +353,9 @@ type NestedMergeExecutionCallbacks[T any] struct {
 }
 
 type ReviewReplayBundle struct {
-	ReplayContext ReviewReplayContext `json:"replay_context"`
-	Decisions     []ReviewDecision    `json:"decisions"`
+	ReplayContext            ReviewReplayContext       `json:"replay_context"`
+	Decisions                []ReviewDecision          `json:"decisions"`
+	ReviewedNestedExecutions []ReviewedNestedExecution `json:"reviewed_nested_executions,omitempty"`
 }
 
 const ReviewTransportVersion = 1
@@ -417,12 +418,13 @@ type ConformanceManifestReviewOptions struct {
 }
 
 type ConformanceManifestReviewState struct {
-	Report           NamedConformanceSuiteReportEnvelope `json:"report"`
-	Diagnostics      []Diagnostic                        `json:"diagnostics"`
-	Requests         []ReviewRequest                     `json:"requests"`
-	AppliedDecisions []ReviewDecision                    `json:"applied_decisions"`
-	HostHints        ReviewHostHints                     `json:"host_hints"`
-	ReplayContext    ReviewReplayContext                 `json:"replay_context"`
+	Report                   NamedConformanceSuiteReportEnvelope `json:"report"`
+	Diagnostics              []Diagnostic                        `json:"diagnostics"`
+	Requests                 []ReviewRequest                     `json:"requests"`
+	AppliedDecisions         []ReviewDecision                    `json:"applied_decisions"`
+	HostHints                ReviewHostHints                     `json:"host_hints"`
+	ReplayContext            ReviewReplayContext                 `json:"replay_context"`
+	ReviewedNestedExecutions []ReviewedNestedExecution           `json:"reviewed_nested_executions,omitempty"`
 }
 
 type ConformanceManifestPlan struct {
@@ -1007,12 +1009,12 @@ func ConformanceManifestReviewRequestIDs(
 
 func ReviewReplayBundleInputs(
 	options ConformanceManifestReviewOptions,
-) (*ReviewReplayContext, []ReviewDecision) {
+) (*ReviewReplayContext, []ReviewDecision, []ReviewedNestedExecution) {
 	if options.ReviewReplayBundle != nil {
-		return &options.ReviewReplayBundle.ReplayContext, options.ReviewReplayBundle.Decisions
+		return &options.ReviewReplayBundle.ReplayContext, options.ReviewReplayBundle.Decisions, options.ReviewReplayBundle.ReviewedNestedExecutions
 	}
 
-	return options.ReviewReplayContext, options.ReviewDecisions
+	return options.ReviewReplayContext, options.ReviewDecisions, nil
 }
 
 func ConformanceManifestReviewStateEnvelopeFor(
@@ -1586,7 +1588,7 @@ func ReviewConformanceManifest(
 	requests := make([]ReviewRequest, 0)
 	appliedDecisions := make([]ReviewDecision, 0)
 	effectiveOptions := options
-	replayInputContext, replayInputDecisions := ReviewReplayBundleInputs(options)
+	replayInputContext, replayInputDecisions, reviewedNestedExecutions := ReviewReplayBundleInputs(options)
 	if len(replayInputDecisions) > 0 {
 		if replayInputContext == nil {
 			diagnostics = append(diagnostics, Diagnostic{
@@ -1597,6 +1599,7 @@ func ReviewConformanceManifest(
 			effectiveOptions.ReviewReplayBundle = nil
 			effectiveOptions.ReviewReplayContext = nil
 			effectiveOptions.ReviewDecisions = nil
+			reviewedNestedExecutions = nil
 		} else if !ReviewReplayContextCompatible(replayContext, replayInputContext) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
@@ -1606,6 +1609,7 @@ func ReviewConformanceManifest(
 			effectiveOptions.ReviewReplayBundle = nil
 			effectiveOptions.ReviewReplayContext = nil
 			effectiveOptions.ReviewDecisions = nil
+			reviewedNestedExecutions = nil
 		} else {
 			allowedRequestIDs := make(map[string]bool)
 			for _, requestID := range ConformanceManifestReviewRequestIDs(manifest, options) {
@@ -1678,12 +1682,13 @@ func ReviewConformanceManifest(
 	}
 
 	return ConformanceManifestReviewState{
-		Report:           ReportNamedConformanceSuiteEnvelope(ReportPlannedNamedConformanceSuites(entries, execute)),
-		Diagnostics:      diagnostics,
-		Requests:         requests,
-		AppliedDecisions: appliedDecisions,
-		HostHints:        ConformanceReviewHostHints(options),
-		ReplayContext:    replayContext,
+		Report:                   ReportNamedConformanceSuiteEnvelope(ReportPlannedNamedConformanceSuites(entries, execute)),
+		Diagnostics:              diagnostics,
+		Requests:                 requests,
+		AppliedDecisions:         appliedDecisions,
+		HostHints:                ConformanceReviewHostHints(options),
+		ReplayContext:            replayContext,
+		ReviewedNestedExecutions: reviewedNestedExecutions,
 	}
 }
 

@@ -2706,7 +2706,7 @@ func TestSharedFixtureReviewReplayBundle(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle"))
 	bundle := parseReviewReplayBundle(fixture["replay_bundle"].(map[string]any))
 
-	replayContext, decisions := ReviewReplayBundleInputs(ConformanceManifestReviewOptions{
+	replayContext, decisions, reviewedNestedExecutions := ReviewReplayBundleInputs(ConformanceManifestReviewOptions{
 		ReviewReplayBundle: &bundle,
 	})
 
@@ -2715,6 +2715,28 @@ func TestSharedFixtureReviewReplayBundle(t *testing.T) {
 	}
 	if !reflect.DeepEqual(decisions, bundle.Decisions) {
 		t.Fatalf("unexpected replay bundle decisions: %+v", decisions)
+	}
+	if !reflect.DeepEqual(reviewedNestedExecutions, bundle.ReviewedNestedExecutions) {
+		t.Fatalf("unexpected replay bundle reviewed nested executions: %+v", reviewedNestedExecutions)
+	}
+}
+
+func TestSharedFixtureReviewReplayBundleReviewedNestedExecutions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_reviewed_nested_executions"))
+	bundle := parseReviewReplayBundle(fixture["replay_bundle"].(map[string]any))
+
+	replayContext, decisions, reviewedNestedExecutions := ReviewReplayBundleInputs(ConformanceManifestReviewOptions{
+		ReviewReplayBundle: &bundle,
+	})
+
+	if replayContext == nil || !reflect.DeepEqual(*replayContext, bundle.ReplayContext) {
+		t.Fatalf("unexpected replay bundle context: %+v", replayContext)
+	}
+	if !reflect.DeepEqual(decisions, bundle.Decisions) {
+		t.Fatalf("unexpected replay bundle decisions: %+v", decisions)
+	}
+	if !reflect.DeepEqual(reviewedNestedExecutions, bundle.ReviewedNestedExecutions) {
+		t.Fatalf("unexpected reviewed nested executions: %+v", reviewedNestedExecutions)
 	}
 }
 
@@ -3239,6 +3261,30 @@ func TestSharedFixtureReviewedNestedExecutionPayload(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewStateReviewedNestedExecutions(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_reviewed_nested_executions"))
+	manifest := decodeFixtureValue[ConformanceManifest](t, fixture["manifest"])
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	state := ReviewConformanceManifest(manifest, options, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if raw, ok := executionsRaw[key]; ok {
+			return parseConformanceCaseExecution(raw.(map[string]any))
+		}
+
+		return ConformanceCaseExecution{
+			Outcome:  ConformanceFailed,
+			Messages: []string{"missing execution"},
+		}
+	})
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected reviewed nested execution review state: %+v", state)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -3619,7 +3665,7 @@ func parseStringSlice(raw []any) []string {
 }
 
 func parseReviewReplayBundle(raw map[string]any) ReviewReplayBundle {
-	return ReviewReplayBundle{
+	bundle := ReviewReplayBundle{
 		ReplayContext: parseReviewReplayContext(raw["replay_context"].(map[string]any)),
 		Decisions: func() []ReviewDecision {
 			decisionsRaw := raw["decisions"].([]any)
@@ -3630,6 +3676,13 @@ func parseReviewReplayBundle(raw map[string]any) ReviewReplayBundle {
 			return decisions
 		}(),
 	}
+	if rawReviewedNestedExecutions, ok := raw["reviewed_nested_executions"]; ok {
+		bundle.ReviewedNestedExecutions = make([]ReviewedNestedExecution, 0, len(rawReviewedNestedExecutions.([]any)))
+		for _, item := range rawReviewedNestedExecutions.([]any) {
+			bundle.ReviewedNestedExecutions = append(bundle.ReviewedNestedExecutions, parseReviewedNestedExecution(item.(map[string]any)))
+		}
+	}
+	return bundle
 }
 
 func parseConformanceManifestReviewStateEnvelope(raw map[string]any) ConformanceManifestReviewStateEnvelope {
@@ -3718,6 +3771,11 @@ func parseConformanceManifestReviewState(raw map[string]any) ConformanceManifest
 	}
 	for _, item := range raw["applied_decisions"].([]any) {
 		state.AppliedDecisions = append(state.AppliedDecisions, parseReviewDecision(item.(map[string]any)))
+	}
+	if rawReviewedNestedExecutions, ok := raw["reviewed_nested_executions"]; ok {
+		for _, item := range rawReviewedNestedExecutions.([]any) {
+			state.ReviewedNestedExecutions = append(state.ReviewedNestedExecutions, parseReviewedNestedExecution(item.(map[string]any)))
+		}
 	}
 
 	return state
