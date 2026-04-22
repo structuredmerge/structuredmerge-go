@@ -113,6 +113,15 @@ func TestSharedFixtureMarkdownProviderAnalysisAndMatching(t *testing.T) {
 	if actual := jsonReady(t, result.UnmatchedDestination); !reflect.DeepEqual(actual, matchingFixture["expected"].(map[string]any)["unmatched_destination"]) {
 		t.Fatalf("unexpected unmatched destination owners: %+v", actual)
 	}
+
+	mergeFixture := readGoldmarkFixture(t, "markdown", "slice-286-merge", "section-merge.json")
+	mergeResult := MergeMarkdown(mergeFixture["template"].(string), mergeFixture["destination"].(string), markdownmerge.DialectMarkdown)
+	if !mergeResult.OK || mergeResult.Output == nil {
+		t.Fatalf("expected merge success: %+v", mergeResult)
+	}
+	if *mergeResult.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected merge output:\n%s", *mergeResult.Output)
+	}
 }
 
 func TestSharedFixtureMarkdownProviderEmbeddedFamilies(t *testing.T) {
