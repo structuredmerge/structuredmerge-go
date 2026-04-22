@@ -109,7 +109,7 @@ func MergeMarkdown(templateSource string, destinationSource string, dialect mark
 		}
 	}
 
-	return markdownmerge.MergeMarkdown(templateSource, destinationSource, dialect, markdownmerge.BackendKreuzberg)
+	return markdownmerge.MergeMarkdown(templateSource, destinationSource, dialect)
 }
 
 func MergeMarkdownWithReviewedNestedOutputs(
@@ -138,7 +138,6 @@ func MergeMarkdownWithReviewedNestedOutputs(
 		dialect,
 		reviewState,
 		appliedChildren,
-		markdownmerge.BackendKreuzberg,
 	)
 }
 
@@ -166,7 +165,6 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
 		destinationSource,
 		dialect,
 		replayBundle,
-		markdownmerge.BackendKreuzberg,
 	)
 }
 
@@ -177,12 +175,23 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
 	envelope astmerge.ReviewReplayBundleEnvelope,
 	backend string,
 ) astmerge.MergeResult[string] {
+	requested := BackendGoldmark
+	if backend != "" {
+		requested = backend
+	}
+	if requested != BackendGoldmark {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported Markdown backend %s.", requested))},
+			Policies:    []astmerge.PolicyReference{},
+		}
+	}
+
 	return markdownmerge.MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
 		templateSource,
 		destinationSource,
 		dialect,
 		envelope,
-		markdownmerge.BackendKreuzberg,
 	)
 }
 
@@ -210,7 +219,6 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
 		destinationSource,
 		dialect,
 		reviewState,
-		markdownmerge.BackendKreuzberg,
 	)
 }
 
@@ -221,12 +229,23 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
 	envelope astmerge.ConformanceManifestReviewStateEnvelope,
 	backend string,
 ) astmerge.MergeResult[string] {
+	requested := BackendGoldmark
+	if backend != "" {
+		requested = backend
+	}
+	if requested != BackendGoldmark {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported Markdown backend %s.", requested))},
+			Policies:    []astmerge.PolicyReference{},
+		}
+	}
+
 	return markdownmerge.MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
 		templateSource,
 		destinationSource,
 		dialect,
 		envelope,
-		markdownmerge.BackendKreuzberg,
 	)
 }
 

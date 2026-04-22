@@ -506,4 +506,32 @@ func TestSharedFixtureMarkdownProviderRejectsUnsupportedBackendOverrides(t *test
 	if actual := jsonReady(t, parseResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
 		t.Fatalf("unexpected parse diagnostics: %+v", actual)
 	}
+
+	replayEnvelopeResult := MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
+		"# Title\n",
+		"# Title\n",
+		markdownmerge.DialectMarkdown,
+		astmerge.ReviewReplayBundleEnvelope{},
+		"kreuzberg-language-pack",
+	)
+	if replayEnvelopeResult.OK {
+		t.Fatalf("expected replay envelope failure: %+v", replayEnvelopeResult)
+	}
+	if actual := jsonReady(t, replayEnvelopeResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected replay envelope diagnostics: %+v", actual)
+	}
+
+	stateEnvelopeResult := MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
+		"# Title\n",
+		"# Title\n",
+		markdownmerge.DialectMarkdown,
+		astmerge.ConformanceManifestReviewStateEnvelope{},
+		"kreuzberg-language-pack",
+	)
+	if stateEnvelopeResult.OK {
+		t.Fatalf("expected state envelope failure: %+v", stateEnvelopeResult)
+	}
+	if actual := jsonReady(t, stateEnvelopeResult.Diagnostics); !reflect.DeepEqual(actual, jsonReady(t, expectedDiagnostics)) {
+		t.Fatalf("unexpected state envelope diagnostics: %+v", actual)
+	}
 }

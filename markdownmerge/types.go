@@ -619,8 +619,12 @@ func MergeMarkdownWithReviewedNestedOutputs(
 	dialect MarkdownDialect,
 	reviewState astmerge.DelegatedChildGroupReviewState,
 	appliedChildren []AppliedChildOutput,
-	backend MarkdownBackend,
+	backend ...MarkdownBackend,
 ) astmerge.MergeResult[string] {
+	resolvedBackend := BackendKreuzberg
+	if len(backend) > 0 {
+		resolvedBackend = backend[0]
+	}
 	resolvedChildren := make([]astmerge.AppliedDelegatedChildOutput, 0, len(appliedChildren))
 	for _, child := range appliedChildren {
 		resolvedChildren = append(resolvedChildren, astmerge.AppliedDelegatedChildOutput{
@@ -635,10 +639,10 @@ func MergeMarkdownWithReviewedNestedOutputs(
 		resolvedChildren,
 		astmerge.NestedMergeExecutionCallbacks[string]{
 			MergeParent: func() astmerge.MergeResult[string] {
-				return MergeMarkdown(templateSource, destinationSource, dialect, backend)
+				return MergeMarkdown(templateSource, destinationSource, dialect, resolvedBackend)
 			},
 			DiscoverOperations: func(mergedOutput string) astmerge.NestedMergeDiscoveryResult {
-				analysis := ParseMarkdownWithBackend(mergedOutput, dialect, backend)
+				analysis := ParseMarkdownWithBackend(mergedOutput, dialect, resolvedBackend)
 				if !analysis.OK || analysis.Analysis == nil {
 					return astmerge.NestedMergeDiscoveryResult{
 						OK:          false,
@@ -681,8 +685,12 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
 	destinationSource string,
 	dialect MarkdownDialect,
 	bundle astmerge.ReviewReplayBundle,
-	backend MarkdownBackend,
+	backend ...MarkdownBackend,
 ) astmerge.MergeResult[string] {
+	resolvedBackend := BackendKreuzberg
+	if len(backend) > 0 {
+		resolvedBackend = backend[0]
+	}
 	for _, execution := range bundle.ReviewedNestedExecutions {
 		if execution.Family == "markdown" {
 			children := make([]AppliedChildOutput, 0, len(execution.AppliedChildren))
@@ -698,7 +706,7 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
 				dialect,
 				execution.ReviewState,
 				children,
-				backend,
+				resolvedBackend,
 			)
 		}
 	}
@@ -719,8 +727,12 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
 	destinationSource string,
 	dialect MarkdownDialect,
 	envelope astmerge.ReviewReplayBundleEnvelope,
-	backend MarkdownBackend,
+	backend ...MarkdownBackend,
 ) astmerge.MergeResult[string] {
+	resolvedBackend := BackendKreuzberg
+	if len(backend) > 0 {
+		resolvedBackend = backend[0]
+	}
 	bundle, importErr := astmerge.ImportReviewReplayBundleEnvelope(envelope)
 	if importErr != nil {
 		return astmerge.MergeResult[string]{
@@ -739,7 +751,7 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
 		destinationSource,
 		dialect,
 		*bundle,
-		backend,
+		resolvedBackend,
 	)
 }
 
@@ -748,8 +760,12 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
 	destinationSource string,
 	dialect MarkdownDialect,
 	state astmerge.ConformanceManifestReviewState,
-	backend MarkdownBackend,
+	backend ...MarkdownBackend,
 ) astmerge.MergeResult[string] {
+	resolvedBackend := BackendKreuzberg
+	if len(backend) > 0 {
+		resolvedBackend = backend[0]
+	}
 	for _, execution := range state.ReviewedNestedExecutions {
 		if execution.Family == "markdown" {
 			children := make([]AppliedChildOutput, 0, len(execution.AppliedChildren))
@@ -765,7 +781,7 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
 				dialect,
 				execution.ReviewState,
 				children,
-				backend,
+				resolvedBackend,
 			)
 		}
 	}
@@ -786,8 +802,12 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
 	destinationSource string,
 	dialect MarkdownDialect,
 	envelope astmerge.ConformanceManifestReviewStateEnvelope,
-	backend MarkdownBackend,
+	backend ...MarkdownBackend,
 ) astmerge.MergeResult[string] {
+	resolvedBackend := BackendKreuzberg
+	if len(backend) > 0 {
+		resolvedBackend = backend[0]
+	}
 	state, importErr := astmerge.ImportConformanceManifestReviewStateEnvelope(envelope)
 	if importErr != nil {
 		return astmerge.MergeResult[string]{
@@ -806,7 +826,7 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
 		destinationSource,
 		dialect,
 		*state,
-		backend,
+		resolvedBackend,
 	)
 }
 
