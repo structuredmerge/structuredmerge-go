@@ -393,6 +393,90 @@ func TestSharedFixtureMarkdownReviewedNestedReviewArtifactRejection(t *testing.T
 	}
 }
 
+func TestSharedFixtureMarkdownReviewedNestedReviewArtifactEnvelopeApplication(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-313-reviewed-nested-review-artifact-envelope-application", "fenced-code-reviewed-nested-review-artifact-envelope-application.json")
+	replayEnvelopeSource, err := json.Marshal(fixture["replay_bundle_envelope"])
+	if err != nil {
+		t.Fatalf("marshal replay bundle envelope: %v", err)
+	}
+	var replayEnvelope astmerge.ReviewReplayBundleEnvelope
+	if err := json.Unmarshal(replayEnvelopeSource, &replayEnvelope); err != nil {
+		t.Fatalf("decode replay bundle envelope: %v", err)
+	}
+	reviewStateEnvelopeSource, err := json.Marshal(fixture["review_state_envelope"])
+	if err != nil {
+		t.Fatalf("marshal review state envelope: %v", err)
+	}
+	var reviewStateEnvelope astmerge.ConformanceManifestReviewStateEnvelope
+	if err := json.Unmarshal(reviewStateEnvelopeSource, &reviewStateEnvelope); err != nil {
+		t.Fatalf("decode review state envelope: %v", err)
+	}
+
+	replayResult := MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		DialectMarkdown,
+		replayEnvelope,
+		BackendKreuzberg,
+	)
+	if !replayResult.OK || replayResult.Output == nil || *replayResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected replay-bundle-envelope reviewed nested merge: %+v", replayResult)
+	}
+
+	stateResult := MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		DialectMarkdown,
+		reviewStateEnvelope,
+		BackendKreuzberg,
+	)
+	if !stateResult.OK || stateResult.Output == nil || *stateResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected review-state-envelope reviewed nested merge: %+v", stateResult)
+	}
+}
+
+func TestSharedFixtureMarkdownReviewedNestedReviewArtifactEnvelopeRejection(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-315-reviewed-nested-review-artifact-envelope-rejection", "fenced-code-reviewed-nested-review-artifact-envelope-rejection.json")
+	replayEnvelopeSource, err := json.Marshal(fixture["replay_bundle_envelope"])
+	if err != nil {
+		t.Fatalf("marshal replay bundle envelope: %v", err)
+	}
+	var replayEnvelope astmerge.ReviewReplayBundleEnvelope
+	if err := json.Unmarshal(replayEnvelopeSource, &replayEnvelope); err != nil {
+		t.Fatalf("decode replay bundle envelope: %v", err)
+	}
+	reviewStateEnvelopeSource, err := json.Marshal(fixture["review_state_envelope"])
+	if err != nil {
+		t.Fatalf("marshal review state envelope: %v", err)
+	}
+	var reviewStateEnvelope astmerge.ConformanceManifestReviewStateEnvelope
+	if err := json.Unmarshal(reviewStateEnvelopeSource, &reviewStateEnvelope); err != nil {
+		t.Fatalf("decode review state envelope: %v", err)
+	}
+
+	replayResult := MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		DialectMarkdown,
+		replayEnvelope,
+		BackendKreuzberg,
+	)
+	if replayResult.OK || replayResult.Output != nil || len(replayResult.Diagnostics) != 1 || replayResult.Diagnostics[0].Message != fixture["expected_replay_bundle"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected replay-bundle-envelope rejection: %+v", replayResult)
+	}
+
+	stateResult := MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		DialectMarkdown,
+		reviewStateEnvelope,
+		BackendKreuzberg,
+	)
+	if stateResult.OK || stateResult.Output != nil || len(stateResult.Diagnostics) != 1 || stateResult.Diagnostics[0].Message != fixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected review-state-envelope rejection: %+v", stateResult)
+	}
+}
+
 func TestSharedFixtureMarkdownEmbeddedFamilies(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-208-embedded-families", "code-fence-families.json")
 	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendKreuzberg)

@@ -170,6 +170,22 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
 	)
 }
 
+func MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
+	templateSource string,
+	destinationSource string,
+	dialect markdownmerge.MarkdownDialect,
+	envelope astmerge.ReviewReplayBundleEnvelope,
+	backend string,
+) astmerge.MergeResult[string] {
+	return markdownmerge.MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
+		templateSource,
+		destinationSource,
+		dialect,
+		envelope,
+		markdownmerge.BackendKreuzberg,
+	)
+}
+
 func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
 	templateSource string,
 	destinationSource string,
@@ -194,6 +210,22 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
 		destinationSource,
 		dialect,
 		reviewState,
+		markdownmerge.BackendKreuzberg,
+	)
+}
+
+func MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
+	templateSource string,
+	destinationSource string,
+	dialect markdownmerge.MarkdownDialect,
+	envelope astmerge.ConformanceManifestReviewStateEnvelope,
+	backend string,
+) astmerge.MergeResult[string] {
+	return markdownmerge.MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
+		templateSource,
+		destinationSource,
+		dialect,
+		envelope,
 		markdownmerge.BackendKreuzberg,
 	)
 }

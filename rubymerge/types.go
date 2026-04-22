@@ -743,6 +743,33 @@ func MergeRubyWithReviewedNestedOutputsFromReplayBundle(
 	}
 }
 
+func MergeRubyWithReviewedNestedOutputsFromReplayBundleEnvelope(
+	templateSource string,
+	destinationSource string,
+	dialect RubyDialect,
+	envelope astmerge.ReviewReplayBundleEnvelope,
+) astmerge.MergeResult[string] {
+	bundle, importErr := astmerge.ImportReviewReplayBundleEnvelope(envelope)
+	if importErr != nil {
+		return astmerge.MergeResult[string]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.DiagnosticCategory(importErr.Category),
+				Message:  importErr.Message,
+			}},
+			Policies: []astmerge.PolicyReference{},
+		}
+	}
+
+	return MergeRubyWithReviewedNestedOutputsFromReplayBundle(
+		templateSource,
+		destinationSource,
+		dialect,
+		*bundle,
+	)
+}
+
 func MergeRubyWithReviewedNestedOutputsFromReviewState(
 	templateSource string,
 	destinationSource string,
@@ -777,6 +804,33 @@ func MergeRubyWithReviewedNestedOutputsFromReviewState(
 		}},
 		Policies: []astmerge.PolicyReference{},
 	}
+}
+
+func MergeRubyWithReviewedNestedOutputsFromReviewStateEnvelope(
+	templateSource string,
+	destinationSource string,
+	dialect RubyDialect,
+	envelope astmerge.ConformanceManifestReviewStateEnvelope,
+) astmerge.MergeResult[string] {
+	state, importErr := astmerge.ImportConformanceManifestReviewStateEnvelope(envelope)
+	if importErr != nil {
+		return astmerge.MergeResult[string]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.DiagnosticCategory(importErr.Category),
+				Message:  importErr.Message,
+			}},
+			Policies: []astmerge.PolicyReference{},
+		}
+	}
+
+	return MergeRubyWithReviewedNestedOutputsFromReviewState(
+		templateSource,
+		destinationSource,
+		dialect,
+		*state,
+	)
 }
 
 func RubyDiscoveredSurfaces(analysis RubyAnalysis) []astmerge.DiscoveredSurface {

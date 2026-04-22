@@ -714,6 +714,35 @@ func MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
 	}
 }
 
+func MergeMarkdownWithReviewedNestedOutputsFromReplayBundleEnvelope(
+	templateSource string,
+	destinationSource string,
+	dialect MarkdownDialect,
+	envelope astmerge.ReviewReplayBundleEnvelope,
+	backend MarkdownBackend,
+) astmerge.MergeResult[string] {
+	bundle, importErr := astmerge.ImportReviewReplayBundleEnvelope(envelope)
+	if importErr != nil {
+		return astmerge.MergeResult[string]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.DiagnosticCategory(importErr.Category),
+				Message:  importErr.Message,
+			}},
+			Policies: []astmerge.PolicyReference{},
+		}
+	}
+
+	return MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
+		templateSource,
+		destinationSource,
+		dialect,
+		*bundle,
+		backend,
+	)
+}
+
 func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
 	templateSource string,
 	destinationSource string,
@@ -750,6 +779,35 @@ func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
 		}},
 		Policies: []astmerge.PolicyReference{},
 	}
+}
+
+func MergeMarkdownWithReviewedNestedOutputsFromReviewStateEnvelope(
+	templateSource string,
+	destinationSource string,
+	dialect MarkdownDialect,
+	envelope astmerge.ConformanceManifestReviewStateEnvelope,
+	backend MarkdownBackend,
+) astmerge.MergeResult[string] {
+	state, importErr := astmerge.ImportConformanceManifestReviewStateEnvelope(envelope)
+	if importErr != nil {
+		return astmerge.MergeResult[string]{
+			OK: false,
+			Diagnostics: []astmerge.Diagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.DiagnosticCategory(importErr.Category),
+				Message:  importErr.Message,
+			}},
+			Policies: []astmerge.PolicyReference{},
+		}
+	}
+
+	return MergeMarkdownWithReviewedNestedOutputsFromReviewState(
+		templateSource,
+		destinationSource,
+		dialect,
+		*state,
+		backend,
+	)
 }
 
 func codeFenceFamily(infoString string) string {
