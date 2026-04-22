@@ -50,6 +50,11 @@ type AppliedChildOutput struct {
 	Output      string `json:"output"`
 }
 
+type NestedChildOutput struct {
+	SurfaceAddress string `json:"surface_address"`
+	Output         string `json:"output"`
+}
+
 func (RubyAnalysis) Kind() string {
 	return "ruby"
 }
@@ -581,6 +586,69 @@ func ApplyRubyDelegatedChildOutputs(
 		Output:      &output,
 		Policies:    []astmerge.PolicyReference{destinationWinsArrayPolicy()},
 	}
+}
+
+func MergeRubyWithNestedOutputs(
+	templateSource string,
+	destinationSource string,
+	dialect RubyDialect,
+	nestedOutputs []NestedChildOutput,
+) astmerge.MergeResult[string] {
+	merged := MergeRuby(templateSource, destinationSource, dialect)
+	if !merged.OK || merged.Output == nil {
+		return merged
+	}
+
+	analysis := ParseRuby(*merged.Output, dialect)
+	if !analysis.OK || analysis.Analysis == nil {
+		return astmerge.MergeResult[string]{OK: false, Diagnostics: analysis.Diagnostics, Policies: []astmerge.PolicyReference{}}
+	}
+
+	operations := RubyDelegatedChildOperations(*analysis.Analysis, "ruby-document-0")
+	operationsBySurfaceAddress := make(map[string]astmerge.DelegatedChildOperation, len(operations))
+	for _, operation := range operations {
+		operationsBySurfaceAddress[operation.Surface.Address] = operation
+	}
+	for _, nestedOutput := range nestedOutputs {
+		if _, ok := operationsBySurfaceAddress[nestedOutput.SurfaceAddress]; !ok {
+			return astmerge.MergeResult[string]{
+				OK:          false,
+				Diagnostics: []astmerge.Diagnostic{configurationError("missing delegated child surface " + nestedOutput.SurfaceAddress + ".")},
+				Policies:    []astmerge.PolicyReference{},
+			}
+		}
+	}
+
+	planEntries := make([]astmerge.DelegatedChildApplyPlanEntry, 0, len(nestedOutputs))
+	appliedChildren := make([]AppliedChildOutput, 0, len(nestedOutputs))
+	for index, nestedOutput := range nestedOutputs {
+		operation := operationsBySurfaceAddress[nestedOutput.SurfaceAddress]
+		requestID := "nested_ruby_child:" + strconv.Itoa(index)
+		planEntries = append(planEntries, astmerge.DelegatedChildApplyPlanEntry{
+			RequestID: requestID,
+			Family:    "ruby",
+			DelegatedGroup: astmerge.ProjectedChildReviewGroup{
+				DelegatedApplyGroup:         requestID,
+				ParentOperationID:           operation.ParentOperationID,
+				ChildOperationID:            operation.OperationID,
+				DelegatedRuntimeSurfacePath: nestedOutput.SurfaceAddress,
+				CaseIDs:                     []string{},
+				DelegatedCaseIDs:            []string{},
+			},
+			Decision: astmerge.ReviewDecision{RequestID: requestID, Action: astmerge.ReviewDecisionApplyDelegatedChildGroup},
+		})
+		appliedChildren = append(appliedChildren, AppliedChildOutput{
+			OperationID: operation.OperationID,
+			Output:      nestedOutput.Output,
+		})
+	}
+
+	return ApplyRubyDelegatedChildOutputs(
+		*merged.Output,
+		operations,
+		astmerge.DelegatedChildApplyPlan{Entries: planEntries},
+		appliedChildren,
+	)
 }
 
 func RubyDiscoveredSurfaces(analysis RubyAnalysis) []astmerge.DiscoveredSurface {

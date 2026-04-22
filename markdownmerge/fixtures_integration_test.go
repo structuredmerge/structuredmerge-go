@@ -243,6 +243,31 @@ func TestSharedFixtureMarkdownDelegatedChildApplyOutput(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMarkdownNestedMerge(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-290-nested-merge", "fenced-code-nested-merge.json")
+	nestedOutputsSource, err := json.Marshal(fixture["nested_outputs"])
+	if err != nil {
+		t.Fatalf("marshal nested outputs: %v", err)
+	}
+	var nestedOutputs []NestedChildOutput
+	if err := json.Unmarshal(nestedOutputsSource, &nestedOutputs); err != nil {
+		t.Fatalf("decode nested outputs: %v", err)
+	}
+	result := MergeMarkdownWithNestedOutputs(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		DialectMarkdown,
+		nestedOutputs,
+		BackendKreuzberg,
+	)
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected nested merge success: %+v", result)
+	}
+	if *result.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected nested merge output:\n%s", *result.Output)
+	}
+}
+
 func TestSharedFixtureMarkdownEmbeddedFamilies(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-208-embedded-families", "code-fence-families.json")
 	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendKreuzberg)

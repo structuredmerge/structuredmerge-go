@@ -213,6 +213,28 @@ func TestRubyFixtures(t *testing.T) {
 		t.Fatalf("unexpected delegated child applied output:\n%s", *applyOutputResult.Output)
 	}
 
+	nestedMergeFixture := readRubyFixture(t, "ruby", "slice-291-nested-merge", "yard-example-nested-merge.json")
+	nestedOutputsSource, err := json.Marshal(nestedMergeFixture["nested_outputs"])
+	if err != nil {
+		t.Fatalf("marshal nested outputs: %v", err)
+	}
+	var nestedOutputs []NestedChildOutput
+	if err := json.Unmarshal(nestedOutputsSource, &nestedOutputs); err != nil {
+		t.Fatalf("decode nested outputs: %v", err)
+	}
+	nestedMergeResult := MergeRubyWithNestedOutputs(
+		nestedMergeFixture["template"].(string),
+		nestedMergeFixture["destination"].(string),
+		DialectRuby,
+		nestedOutputs,
+	)
+	if !nestedMergeResult.OK || nestedMergeResult.Output == nil {
+		t.Fatalf("expected nested merge success: %+v", nestedMergeResult)
+	}
+	if *nestedMergeResult.Output != nestedMergeFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected nested merge output:\n%s", *nestedMergeResult.Output)
+	}
+
 	invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
 	invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
 	if invalidTemplateResult.OK {
