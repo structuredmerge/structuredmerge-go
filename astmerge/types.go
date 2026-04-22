@@ -340,6 +340,18 @@ type DelegatedChildOutputResolution struct {
 	AppliedChildren []AppliedDelegatedChildOutput `json:"applied_children,omitempty"`
 }
 
+type NestedMergeDiscoveryResult struct {
+	OK          bool                      `json:"ok"`
+	Diagnostics []Diagnostic              `json:"diagnostics"`
+	Operations  []DelegatedChildOperation `json:"operations,omitempty"`
+}
+
+type NestedMergeExecutionCallbacks[T any] struct {
+	MergeParent          func() MergeResult[T]
+	DiscoverOperations   func(mergedOutput T) NestedMergeDiscoveryResult
+	ApplyResolvedOutputs func(mergedOutput T, operations []DelegatedChildOperation, applyPlan DelegatedChildApplyPlan, appliedChildren []AppliedDelegatedChildOutput) MergeResult[T]
+}
+
 type ReviewReplayBundle struct {
 	ReplayContext ReviewReplayContext `json:"replay_context"`
 	Decisions     []ReviewDecision    `json:"decisions"`
@@ -798,6 +810,42 @@ func ResolveDelegatedChildOutputs(
 		ApplyPlan:       &DelegatedChildApplyPlan{Entries: entries},
 		AppliedChildren: appliedChildren,
 	}
+}
+
+func ExecuteNestedMerge[T any](
+	nestedOutputs []DelegatedChildSurfaceOutput,
+	options DelegatedChildOutputResolutionOptions,
+	callbacks NestedMergeExecutionCallbacks[T],
+) MergeResult[T] {
+	merged := callbacks.MergeParent()
+	if !merged.OK || merged.Output == nil {
+		return merged
+	}
+
+	discovery := callbacks.DiscoverOperations(*merged.Output)
+	if !discovery.OK {
+		return MergeResult[T]{
+			OK:          false,
+			Diagnostics: discovery.Diagnostics,
+			Policies:    []PolicyReference{},
+		}
+	}
+
+	resolution := ResolveDelegatedChildOutputs(discovery.Operations, nestedOutputs, options)
+	if !resolution.OK || resolution.ApplyPlan == nil {
+		return MergeResult[T]{
+			OK:          false,
+			Diagnostics: resolution.Diagnostics,
+			Policies:    []PolicyReference{},
+		}
+	}
+
+	return callbacks.ApplyResolvedOutputs(
+		*merged.Output,
+		discovery.Operations,
+		*resolution.ApplyPlan,
+		resolution.AppliedChildren,
+	)
 }
 
 func DefaultConformanceFamilyContext(

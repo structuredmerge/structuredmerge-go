@@ -594,17 +594,6 @@ func MergeRubyWithNestedOutputs(
 	dialect RubyDialect,
 	nestedOutputs []NestedChildOutput,
 ) astmerge.MergeResult[string] {
-	merged := MergeRuby(templateSource, destinationSource, dialect)
-	if !merged.OK || merged.Output == nil {
-		return merged
-	}
-
-	analysis := ParseRuby(*merged.Output, dialect)
-	if !analysis.OK || analysis.Analysis == nil {
-		return astmerge.MergeResult[string]{OK: false, Diagnostics: analysis.Diagnostics, Policies: []astmerge.PolicyReference{}}
-	}
-
-	operations := RubyDelegatedChildOperations(*analysis.Analysis, "ruby-document-0")
 	resolutionInputs := make([]astmerge.DelegatedChildSurfaceOutput, 0, len(nestedOutputs))
 	for _, nestedOutput := range nestedOutputs {
 		resolutionInputs = append(resolutionInputs, astmerge.DelegatedChildSurfaceOutput{
@@ -612,30 +601,47 @@ func MergeRubyWithNestedOutputs(
 			Output:         nestedOutput.Output,
 		})
 	}
-	resolution := astmerge.ResolveDelegatedChildOutputs(
-		operations,
+	return astmerge.ExecuteNestedMerge[string](
 		resolutionInputs,
 		astmerge.DelegatedChildOutputResolutionOptions{
 			DefaultFamily:   "ruby",
 			RequestIDPrefix: "nested_ruby_child",
 		},
-	)
-	if !resolution.OK || resolution.ApplyPlan == nil {
-		return astmerge.MergeResult[string]{OK: false, Diagnostics: resolution.Diagnostics, Policies: []astmerge.PolicyReference{}}
-	}
-	appliedChildren := make([]AppliedChildOutput, 0, len(resolution.AppliedChildren))
-	for _, entry := range resolution.AppliedChildren {
-		appliedChildren = append(appliedChildren, AppliedChildOutput{
-			OperationID: entry.OperationID,
-			Output:      entry.Output,
-		})
-	}
+		astmerge.NestedMergeExecutionCallbacks[string]{
+			MergeParent: func() astmerge.MergeResult[string] {
+				return MergeRuby(templateSource, destinationSource, dialect)
+			},
+			DiscoverOperations: func(mergedOutput string) astmerge.NestedMergeDiscoveryResult {
+				analysis := ParseRuby(mergedOutput, dialect)
+				if !analysis.OK || analysis.Analysis == nil {
+					return astmerge.NestedMergeDiscoveryResult{
+						OK:          false,
+						Diagnostics: analysis.Diagnostics,
+					}
+				}
 
-	return ApplyRubyDelegatedChildOutputs(
-		*merged.Output,
-		operations,
-		*resolution.ApplyPlan,
-		appliedChildren,
+				return astmerge.NestedMergeDiscoveryResult{
+					OK:          true,
+					Diagnostics: []astmerge.Diagnostic{},
+					Operations:  RubyDelegatedChildOperations(*analysis.Analysis, "ruby-document-0"),
+				}
+			},
+			ApplyResolvedOutputs: func(mergedOutput string, operations []astmerge.DelegatedChildOperation, applyPlan astmerge.DelegatedChildApplyPlan, appliedChildren []astmerge.AppliedDelegatedChildOutput) astmerge.MergeResult[string] {
+				children := make([]AppliedChildOutput, 0, len(appliedChildren))
+				for _, entry := range appliedChildren {
+					children = append(children, AppliedChildOutput{
+						OperationID: entry.OperationID,
+						Output:      entry.Output,
+					})
+				}
+				return ApplyRubyDelegatedChildOutputs(
+					mergedOutput,
+					operations,
+					applyPlan,
+					children,
+				)
+			},
+		},
 	)
 }
 
