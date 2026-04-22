@@ -3195,6 +3195,85 @@ func TestSharedFixtureReviewReplayBundleTransportRejection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewReplayBundleEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope_application"))
+	manifest := decodeFixtureValue[ConformanceManifest](t, fixture["manifest"])
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	envelope := parseReviewReplayBundleEnvelope(fixture["review_replay_bundle_envelope"].(map[string]any))
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	state := ReviewConformanceManifestWithReplayBundleEnvelope(manifest, options, envelope, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if raw, ok := executionsRaw[key]; ok {
+			return parseConformanceCaseExecution(raw.(map[string]any))
+		}
+
+		return ConformanceCaseExecution{
+			Outcome:  ConformanceFailed,
+			Messages: []string{"missing execution"},
+		}
+	})
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected replay bundle envelope application state: %+v", state)
+	}
+}
+
+func TestSharedFixtureExplicitReviewReplayBundleEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "explicit_review_replay_bundle_envelope_application"))
+	manifest := decodeFixtureValue[ConformanceManifest](t, fixture["manifest"])
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	envelope := parseReviewReplayBundleEnvelope(fixture["review_replay_bundle_envelope"].(map[string]any))
+	expected := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	state := ReviewConformanceManifestWithReplayBundleEnvelope(manifest, options, envelope, func(run ConformanceCaseRun) ConformanceCaseExecution {
+		key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+		if raw, ok := executionsRaw[key]; ok {
+			return parseConformanceCaseExecution(raw.(map[string]any))
+		}
+
+		return ConformanceCaseExecution{
+			Outcome:  ConformanceFailed,
+			Messages: []string{"missing execution"},
+		}
+	})
+
+	if !reflect.DeepEqual(state, expected) {
+		t.Fatalf("unexpected explicit replay bundle envelope application state: %+v", state)
+	}
+}
+
+func TestSharedFixtureReviewReplayBundleEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope_review_rejection"))
+	manifest := decodeFixtureValue[ConformanceManifest](t, fixture["manifest"])
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		fixtureCase := rawCase.(map[string]any)
+		envelope := parseReviewReplayBundleEnvelope(fixtureCase["review_replay_bundle_envelope"].(map[string]any))
+		expected := parseConformanceManifestReviewState(fixtureCase["expected_state"].(map[string]any))
+
+		state := ReviewConformanceManifestWithReplayBundleEnvelope(manifest, options, envelope, func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := executionsRaw[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		})
+
+		if !reflect.DeepEqual(state, expected) {
+			t.Fatalf("unexpected replay bundle envelope rejection state: %+v", state)
+		}
+	}
+}
+
 func TestSharedFixtureReviewedNestedExecutionJSONRoundtrip(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "reviewed_nested_execution_json_roundtrip"))
 	execution := parseReviewedNestedExecution(fixture["execution"].(map[string]any))

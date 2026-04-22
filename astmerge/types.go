@@ -1725,6 +1725,30 @@ func ReviewConformanceManifest(
 	}
 }
 
+func ReviewConformanceManifestWithReplayBundleEnvelope(
+	manifest ConformanceManifest,
+	options ConformanceManifestReviewOptions,
+	replayBundleEnvelope ReviewReplayBundleEnvelope,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+) ConformanceManifestReviewState {
+	replayBundle, importErr := ImportReviewReplayBundleEnvelope(replayBundleEnvelope)
+	if importErr == nil {
+		envelopeOptions := options
+		envelopeOptions.ReviewReplayBundle = replayBundle
+		return ReviewConformanceManifest(manifest, envelopeOptions, execute)
+	}
+
+	fallbackOptions := options
+	fallbackOptions.ReviewReplayBundle = nil
+	state := ReviewConformanceManifest(manifest, fallbackOptions, execute)
+	state.Diagnostics = append(state.Diagnostics, Diagnostic{
+		Severity: SeverityError,
+		Category: DiagnosticCategory(importErr.Category),
+		Message:  importErr.Message,
+	})
+	return state
+}
+
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {
 	return ConformanceSuiteReport{
 		Results: results,
