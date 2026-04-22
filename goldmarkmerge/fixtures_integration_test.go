@@ -169,7 +169,14 @@ func TestSharedFixtureMarkdownProviderReviewedNestedMerge(t *testing.T) {
 }
 
 func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactApplication(t *testing.T) {
-	fixture := readGoldmarkFixture(t, "markdown", "slice-309-reviewed-nested-review-artifact-application", "fenced-code-reviewed-nested-review-artifact-application.json")
+	providerFixture := readGoldmarkFixture(t, "diagnostics", "slice-326-markdown-provider-reviewed-nested-review-artifact-application", "go-markdown-provider-reviewed-nested-review-artifact-application.json")
+	sharedFixturePathRaw := providerFixture["shared_fixture_path"].([]any)
+	sharedFixturePath := make([]string, 0, len(sharedFixturePathRaw))
+	for _, part := range sharedFixturePathRaw {
+		sharedFixturePath = append(sharedFixturePath, part.(string))
+	}
+	fixture := readGoldmarkFixture(t, sharedFixturePath...)
+	expected := providerFixture["providers"].(map[string]any)["goldmark"].(map[string]any)["expected"].(map[string]any)
 	replayBundleSource, err := json.Marshal(fixture["replay_bundle"])
 	if err != nil {
 		t.Fatalf("marshal replay bundle: %v", err)
@@ -196,7 +203,7 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactApplication(t 
 	if !replayResult.OK || replayResult.Output == nil {
 		t.Fatalf("expected replay-bundle reviewed nested merge success: %+v", replayResult)
 	}
-	if *replayResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+	if *replayResult.Output != expected["output"].(string) {
 		t.Fatalf("unexpected replay-bundle reviewed nested merge output:\n%s", *replayResult.Output)
 	}
 
@@ -209,7 +216,7 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactApplication(t 
 	if !stateResult.OK || stateResult.Output == nil {
 		t.Fatalf("expected review-state reviewed nested merge success: %+v", stateResult)
 	}
-	if *stateResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+	if *stateResult.Output != expected["output"].(string) {
 		t.Fatalf("unexpected review-state reviewed nested merge output:\n%s", *stateResult.Output)
 	}
 }
