@@ -395,6 +395,11 @@ type ReviewedNestedExecutionApplication[T any] struct {
 	Results     []ReviewedNestedExecutionResult[T] `json:"results"`
 }
 
+type ConformanceManifestReviewedNestedApplication[T any] struct {
+	State   ConformanceManifestReviewState     `json:"state"`
+	Results []ReviewedNestedExecutionResult[T] `json:"results"`
+}
+
 type ReviewedNestedExecutionResult[T any] struct {
 	Execution ReviewedNestedExecution `json:"execution"`
 	Result    MergeResult[T]          `json:"result"`
@@ -1796,6 +1801,26 @@ func ReviewConformanceManifestWithReplayBundleEnvelope(
 		Message:  importErr.Message,
 	})
 	return state
+}
+
+func ReviewAndExecuteConformanceManifestWithReplayBundleEnvelope[T any](
+	manifest ConformanceManifest,
+	options ConformanceManifestReviewOptions,
+	replayBundleEnvelope ReviewReplayBundleEnvelope,
+	execute func(ConformanceCaseRun) ConformanceCaseExecution,
+	callbacksForExecution func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[T],
+) ConformanceManifestReviewedNestedApplication[T] {
+	state := ReviewConformanceManifestWithReplayBundleEnvelope(
+		manifest,
+		options,
+		replayBundleEnvelope,
+		execute,
+	)
+
+	return ConformanceManifestReviewedNestedApplication[T]{
+		State:   state,
+		Results: ExecuteReviewStateReviewedNestedExecutions(state, callbacksForExecution),
+	}
 }
 
 func ReportConformanceSuite(results []ConformanceCaseResult) ConformanceSuiteReport {

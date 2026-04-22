@@ -3452,6 +3452,77 @@ func TestSharedFixtureReviewStateEnvelopeReviewedNestedExecutionRejection(t *tes
 	}
 }
 
+func TestSharedFixtureReviewReplayBundleEnvelopeReviewedNestedManifestApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope_reviewed_nested_manifest_application"))
+	manifest := decodeFixtureValue[ConformanceManifest](t, fixture["manifest"])
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	envelope := parseReviewReplayBundleEnvelope(fixture["review_replay_bundle_envelope"].(map[string]any))
+	expectedState := parseConformanceManifestReviewState(fixture["expected_state"].(map[string]any))
+	expectedApplication := fixture["expected_application"].(map[string]any)
+	expectedResults := expectedApplication["results"].([]any)
+
+	application := ReviewAndExecuteConformanceManifestWithReplayBundleEnvelope(
+		manifest,
+		options,
+		envelope,
+		func(run ConformanceCaseRun) ConformanceCaseExecution {
+			key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+			if raw, ok := fixture["executions"].(map[string]any)[key]; ok {
+				return parseConformanceCaseExecution(raw.(map[string]any))
+			}
+
+			return ConformanceCaseExecution{
+				Outcome:  ConformanceFailed,
+				Messages: []string{"missing execution"},
+			}
+		},
+		reviewedNestedExecutionCallbacksForFixture(t, expectedResults),
+	)
+
+	if !reflect.DeepEqual(application.State, expectedState) {
+		t.Fatalf("unexpected replay bundle envelope reviewed nested application state: %+v", application.State)
+	}
+	assertReviewedNestedExecutionResults(t, application.Results, expectedResults)
+}
+
+func TestSharedFixtureReviewReplayBundleEnvelopeReviewedNestedManifestRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope_reviewed_nested_manifest_rejection"))
+	manifest := decodeFixtureValue[ConformanceManifest](t, fixture["manifest"])
+	options := parseConformanceManifestReviewOptions(fixture["options"].(map[string]any))
+	executionsRaw := fixture["executions"].(map[string]any)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		fixtureCase := rawCase.(map[string]any)
+		envelope := parseReviewReplayBundleEnvelope(fixtureCase["review_replay_bundle_envelope"].(map[string]any))
+		expectedState := parseConformanceManifestReviewState(fixtureCase["expected_state"].(map[string]any))
+
+		application := ReviewAndExecuteConformanceManifestWithReplayBundleEnvelope[string](
+			manifest,
+			options,
+			envelope,
+			func(run ConformanceCaseRun) ConformanceCaseExecution {
+				key := run.Ref.Family + ":" + run.Ref.Role + ":" + run.Ref.Case
+				if raw, ok := executionsRaw[key]; ok {
+					return parseConformanceCaseExecution(raw.(map[string]any))
+				}
+
+				return ConformanceCaseExecution{
+					Outcome:  ConformanceFailed,
+					Messages: []string{"missing execution"},
+				}
+			},
+			func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[string] {
+				t.Fatal("callbacks should not run for rejected replay bundle envelopes")
+				return NestedMergeExecutionCallbacks[string]{}
+			},
+		)
+
+		if !reflect.DeepEqual(application.State, expectedState) || len(application.Results) != 0 {
+			t.Fatalf("unexpected replay bundle envelope reviewed nested rejection application: %+v", application)
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
