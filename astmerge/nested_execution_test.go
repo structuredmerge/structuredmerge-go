@@ -145,3 +145,100 @@ func TestExecuteNestedMergeReturnsDiscoveryFailureAndSkipsApply(t *testing.T) {
 		t.Fatalf("unexpected discovery failure handling: result=%+v applied=%v", result, applied)
 	}
 }
+
+func TestExecuteDelegatedChildApplyPlanOrchestratesStages(t *testing.T) {
+	address := "document[0] > fenced_code_block[/code_fence/0]"
+	output := "final-parent"
+	result := ExecuteDelegatedChildApplyPlan[string](
+		DelegatedChildApplyPlan{
+			Entries: []DelegatedChildApplyPlanEntry{{
+				RequestID: "projected_child_group:markdown:fence:typescript",
+				Family:    "markdown",
+				DelegatedGroup: ProjectedChildReviewGroup{
+					DelegatedApplyGroup:         "markdown:fence:typescript",
+					ParentOperationID:           "parent:merge",
+					ChildOperationID:            "operation:" + address,
+					DelegatedRuntimeSurfacePath: address,
+					CaseIDs:                     []string{},
+					DelegatedCaseIDs:            []string{},
+				},
+				Decision: ReviewDecision{
+					RequestID: "projected_child_group:markdown:fence:typescript",
+					Action:    ReviewDecisionApplyDelegatedChildGroup,
+				},
+			}},
+		},
+		[]AppliedDelegatedChildOutput{{OperationID: "operation:" + address, Output: "child-output\n"}},
+		NestedMergeExecutionCallbacks[string]{
+			MergeParent: func() MergeResult[string] {
+				merged := "merged-parent"
+				return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &merged, Policies: []PolicyReference{}}
+			},
+			DiscoverOperations: func(string) NestedMergeDiscoveryResult {
+				return NestedMergeDiscoveryResult{
+					OK:          true,
+					Diagnostics: []Diagnostic{},
+					Operations:  []DelegatedChildOperation{nestedOperation(address, "")},
+				}
+			},
+			ApplyResolvedOutputs: func(_ string, _ []DelegatedChildOperation, applyPlan DelegatedChildApplyPlan, appliedChildren []AppliedDelegatedChildOutput) MergeResult[string] {
+				if len(applyPlan.Entries) != 1 || len(appliedChildren) != 1 {
+					t.Fatalf("unexpected apply orchestration inputs: %+v %+v", applyPlan, appliedChildren)
+				}
+				return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+			},
+		},
+	)
+
+	if !result.OK || result.Output == nil || *result.Output != "final-parent" {
+		t.Fatalf("unexpected delegated child apply plan execution result: %+v", result)
+	}
+}
+
+func TestExecuteReviewedNestedMergeUsesAcceptedReviewState(t *testing.T) {
+	address := "document[0] > fenced_code_block[/code_fence/0]"
+	output := "final-parent"
+	result := ExecuteReviewedNestedMerge[string](
+		DelegatedChildGroupReviewState{
+			Requests: []ReviewRequest{},
+			AcceptedGroups: []ProjectedChildReviewGroup{{
+				DelegatedApplyGroup:         "markdown:fence:typescript",
+				ParentOperationID:           "parent:merge",
+				ChildOperationID:            "operation:" + address,
+				DelegatedRuntimeSurfacePath: address,
+				CaseIDs:                     []string{},
+				DelegatedCaseIDs:            []string{},
+			}},
+			AppliedDecisions: []ReviewDecision{{
+				RequestID: "projected_child_group:markdown:fence:typescript",
+				Action:    ReviewDecisionApplyDelegatedChildGroup,
+			}},
+			Diagnostics: []Diagnostic{},
+		},
+		"markdown",
+		[]AppliedDelegatedChildOutput{{OperationID: "operation:" + address, Output: "child-output\n"}},
+		NestedMergeExecutionCallbacks[string]{
+			MergeParent: func() MergeResult[string] {
+				merged := "merged-parent"
+				return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &merged, Policies: []PolicyReference{}}
+			},
+			DiscoverOperations: func(string) NestedMergeDiscoveryResult {
+				return NestedMergeDiscoveryResult{
+					OK:          true,
+					Diagnostics: []Diagnostic{},
+					Operations:  []DelegatedChildOperation{nestedOperation(address, "")},
+				}
+			},
+			ApplyResolvedOutputs: func(_ string, _ []DelegatedChildOperation, applyPlan DelegatedChildApplyPlan, _ []AppliedDelegatedChildOutput) MergeResult[string] {
+				if len(applyPlan.Entries) != 1 || applyPlan.Entries[0].RequestID != "projected_child_group:markdown:fence:typescript" {
+					t.Fatalf("unexpected reviewed nested merge apply plan: %+v", applyPlan)
+				}
+				return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+			},
+		},
+	)
+
+	if !result.OK || result.Output == nil || *result.Output != "final-parent" {
+		t.Fatalf("unexpected reviewed nested merge result: %+v", result)
+	}
+}

@@ -848,6 +848,46 @@ func ExecuteNestedMerge[T any](
 	)
 }
 
+func ExecuteDelegatedChildApplyPlan[T any](
+	applyPlan DelegatedChildApplyPlan,
+	appliedChildren []AppliedDelegatedChildOutput,
+	callbacks NestedMergeExecutionCallbacks[T],
+) MergeResult[T] {
+	merged := callbacks.MergeParent()
+	if !merged.OK || merged.Output == nil {
+		return merged
+	}
+
+	discovery := callbacks.DiscoverOperations(*merged.Output)
+	if !discovery.OK {
+		return MergeResult[T]{
+			OK:          false,
+			Diagnostics: discovery.Diagnostics,
+			Policies:    []PolicyReference{},
+		}
+	}
+
+	return callbacks.ApplyResolvedOutputs(
+		*merged.Output,
+		discovery.Operations,
+		applyPlan,
+		appliedChildren,
+	)
+}
+
+func ExecuteReviewedNestedMerge[T any](
+	state DelegatedChildGroupReviewState,
+	family string,
+	appliedChildren []AppliedDelegatedChildOutput,
+	callbacks NestedMergeExecutionCallbacks[T],
+) MergeResult[T] {
+	return ExecuteDelegatedChildApplyPlan(
+		DelegatedChildApplyPlanForState(state, family),
+		appliedChildren,
+		callbacks,
+	)
+}
+
 func DefaultConformanceFamilyContext(
 	familyProfile FamilyFeatureProfile,
 ) ConformanceFamilyPlanContext {
