@@ -478,6 +478,96 @@ func TestMiniTemplateTreePreviewFixture(t *testing.T) {
 	}
 }
 
+func TestMiniTemplateTreeApplyFixture(t *testing.T) {
+	planFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	applyFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_apply"))
+	fixtureDir := filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	templateContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "template"))
+	destinationContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "destination"))
+	templateSourcePaths := mapsKeys(templateContents)
+	slices.Sort(templateSourcePaths)
+	existingDestinationPaths := mapsKeys(destinationContents)
+	slices.Sort(existingDestinationPaths)
+	context := decodeFixtureValueUntyped[TemplateDestinationContext](planFixture["context"])
+	overrides := decodeFixtureValueUntyped[[]TemplateStrategyOverride](planFixture["overrides"])
+	replacements := decodeFixtureValueUntyped[map[string]string](planFixture["replacements"])
+	mergeResults := decodeFixtureValueUntyped[map[string]MergeResult[string]](applyFixture["merge_results"])
+
+	executionPlan := PlanTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		existingDestinationPaths,
+		destinationContents,
+		&context,
+		TemplateStrategy(planFixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		nil,
+	)
+	actual := ApplyTemplateExecution(executionPlan, func(entry TemplateExecutionPlanEntry) MergeResult[string] {
+		if entry.DestinationPath == nil {
+			return MergeResult[string]{OK: false}
+		}
+
+		return mergeResults[*entry.DestinationPath]
+	})
+	expected := decodeFixtureValue[TemplateApplyResult](t, applyFixture["expected_result"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected mini template tree apply to match fixture")
+	}
+}
+
+func TestMiniTemplateTreeConvergenceFixture(t *testing.T) {
+	planFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	applyFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_apply"))
+	convergenceFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_convergence"))
+	fixtureDir := filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	templateContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "template"))
+	destinationContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "destination"))
+	templateSourcePaths := mapsKeys(templateContents)
+	slices.Sort(templateSourcePaths)
+	existingDestinationPaths := mapsKeys(destinationContents)
+	slices.Sort(existingDestinationPaths)
+	context := decodeFixtureValueUntyped[TemplateDestinationContext](planFixture["context"])
+	overrides := decodeFixtureValueUntyped[[]TemplateStrategyOverride](planFixture["overrides"])
+	replacements := decodeFixtureValueUntyped[map[string]string](planFixture["replacements"])
+	mergeResults := decodeFixtureValueUntyped[map[string]MergeResult[string]](applyFixture["merge_results"])
+
+	executionPlan := PlanTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		existingDestinationPaths,
+		destinationContents,
+		&context,
+		TemplateStrategy(planFixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		nil,
+	)
+	applyResult := ApplyTemplateExecution(executionPlan, func(entry TemplateExecutionPlanEntry) MergeResult[string] {
+		if entry.DestinationPath == nil {
+			return MergeResult[string]{OK: false}
+		}
+
+		return mergeResults[*entry.DestinationPath]
+	})
+	convergenceReplacements := decodeFixtureValueUntyped[map[string]string](convergenceFixture["replacements"])
+	actual := EvaluateTemplateTreeConvergence(
+		templateSourcePaths,
+		templateContents,
+		applyResult.ResultFiles,
+		&context,
+		TemplateStrategy(planFixture["default_strategy"].(string)),
+		overrides,
+		convergenceReplacements,
+		nil,
+	)
+	expected := decodeFixtureValue[TemplateConvergenceResult](t, convergenceFixture["expected"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected mini template tree convergence to match fixture")
+	}
+}
+
 func mapsKeys[V any](input map[string]V) []string {
 	keys := make([]string, 0, len(input))
 	for key := range input {

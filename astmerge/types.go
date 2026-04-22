@@ -298,6 +298,21 @@ type TemplatePreviewResult struct {
 	OmittedPaths []string          `json:"omitted_paths"`
 }
 
+type TemplateApplyResult struct {
+	ResultFiles  map[string]string `json:"result_files"`
+	CreatedPaths []string          `json:"created_paths"`
+	UpdatedPaths []string          `json:"updated_paths"`
+	KeptPaths    []string          `json:"kept_paths"`
+	BlockedPaths []string          `json:"blocked_paths"`
+	OmittedPaths []string          `json:"omitted_paths"`
+	Diagnostics  []Diagnostic      `json:"diagnostics"`
+}
+
+type TemplateConvergenceResult struct {
+	Converged    bool     `json:"converged"`
+	PendingPaths []string `json:"pending_paths"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -1207,6 +1222,128 @@ func PreviewTemplateExecution(entries []TemplateExecutionPlanEntry) TemplatePrev
 	}
 
 	return result
+}
+
+func ApplyTemplateExecution(
+	entries []TemplateExecutionPlanEntry,
+	mergePreparedContent func(TemplateExecutionPlanEntry) MergeResult[string],
+) TemplateApplyResult {
+	result := TemplateApplyResult{
+		ResultFiles:  map[string]string{},
+		CreatedPaths: []string{},
+		UpdatedPaths: []string{},
+		KeptPaths:    []string{},
+		BlockedPaths: []string{},
+		OmittedPaths: []string{},
+		Diagnostics:  []Diagnostic{},
+	}
+
+	for _, entry := range entries {
+		switch entry.ExecutionAction {
+		case TemplateExecutionBlocked:
+			if entry.DestinationPath != nil {
+				result.BlockedPaths = append(result.BlockedPaths, *entry.DestinationPath)
+			}
+		case TemplateExecutionOmit:
+			result.OmittedPaths = append(result.OmittedPaths, entry.LogicalDestinationPath)
+		case TemplateExecutionKeep:
+			if entry.DestinationPath != nil && entry.DestinationContent != nil {
+				result.ResultFiles[*entry.DestinationPath] = *entry.DestinationContent
+				result.KeptPaths = append(result.KeptPaths, *entry.DestinationPath)
+			}
+		case TemplateExecutionRawCopy, TemplateExecutionWritePrepared:
+			if entry.DestinationPath != nil && entry.PreparedTemplateContent != nil {
+				result.ResultFiles[*entry.DestinationPath] = *entry.PreparedTemplateContent
+				if entry.DestinationExists {
+					result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
+				} else {
+					result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
+				}
+			}
+		case TemplateExecutionMergePrepared:
+			if entry.DestinationPath == nil || entry.PreparedTemplateContent == nil {
+				continue
+			}
+			if entry.DestinationContent == nil {
+				result.ResultFiles[*entry.DestinationPath] = *entry.PreparedTemplateContent
+				if entry.DestinationExists {
+					result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
+				} else {
+					result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
+				}
+				continue
+			}
+
+			mergeResult := mergePreparedContent(entry)
+			result.Diagnostics = append(result.Diagnostics, mergeResult.Diagnostics...)
+			if !mergeResult.OK || mergeResult.Output == nil {
+				result.BlockedPaths = append(result.BlockedPaths, *entry.DestinationPath)
+				continue
+			}
+
+			result.ResultFiles[*entry.DestinationPath] = *mergeResult.Output
+			if entry.DestinationExists {
+				result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
+			} else {
+				result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
+			}
+		}
+	}
+
+	return result
+}
+
+func EvaluateTemplateTreeConvergence(
+	templateSourcePaths []string,
+	templateContents map[string]string,
+	destinationContents map[string]string,
+	context *TemplateDestinationContext,
+	defaultStrategy TemplateStrategy,
+	overrides []TemplateStrategyOverride,
+	replacements map[string]string,
+	config *TemplateTokenConfig,
+) TemplateConvergenceResult {
+	existingDestinationPaths := mapsKeys(destinationContents)
+	slices.Sort(existingDestinationPaths)
+	executionPlan := PlanTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		existingDestinationPaths,
+		destinationContents,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		config,
+	)
+	pendingPaths := make([]string, 0)
+	for _, entry := range executionPlan {
+		if entry.Blocked {
+			if entry.DestinationPath != nil {
+				pendingPaths = append(pendingPaths, *entry.DestinationPath)
+			} else {
+				pendingPaths = append(pendingPaths, entry.LogicalDestinationPath)
+			}
+			continue
+		}
+		if !entry.Ready {
+			continue
+		}
+		if entry.DestinationContent != nil && entry.PreparedTemplateContent != nil &&
+			*entry.DestinationContent == *entry.PreparedTemplateContent {
+			continue
+		}
+		if entry.DestinationPath != nil {
+			pendingPaths = append(pendingPaths, *entry.DestinationPath)
+		} else {
+			pendingPaths = append(pendingPaths, entry.LogicalDestinationPath)
+		}
+	}
+
+	return TemplateConvergenceResult{
+		Converged:    len(pendingPaths) == 0,
+		PendingPaths: pendingPaths,
+	}
 }
 
 func pathBase(path string) string {
