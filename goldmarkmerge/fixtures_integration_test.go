@@ -222,7 +222,15 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactApplication(t 
 }
 
 func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactRejection(t *testing.T) {
-	fixture := readGoldmarkFixture(t, "markdown", "slice-311-reviewed-nested-review-artifact-rejection", "fenced-code-reviewed-nested-review-artifact-rejection.json")
+	providerFixture := readGoldmarkFixture(t, "diagnostics", "slice-327-markdown-provider-reviewed-nested-review-artifact-rejection", "go-markdown-provider-reviewed-nested-review-artifact-rejection.json")
+	sharedFixturePathRaw := providerFixture["shared_fixture_path"].([]any)
+	sharedFixturePath := make([]string, 0, len(sharedFixturePathRaw))
+	for _, part := range sharedFixturePathRaw {
+		sharedFixturePath = append(sharedFixturePath, part.(string))
+	}
+	fixture := readGoldmarkFixture(t, sharedFixturePath...)
+	expectedReplay := providerFixture["providers"].(map[string]any)["goldmark"].(map[string]any)["expected_replay_bundle"].(map[string]any)
+	expectedState := providerFixture["providers"].(map[string]any)["goldmark"].(map[string]any)["expected_review_state"].(map[string]any)
 	replayBundleSource, err := json.Marshal(fixture["replay_bundle"])
 	if err != nil {
 		t.Fatalf("marshal replay bundle: %v", err)
@@ -246,7 +254,7 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactRejection(t *t
 		markdownmerge.DialectMarkdown,
 		replayBundle,
 	)
-	if replayResult.OK || replayResult.Output != nil || len(replayResult.Diagnostics) != 1 || replayResult.Diagnostics[0].Message != fixture["expected"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+	if replayResult.OK || replayResult.Output != nil || len(replayResult.Diagnostics) != 1 || replayResult.Diagnostics[0].Message != expectedReplay["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
 		t.Fatalf("unexpected replay-bundle rejection: %+v", replayResult)
 	}
 
@@ -256,7 +264,7 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactRejection(t *t
 		markdownmerge.DialectMarkdown,
 		reviewState,
 	)
-	if stateResult.OK || stateResult.Output != nil || len(stateResult.Diagnostics) != 1 || stateResult.Diagnostics[0].Message != fixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+	if stateResult.OK || stateResult.Output != nil || len(stateResult.Diagnostics) != 1 || stateResult.Diagnostics[0].Message != expectedState["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
 		t.Fatalf("unexpected review-state rejection: %+v", stateResult)
 	}
 }
