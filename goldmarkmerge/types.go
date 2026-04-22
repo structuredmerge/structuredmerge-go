@@ -112,6 +112,36 @@ func MergeMarkdown(templateSource string, destinationSource string, dialect mark
 	return markdownmerge.MergeMarkdown(templateSource, destinationSource, dialect, markdownmerge.BackendKreuzberg)
 }
 
+func MergeMarkdownWithReviewedNestedOutputs(
+	templateSource string,
+	destinationSource string,
+	dialect markdownmerge.MarkdownDialect,
+	reviewState astmerge.DelegatedChildGroupReviewState,
+	appliedChildren []markdownmerge.AppliedChildOutput,
+	backend ...string,
+) astmerge.MergeResult[string] {
+	requested := BackendGoldmark
+	if len(backend) > 0 && backend[0] != "" {
+		requested = backend[0]
+	}
+	if requested != BackendGoldmark {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported Markdown backend %s.", requested))},
+			Policies:    []astmerge.PolicyReference{},
+		}
+	}
+
+	return markdownmerge.MergeMarkdownWithReviewedNestedOutputs(
+		templateSource,
+		destinationSource,
+		dialect,
+		reviewState,
+		appliedChildren,
+		markdownmerge.BackendKreuzberg,
+	)
+}
+
 func MarkdownEmbeddedFamilies(analysis markdownmerge.MarkdownAnalysis) []markdownmerge.MarkdownEmbeddedFamilyCandidate {
 	return markdownmerge.MarkdownEmbeddedFamilies(analysis)
 }

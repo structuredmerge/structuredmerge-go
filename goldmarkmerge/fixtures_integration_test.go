@@ -135,6 +135,39 @@ func TestSharedFixtureMarkdownProviderEmbeddedFamilies(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMarkdownProviderReviewedNestedMerge(t *testing.T) {
+	fixture := readGoldmarkFixture(t, "markdown", "slice-298-reviewed-nested-merge", "fenced-code-reviewed-nested-merge.json")
+	reviewStateSource, err := json.Marshal(fixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal review state: %v", err)
+	}
+	var reviewState astmerge.DelegatedChildGroupReviewState
+	if err := json.Unmarshal(reviewStateSource, &reviewState); err != nil {
+		t.Fatalf("decode review state: %v", err)
+	}
+	appliedChildrenSource, err := json.Marshal(fixture["applied_children"])
+	if err != nil {
+		t.Fatalf("marshal applied children: %v", err)
+	}
+	var appliedChildren []markdownmerge.AppliedChildOutput
+	if err := json.Unmarshal(appliedChildrenSource, &appliedChildren); err != nil {
+		t.Fatalf("decode applied children: %v", err)
+	}
+	result := MergeMarkdownWithReviewedNestedOutputs(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		markdownmerge.DialectMarkdown,
+		reviewState,
+		appliedChildren,
+	)
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected reviewed nested merge success: %+v", result)
+	}
+	if *result.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected reviewed nested merge output:\n%s", *result.Output)
+	}
+}
+
 func TestSharedFixtureMarkdownProviderNamedSuitePlans(t *testing.T) {
 	fixture := readGoldmarkFixture(t, "diagnostics", "slice-206-markdown-provider-named-suite-plans", "go-markdown-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])
