@@ -175,6 +175,44 @@ func TestRubyFixtures(t *testing.T) {
 		t.Fatalf("unexpected merge output:\n%s", *mergeResult.Output)
 	}
 
+	applyOutputFixture := readRubyFixture(t, "ruby", "slice-289-delegated-child-apply-output", "yard-example-applied-output.json")
+	operationsSource, err := json.Marshal(applyOutputFixture["delegated_operations"])
+	if err != nil {
+		t.Fatalf("marshal delegated operations: %v", err)
+	}
+	var operations []astmerge.DelegatedChildOperation
+	if err := json.Unmarshal(operationsSource, &operations); err != nil {
+		t.Fatalf("decode delegated operations: %v", err)
+	}
+	applyPlanSource, err := json.Marshal(applyOutputFixture["apply_plan"])
+	if err != nil {
+		t.Fatalf("marshal apply plan: %v", err)
+	}
+	var applyPlan astmerge.DelegatedChildApplyPlan
+	if err := json.Unmarshal(applyPlanSource, &applyPlan); err != nil {
+		t.Fatalf("decode apply plan: %v", err)
+	}
+	childrenSource, err := json.Marshal(applyOutputFixture["applied_children"])
+	if err != nil {
+		t.Fatalf("marshal applied children: %v", err)
+	}
+	var appliedChildren []AppliedChildOutput
+	if err := json.Unmarshal(childrenSource, &appliedChildren); err != nil {
+		t.Fatalf("decode applied children: %v", err)
+	}
+	applyOutputResult := ApplyRubyDelegatedChildOutputs(
+		applyOutputFixture["source"].(string),
+		operations,
+		applyPlan,
+		appliedChildren,
+	)
+	if !applyOutputResult.OK || applyOutputResult.Output == nil {
+		t.Fatalf("expected delegated child apply output success: %+v", applyOutputResult)
+	}
+	if *applyOutputResult.Output != applyOutputFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected delegated child applied output:\n%s", *applyOutputResult.Output)
+	}
+
 	invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
 	invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
 	if invalidTemplateResult.OK {
@@ -362,7 +400,7 @@ func TestRubyFixtures(t *testing.T) {
 	}
 
 	applyPlanFixture := readRubyFixture(t, "ruby", "slice-245-delegated-child-apply-plan", "yard-example-apply-plan.json")
-	applyPlanSource, err := json.Marshal(applyPlanFixture["review_state"])
+	applyPlanSource, err = json.Marshal(applyPlanFixture["review_state"])
 	if err != nil {
 		t.Fatalf("marshal delegated child review state: %v", err)
 	}

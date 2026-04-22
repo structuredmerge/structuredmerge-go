@@ -73,6 +73,11 @@ type MarkdownEmbeddedFamilyCandidate struct {
 	Dialect  string `json:"dialect"`
 }
 
+type AppliedChildOutput struct {
+	OperationID string `json:"operation_id"`
+	Output      string `json:"output"`
+}
+
 func (MarkdownAnalysis) Kind() string {
 	return "markdown"
 }
@@ -95,6 +100,14 @@ func unsupportedFeature(message string) astmerge.Diagnostic {
 	return astmerge.Diagnostic{
 		Severity: astmerge.SeverityError,
 		Category: astmerge.CategoryUnsupportedFeature,
+		Message:  message,
+	}
+}
+
+func configurationError(message string) astmerge.Diagnostic {
+	return astmerge.Diagnostic{
+		Severity: astmerge.SeverityError,
+		Category: astmerge.CategoryConfigurationError,
 		Message:  message,
 	}
 }
@@ -422,6 +435,109 @@ func MergeMarkdown(templateSource string, destinationSource string, dialect Mark
 	}
 
 	output := strings.TrimSpace(strings.Join(mergedSections, "\n\n")) + "\n"
+	return astmerge.MergeResult[string]{
+		OK:          true,
+		Diagnostics: []astmerge.Diagnostic{},
+		Output:      &output,
+		Policies:    []astmerge.PolicyReference{},
+	}
+}
+
+type markdownFenceRange struct {
+	Start int
+	End   int
+}
+
+func markdownFenceRanges(source string) map[string]markdownFenceRange {
+	lines := strings.Split(NormalizeMarkdownSource(source), "\n")
+	ranges := make(map[string]markdownFenceRange)
+	codeFenceIndex := 0
+
+	for index := 0; index < len(lines); index++ {
+		line := lines[index]
+		fence := codeFencePattern.FindStringSubmatch(line)
+		if fence == nil {
+			continue
+		}
+
+		marker := fence[1]
+		markerChar := marker[:1]
+		markerLength := len(marker)
+		end := index
+		for cursor := index + 1; cursor < len(lines); cursor++ {
+			trimmed := strings.TrimSpace(lines[cursor])
+			if len(trimmed) >= markerLength &&
+				strings.Trim(trimmed, markerChar) == "" &&
+				strings.HasPrefix(trimmed, strings.Repeat(markerChar, markerLength)) {
+				end = cursor
+				break
+			}
+			if cursor == len(lines)-1 {
+				end = cursor
+			}
+		}
+
+		ranges[fmt.Sprintf("/code_fence/%d", codeFenceIndex)] = markdownFenceRange{Start: index, End: end}
+		codeFenceIndex++
+		index = end
+	}
+
+	return ranges
+}
+
+func ApplyMarkdownDelegatedChildOutputs(
+	source string,
+	operations []astmerge.DelegatedChildOperation,
+	applyPlan astmerge.DelegatedChildApplyPlan,
+	appliedChildren []AppliedChildOutput,
+) astmerge.MergeResult[string] {
+	lines := strings.Split(NormalizeMarkdownSource(source), "\n")
+	ranges := markdownFenceRanges(source)
+	operationsByID := make(map[string]astmerge.DelegatedChildOperation, len(operations))
+	for _, operation := range operations {
+		operationsByID[operation.OperationID] = operation
+	}
+	outputsByID := make(map[string]string, len(appliedChildren))
+	for _, entry := range appliedChildren {
+		outputsByID[entry.OperationID] = entry.Output
+	}
+
+	type replacement struct {
+		start  int
+		end    int
+		output string
+	}
+	replacements := make([]replacement, 0, len(applyPlan.Entries))
+	for _, entry := range applyPlan.Entries {
+		operation, ok := operationsByID[entry.DelegatedGroup.ChildOperationID]
+		if !ok {
+			continue
+		}
+		output, ok := outputsByID[entry.DelegatedGroup.ChildOperationID]
+		if !ok {
+			continue
+		}
+		rng, ok := ranges[operation.Surface.Owner.Address]
+		if !ok {
+			return astmerge.MergeResult[string]{
+				OK:          false,
+				Diagnostics: []astmerge.Diagnostic{configurationError("missing fenced-code range for " + operation.Surface.Owner.Address)},
+			}
+		}
+		replacements = append(replacements, replacement{start: rng.Start, end: rng.End, output: output})
+	}
+
+	slices.SortFunc(replacements, func(left, right replacement) int { return right.start - left.start })
+	for _, entry := range replacements {
+		body := strings.TrimSuffix(entry.output, "\n")
+		replacementLines := []string{}
+		if entry.output != "" {
+			replacementLines = strings.Split(body, "\n")
+		}
+		lines = append(lines[:entry.start+1], append(replacementLines, lines[entry.end:]...)...)
+	}
+
+	output := strings.TrimRight(strings.Join(lines, "\n"), "\n") + "\n"
 	return astmerge.MergeResult[string]{
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},

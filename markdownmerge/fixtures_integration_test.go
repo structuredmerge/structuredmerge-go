@@ -207,6 +207,42 @@ func TestSharedFixtureMarkdownMerge(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMarkdownDelegatedChildApplyOutput(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-288-delegated-child-apply-output", "fenced-code-applied-output.json")
+	operationsSource, err := json.Marshal(fixture["delegated_operations"])
+	if err != nil {
+		t.Fatalf("marshal delegated operations: %v", err)
+	}
+	var operations []astmerge.DelegatedChildOperation
+	if err := json.Unmarshal(operationsSource, &operations); err != nil {
+		t.Fatalf("decode delegated operations: %v", err)
+	}
+	applyPlanSource, err := json.Marshal(fixture["apply_plan"])
+	if err != nil {
+		t.Fatalf("marshal apply plan: %v", err)
+	}
+	var applyPlan astmerge.DelegatedChildApplyPlan
+	if err := json.Unmarshal(applyPlanSource, &applyPlan); err != nil {
+		t.Fatalf("decode apply plan: %v", err)
+	}
+	childrenSource, err := json.Marshal(fixture["applied_children"])
+	if err != nil {
+		t.Fatalf("marshal applied children: %v", err)
+	}
+	var appliedChildren []AppliedChildOutput
+	if err := json.Unmarshal(childrenSource, &appliedChildren); err != nil {
+		t.Fatalf("decode applied children: %v", err)
+	}
+
+	result := ApplyMarkdownDelegatedChildOutputs(fixture["source"].(string), operations, applyPlan, appliedChildren)
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected apply output success: %+v", result)
+	}
+	if *result.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected delegated child applied output:\n%s", *result.Output)
+	}
+}
+
 func TestSharedFixtureMarkdownEmbeddedFamilies(t *testing.T) {
 	fixture := readMarkdownFixture(t, "markdown", "slice-208-embedded-families", "code-fence-families.json")
 	result := ParseMarkdownWithBackend(fixture["source"].(string), DialectMarkdown, BackendKreuzberg)

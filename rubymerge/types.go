@@ -45,6 +45,11 @@ type RubyAnalysis struct {
 	DiscoveredSurfaces []astmerge.DiscoveredSurface
 }
 
+type AppliedChildOutput struct {
+	OperationID string `json:"operation_id"`
+	Output      string `json:"output"`
+}
+
 func (RubyAnalysis) Kind() string {
 	return "ruby"
 }
@@ -92,6 +97,14 @@ var (
 
 func destinationWinsArrayPolicy() astmerge.PolicyReference {
 	return astmerge.PolicyReference{Surface: astmerge.PolicySurfaceArray, Name: "destination_wins_array"}
+}
+
+func configurationError(message string) astmerge.Diagnostic {
+	return astmerge.Diagnostic{
+		Severity: astmerge.SeverityError,
+		Category: astmerge.CategoryConfigurationError,
+		Message:  message,
+	}
 }
 
 func rubyParseRequest(source string) treehaver.ParserRequest {
@@ -494,6 +507,80 @@ func MergeRuby(templateSource string, destinationSource string, dialect RubyDial
 	output := strings.TrimSpace(strings.Join(sections, "\n\n")) + "\n"
 	policies := []astmerge.PolicyReference{destinationWinsArrayPolicy()}
 	return astmerge.MergeResult[string]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Output: &output, Policies: policies}
+}
+
+func rubyExampleLinePrefix(line string) string {
+	matches := regexp.MustCompile(`^(\s*#\s*)`).FindStringSubmatch(line)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return "# "
+}
+
+func ApplyRubyDelegatedChildOutputs(
+	source string,
+	operations []astmerge.DelegatedChildOperation,
+	applyPlan astmerge.DelegatedChildApplyPlan,
+	appliedChildren []AppliedChildOutput,
+) astmerge.MergeResult[string] {
+	lines := strings.Split(normalizeSource(source), "\n")
+	operationsByID := make(map[string]astmerge.DelegatedChildOperation, len(operations))
+	for _, operation := range operations {
+		operationsByID[operation.OperationID] = operation
+	}
+	outputsByID := make(map[string]string, len(appliedChildren))
+	for _, entry := range appliedChildren {
+		outputsByID[entry.OperationID] = entry.Output
+	}
+
+	type replacement struct {
+		start  int
+		end    int
+		output string
+	}
+	replacements := make([]replacement, 0, len(applyPlan.Entries))
+	for _, entry := range applyPlan.Entries {
+		operation, ok := operationsByID[entry.DelegatedGroup.ChildOperationID]
+		if !ok || operation.Surface.Span == nil {
+			continue
+		}
+		output, ok := outputsByID[entry.DelegatedGroup.ChildOperationID]
+		if !ok {
+			continue
+		}
+		replacements = append(replacements, replacement{
+			start:  operation.Surface.Span.StartLine - 1,
+			end:    operation.Surface.Span.EndLine - 1,
+			output: output,
+		})
+	}
+
+	slices.SortFunc(replacements, func(left, right replacement) int { return right.start - left.start })
+	for _, entry := range replacements {
+		if entry.start < 0 || entry.start >= len(lines) {
+			return astmerge.MergeResult[string]{
+				OK:          false,
+				Diagnostics: []astmerge.Diagnostic{configurationError("invalid delegated child span.")},
+				Policies:    []astmerge.PolicyReference{},
+			}
+		}
+		prefix := rubyExampleLinePrefix(lines[entry.start])
+		replacementLines := []string{}
+		if entry.output != "" {
+			for _, bodyLine := range strings.Split(strings.TrimSuffix(entry.output, "\n"), "\n") {
+				replacementLines = append(replacementLines, prefix+bodyLine)
+			}
+		}
+		lines = append(lines[:entry.start], append(replacementLines, lines[entry.end+1:]...)...)
+	}
+
+	output := strings.TrimRight(strings.Join(lines, "\n"), "\n") + "\n"
+	return astmerge.MergeResult[string]{
+		OK:          true,
+		Diagnostics: []astmerge.Diagnostic{},
+		Output:      &output,
+		Policies:    []astmerge.PolicyReference{destinationWinsArrayPolicy()},
+	}
 }
 
 func RubyDiscoveredSurfaces(analysis RubyAnalysis) []astmerge.DiscoveredSurface {
