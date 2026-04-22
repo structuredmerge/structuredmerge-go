@@ -1494,6 +1494,15 @@ func containsKey[V any](input map[string]V, key string) bool {
 	return ok
 }
 
+func mapsKeys[V any](input map[string]V) []string {
+	keys := make([]string, 0, len(input))
+	for key := range input {
+		keys = append(keys, key)
+	}
+
+	return keys
+}
+
 func conformanceSuiteSelectorsEqual(left ConformanceSuiteSelector, right ConformanceSuiteSelector) bool {
 	return left.Kind == right.Kind &&
 		left.Subject.Grammar == right.Subject.Grammar &&

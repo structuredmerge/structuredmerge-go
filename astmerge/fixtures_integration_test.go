@@ -642,15 +642,6 @@ func TestMiniTemplateTreeRunReportFixture(t *testing.T) {
 	}
 }
 
-func mapsKeys[V any](input map[string]V) []string {
-	keys := make([]string, 0, len(input))
-	for key := range input {
-		keys = append(keys, key)
-	}
-
-	return keys
-}
-
 func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_shape"))
 
