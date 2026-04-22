@@ -313,6 +313,11 @@ type TemplateConvergenceResult struct {
 	PendingPaths []string `json:"pending_paths"`
 }
 
+type TemplateTreeRunResult struct {
+	ExecutionPlan []TemplateExecutionPlanEntry `json:"execution_plan"`
+	ApplyResult   TemplateApplyResult          `json:"apply_result"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -1343,6 +1348,37 @@ func EvaluateTemplateTreeConvergence(
 	return TemplateConvergenceResult{
 		Converged:    len(pendingPaths) == 0,
 		PendingPaths: pendingPaths,
+	}
+}
+
+func RunTemplateTreeExecution(
+	templateSourcePaths []string,
+	templateContents map[string]string,
+	destinationContents map[string]string,
+	context *TemplateDestinationContext,
+	defaultStrategy TemplateStrategy,
+	overrides []TemplateStrategyOverride,
+	replacements map[string]string,
+	mergePreparedContent func(TemplateExecutionPlanEntry) MergeResult[string],
+	config *TemplateTokenConfig,
+) TemplateTreeRunResult {
+	existingDestinationPaths := mapsKeys(destinationContents)
+	slices.Sort(existingDestinationPaths)
+	executionPlan := PlanTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		existingDestinationPaths,
+		destinationContents,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		config,
+	)
+
+	return TemplateTreeRunResult{
+		ExecutionPlan: executionPlan,
+		ApplyResult:   ApplyTemplateExecution(executionPlan, mergePreparedContent),
 	}
 }
 
