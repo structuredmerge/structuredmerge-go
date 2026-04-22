@@ -152,6 +152,13 @@ type FamilyFeatureProfile struct {
 	SupportedPolicies []PolicyReference `json:"supported_policies"`
 }
 
+type TemplateTargetClassification struct {
+	DestinationPath string `json:"destination_path"`
+	FileType        string `json:"file_type"`
+	Family          string `json:"family"`
+	Dialect         string `json:"dialect"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -529,6 +536,92 @@ func ConformanceFamilyFeatureProfilePath(manifest ConformanceManifest, family st
 	}
 
 	return nil
+}
+
+func NormalizeTemplateSourcePath(path string) string {
+	if strings.HasSuffix(path, ".no-osc.example") {
+		return strings.TrimSuffix(path, ".no-osc.example")
+	}
+
+	if strings.HasSuffix(path, ".example") {
+		return strings.TrimSuffix(path, ".example")
+	}
+
+	return path
+}
+
+func ClassifyTemplateTargetPath(path string) TemplateTargetClassification {
+	classify := func(fileType string, family string, dialect string) TemplateTargetClassification {
+		return TemplateTargetClassification{
+			DestinationPath: path,
+			FileType:        fileType,
+			Family:          family,
+			Dialect:         dialect,
+		}
+	}
+
+	normalizedPath := strings.TrimPrefix(path, "./")
+	lowerPath := strings.ToLower(normalizedPath)
+	base := pathBase(normalizedPath)
+	lowerBase := strings.ToLower(base)
+
+	switch normalizedPath {
+	case ".git-hooks/commit-msg":
+		return classify("ruby", "ruby", "ruby")
+	case ".git-hooks/prepare-commit-msg":
+		return classify("bash", "bash", "bash")
+	}
+
+	switch base {
+	case "Gemfile", "Appraisal.root.gemfile":
+		return classify("gemfile", "ruby", "ruby")
+	case "Appraisals":
+		return classify("appraisals", "ruby", "ruby")
+	case "Rakefile", ".simplecov":
+		return classify("ruby", "ruby", "ruby")
+	case ".envrc":
+		return classify("bash", "bash", "bash")
+	case ".tool-versions":
+		return classify("tool_versions", "text", "tool_versions")
+	case "CITATION.cff":
+		return classify("yaml", "yaml", "yaml")
+	}
+
+	switch {
+	case strings.HasSuffix(lowerBase, ".gemspec"):
+		return classify("gemspec", "ruby", "ruby")
+	case strings.HasSuffix(lowerBase, ".gemfile"):
+		return classify("gemfile", "ruby", "ruby")
+	case strings.HasSuffix(lowerBase, ".rb"), strings.HasSuffix(lowerBase, ".rake"):
+		return classify("ruby", "ruby", "ruby")
+	case strings.HasSuffix(lowerPath, ".yml"), strings.HasSuffix(lowerPath, ".yaml"):
+		return classify("yaml", "yaml", "yaml")
+	case strings.HasSuffix(lowerPath, ".md"), strings.HasSuffix(lowerPath, ".markdown"):
+		return classify("markdown", "markdown", "markdown")
+	case strings.HasSuffix(lowerPath, ".sh"), strings.HasSuffix(lowerPath, ".bash"):
+		return classify("bash", "bash", "bash")
+	case lowerBase == ".env", strings.HasPrefix(lowerBase, ".env."):
+		return classify("dotenv", "dotenv", "dotenv")
+	case strings.HasSuffix(lowerPath, ".jsonc"):
+		return classify("json", "json", "jsonc")
+	case strings.HasSuffix(lowerPath, ".json"):
+		return classify("json", "json", "json")
+	case strings.HasSuffix(lowerPath, ".toml"):
+		return classify("toml", "toml", "toml")
+	case strings.HasSuffix(lowerPath, ".rbs"):
+		return classify("rbs", "rbs", "rbs")
+	default:
+		return classify("text", "text", "text")
+	}
+}
+
+func pathBase(path string) string {
+	idx := strings.LastIndex(path, "/")
+	if idx == -1 {
+		return path
+	}
+
+	return path[idx+1:]
 }
 
 func conformanceSuiteSelectorsEqual(left ConformanceSuiteSelector, right ConformanceSuiteSelector) bool {

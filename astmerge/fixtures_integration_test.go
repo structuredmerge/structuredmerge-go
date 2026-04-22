@@ -237,6 +237,31 @@ func TestSharedFixtureFamilyFeatureProfile(t *testing.T) {
 	assertExpectedPolicies(t, profile.SupportedPolicies, expected["supported_policies"].([]any))
 }
 
+func TestTemplateSourcePathMappingFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_source_path_mapping"))
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		actual := NormalizeTemplateSourcePath(testCase["template_source_path"].(string))
+		if actual != testCase["expected_destination_path"].(string) {
+			t.Fatalf("expected %q, got %q", testCase["expected_destination_path"], actual)
+		}
+	}
+}
+
+func TestTemplateTargetClassificationFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_target_classification"))
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		actual := ClassifyTemplateTargetPath(testCase["destination_path"].(string))
+		expected := decodeFixtureValue[TemplateTargetClassification](t, testCase["expected"])
+		if !reflect.DeepEqual(actual, expected) {
+			t.Fatalf("expected classification for %q to match fixture", testCase["destination_path"])
+		}
+	}
+}
+
 func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_shape"))
 
