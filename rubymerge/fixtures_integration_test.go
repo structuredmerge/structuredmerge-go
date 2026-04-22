@@ -308,6 +308,40 @@ func TestRubyFixtures(t *testing.T) {
 		t.Fatalf("unexpected review-state reviewed nested merge output:\n%s", *stateArtifactResult.Output)
 	}
 
+	rejectionFixture := readRubyFixture(t, "ruby", "slice-312-reviewed-nested-review-artifact-rejection", "yard-example-reviewed-nested-review-artifact-rejection.json")
+	replayBundleSource, err = json.Marshal(rejectionFixture["replay_bundle"])
+	if err != nil {
+		t.Fatalf("marshal rejection replay bundle: %v", err)
+	}
+	if err := json.Unmarshal(replayBundleSource, &replayBundle); err != nil {
+		t.Fatalf("decode rejection replay bundle: %v", err)
+	}
+	reviewStateArtifactSource, err = json.Marshal(rejectionFixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal rejection review state: %v", err)
+	}
+	if err := json.Unmarshal(reviewStateArtifactSource, &reviewStateArtifact); err != nil {
+		t.Fatalf("decode rejection review state: %v", err)
+	}
+	replayRejectionResult := MergeRubyWithReviewedNestedOutputsFromReplayBundle(
+		rejectionFixture["template"].(string),
+		rejectionFixture["destination"].(string),
+		DialectRuby,
+		replayBundle,
+	)
+	if replayRejectionResult.OK || replayRejectionResult.Output != nil || len(replayRejectionResult.Diagnostics) != 1 || replayRejectionResult.Diagnostics[0].Message != rejectionFixture["expected"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected replay-bundle rejection: %+v", replayRejectionResult)
+	}
+	stateRejectionResult := MergeRubyWithReviewedNestedOutputsFromReviewState(
+		rejectionFixture["template"].(string),
+		rejectionFixture["destination"].(string),
+		DialectRuby,
+		reviewStateArtifact,
+	)
+	if stateRejectionResult.OK || stateRejectionResult.Output != nil || len(stateRejectionResult.Diagnostics) != 1 || stateRejectionResult.Diagnostics[0].Message != rejectionFixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected review-state rejection: %+v", stateRejectionResult)
+	}
+
 	invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
 	invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
 	if invalidTemplateResult.OK {

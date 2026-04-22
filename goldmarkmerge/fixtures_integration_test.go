@@ -214,6 +214,46 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactApplication(t 
 	}
 }
 
+func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactRejection(t *testing.T) {
+	fixture := readGoldmarkFixture(t, "markdown", "slice-311-reviewed-nested-review-artifact-rejection", "fenced-code-reviewed-nested-review-artifact-rejection.json")
+	replayBundleSource, err := json.Marshal(fixture["replay_bundle"])
+	if err != nil {
+		t.Fatalf("marshal replay bundle: %v", err)
+	}
+	var replayBundle astmerge.ReviewReplayBundle
+	if err := json.Unmarshal(replayBundleSource, &replayBundle); err != nil {
+		t.Fatalf("decode replay bundle: %v", err)
+	}
+	reviewStateSource, err := json.Marshal(fixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal review state: %v", err)
+	}
+	var reviewState astmerge.ConformanceManifestReviewState
+	if err := json.Unmarshal(reviewStateSource, &reviewState); err != nil {
+		t.Fatalf("decode review state: %v", err)
+	}
+
+	replayResult := MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		markdownmerge.DialectMarkdown,
+		replayBundle,
+	)
+	if replayResult.OK || replayResult.Output != nil || len(replayResult.Diagnostics) != 1 || replayResult.Diagnostics[0].Message != fixture["expected"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected replay-bundle rejection: %+v", replayResult)
+	}
+
+	stateResult := MergeMarkdownWithReviewedNestedOutputsFromReviewState(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		markdownmerge.DialectMarkdown,
+		reviewState,
+	)
+	if stateResult.OK || stateResult.Output != nil || len(stateResult.Diagnostics) != 1 || stateResult.Diagnostics[0].Message != fixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected review-state rejection: %+v", stateResult)
+	}
+}
+
 func TestSharedFixtureMarkdownProviderNamedSuitePlans(t *testing.T) {
 	fixture := readGoldmarkFixture(t, "diagnostics", "slice-206-markdown-provider-named-suite-plans", "go-markdown-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])
