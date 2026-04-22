@@ -177,6 +177,15 @@ type TemplateStrategyOverride struct {
 	Strategy TemplateStrategy `json:"strategy"`
 }
 
+type TemplatePlanEntry struct {
+	TemplateSourcePath     string                       `json:"template_source_path"`
+	LogicalDestinationPath string                       `json:"logical_destination_path"`
+	DestinationPath        *string                      `json:"destination_path"`
+	Classification         TemplateTargetClassification `json:"classification"`
+	Strategy               TemplateStrategy             `json:"strategy"`
+	Action                 string                       `json:"action"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -664,6 +673,36 @@ func SelectTemplateStrategy(path string, defaultStrategy TemplateStrategy, overr
 	}
 
 	return defaultStrategy
+}
+
+func PlanTemplateEntries(
+	templateSourcePaths []string,
+	context *TemplateDestinationContext,
+	defaultStrategy TemplateStrategy,
+	overrides []TemplateStrategyOverride,
+) []TemplatePlanEntry {
+	entries := make([]TemplatePlanEntry, 0, len(templateSourcePaths))
+	for _, templateSourcePath := range templateSourcePaths {
+		logicalDestinationPath := NormalizeTemplateSourcePath(templateSourcePath)
+		destinationPath := ResolveTemplateDestinationPath(logicalDestinationPath, context)
+		classification := ClassifyTemplateTargetPath(logicalDestinationPath)
+		strategy := SelectTemplateStrategy(logicalDestinationPath, defaultStrategy, overrides)
+		action := string(strategy)
+		if destinationPath == nil {
+			action = "omit"
+		}
+
+		entries = append(entries, TemplatePlanEntry{
+			TemplateSourcePath:     templateSourcePath,
+			LogicalDestinationPath: logicalDestinationPath,
+			DestinationPath:        destinationPath,
+			Classification:         classification,
+			Strategy:               strategy,
+			Action:                 action,
+		})
+	}
+
+	return entries
 }
 
 func pathBase(path string) string {

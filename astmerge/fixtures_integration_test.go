@@ -300,6 +300,24 @@ func TestTemplateStrategySelectionFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateEntryPlanFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_entry_plan"))
+
+	context := decodeFixtureValueUntyped[TemplateDestinationContext](fixture["context"])
+	overrides := decodeFixtureValueUntyped[[]TemplateStrategyOverride](fixture["overrides"])
+	templateSourcePaths := decodeFixtureValueUntyped[[]string](fixture["template_source_paths"])
+	actual := PlanTemplateEntries(
+		templateSourcePaths,
+		&context,
+		TemplateStrategy(fixture["default_strategy"].(string)),
+		overrides,
+	)
+	expected := decodeFixtureValue[[]TemplatePlanEntry](t, fixture["expected_entries"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected template entry plan to match fixture")
+	}
+}
+
 func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_shape"))
 
