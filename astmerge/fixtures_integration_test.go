@@ -3223,6 +3223,22 @@ func TestSharedFixtureReviewedNestedExecutionTransportRejection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewedNestedExecutionPayload(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "reviewed_nested_execution_payload"))
+	reviewState := parseDelegatedChildGroupReviewState(fixture["review_state"].(map[string]any))
+	appliedChildren := parseReviewedNestedExecution(fixture["expected_execution"].(map[string]any)).AppliedChildren
+	expected := parseReviewedNestedExecution(fixture["expected_execution"].(map[string]any))
+
+	execution := ReviewedNestedExecutionFor(
+		fixture["family"].(string),
+		reviewState,
+		appliedChildren,
+	)
+	if !reflect.DeepEqual(execution, expected) {
+		t.Fatalf("unexpected reviewed nested execution payload: %+v", execution)
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 

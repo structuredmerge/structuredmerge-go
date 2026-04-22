@@ -900,6 +900,30 @@ func ExecuteReviewedNestedMerge[T any](
 	)
 }
 
+func ReviewedNestedExecutionFor(
+	family string,
+	reviewState DelegatedChildGroupReviewState,
+	appliedChildren []AppliedDelegatedChildOutput,
+) ReviewedNestedExecution {
+	return ReviewedNestedExecution{
+		Family:          family,
+		ReviewState:     reviewState,
+		AppliedChildren: appliedChildren,
+	}
+}
+
+func ExecuteReviewedNestedExecution[T any](
+	execution ReviewedNestedExecution,
+	callbacks NestedMergeExecutionCallbacks[T],
+) MergeResult[T] {
+	return ExecuteReviewedNestedMerge(
+		execution.ReviewState,
+		execution.Family,
+		execution.AppliedChildren,
+		callbacks,
+	)
+}
+
 func DefaultConformanceFamilyContext(
 	familyProfile FamilyFeatureProfile,
 ) ConformanceFamilyPlanContext {
