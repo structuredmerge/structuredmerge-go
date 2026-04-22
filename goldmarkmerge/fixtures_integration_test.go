@@ -168,6 +168,52 @@ func TestSharedFixtureMarkdownProviderReviewedNestedMerge(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactApplication(t *testing.T) {
+	fixture := readGoldmarkFixture(t, "markdown", "slice-309-reviewed-nested-review-artifact-application", "fenced-code-reviewed-nested-review-artifact-application.json")
+	replayBundleSource, err := json.Marshal(fixture["replay_bundle"])
+	if err != nil {
+		t.Fatalf("marshal replay bundle: %v", err)
+	}
+	var replayBundle astmerge.ReviewReplayBundle
+	if err := json.Unmarshal(replayBundleSource, &replayBundle); err != nil {
+		t.Fatalf("decode replay bundle: %v", err)
+	}
+	reviewStateSource, err := json.Marshal(fixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal review state: %v", err)
+	}
+	var reviewState astmerge.ConformanceManifestReviewState
+	if err := json.Unmarshal(reviewStateSource, &reviewState); err != nil {
+		t.Fatalf("decode review state: %v", err)
+	}
+
+	replayResult := MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		markdownmerge.DialectMarkdown,
+		replayBundle,
+	)
+	if !replayResult.OK || replayResult.Output == nil {
+		t.Fatalf("expected replay-bundle reviewed nested merge success: %+v", replayResult)
+	}
+	if *replayResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected replay-bundle reviewed nested merge output:\n%s", *replayResult.Output)
+	}
+
+	stateResult := MergeMarkdownWithReviewedNestedOutputsFromReviewState(
+		fixture["template"].(string),
+		fixture["destination"].(string),
+		markdownmerge.DialectMarkdown,
+		reviewState,
+	)
+	if !stateResult.OK || stateResult.Output == nil {
+		t.Fatalf("expected review-state reviewed nested merge success: %+v", stateResult)
+	}
+	if *stateResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected review-state reviewed nested merge output:\n%s", *stateResult.Output)
+	}
+}
+
 func TestSharedFixtureMarkdownProviderNamedSuitePlans(t *testing.T) {
 	fixture := readGoldmarkFixture(t, "diagnostics", "slice-206-markdown-provider-named-suite-plans", "go-markdown-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])

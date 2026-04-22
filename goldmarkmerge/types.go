@@ -142,6 +142,62 @@ func MergeMarkdownWithReviewedNestedOutputs(
 	)
 }
 
+func MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
+	templateSource string,
+	destinationSource string,
+	dialect markdownmerge.MarkdownDialect,
+	replayBundle astmerge.ReviewReplayBundle,
+	backend ...string,
+) astmerge.MergeResult[string] {
+	requested := BackendGoldmark
+	if len(backend) > 0 && backend[0] != "" {
+		requested = backend[0]
+	}
+	if requested != BackendGoldmark {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported Markdown backend %s.", requested))},
+			Policies:    []astmerge.PolicyReference{},
+		}
+	}
+
+	return markdownmerge.MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
+		templateSource,
+		destinationSource,
+		dialect,
+		replayBundle,
+		markdownmerge.BackendKreuzberg,
+	)
+}
+
+func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
+	templateSource string,
+	destinationSource string,
+	dialect markdownmerge.MarkdownDialect,
+	reviewState astmerge.ConformanceManifestReviewState,
+	backend ...string,
+) astmerge.MergeResult[string] {
+	requested := BackendGoldmark
+	if len(backend) > 0 && backend[0] != "" {
+		requested = backend[0]
+	}
+	if requested != BackendGoldmark {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: []astmerge.Diagnostic{unsupportedFeature(fmt.Sprintf("Unsupported Markdown backend %s.", requested))},
+			Policies:    []astmerge.PolicyReference{},
+		}
+	}
+
+	return markdownmerge.MergeMarkdownWithReviewedNestedOutputsFromReviewState(
+		templateSource,
+		destinationSource,
+		dialect,
+		reviewState,
+		markdownmerge.BackendKreuzberg,
+	)
+}
+
 func MarkdownEmbeddedFamilies(analysis markdownmerge.MarkdownAnalysis) []markdownmerge.MarkdownEmbeddedFamilyCandidate {
 	return markdownmerge.MarkdownEmbeddedFamilies(analysis)
 }
