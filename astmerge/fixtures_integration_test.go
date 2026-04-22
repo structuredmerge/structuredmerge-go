@@ -3173,6 +3173,56 @@ func TestSharedFixtureReviewReplayBundleTransportRejection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewedNestedExecutionJSONRoundtrip(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "reviewed_nested_execution_json_roundtrip"))
+	execution := parseReviewedNestedExecution(fixture["execution"].(map[string]any))
+
+	raw, err := json.Marshal(execution)
+	if err != nil {
+		t.Fatalf("marshal reviewed nested execution: %v", err)
+	}
+	var roundTripped ReviewedNestedExecution
+	if err := json.Unmarshal(raw, &roundTripped); err != nil {
+		t.Fatalf("unmarshal reviewed nested execution: %v", err)
+	}
+
+	if !reflect.DeepEqual(roundTripped, execution) {
+		t.Fatalf("unexpected reviewed nested execution roundtrip: %+v", roundTripped)
+	}
+}
+
+func TestSharedFixtureReviewedNestedExecutionTransportEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "reviewed_nested_execution_envelope"))
+	execution := parseReviewedNestedExecution(fixture["execution"].(map[string]any))
+	expected := parseReviewedNestedExecutionEnvelope(fixture["expected_envelope"].(map[string]any))
+
+	envelope := ReviewedNestedExecutionEnvelopeFor(execution)
+	if !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected reviewed nested execution envelope: %+v", envelope)
+	}
+	imported, importErr := ImportReviewedNestedExecutionEnvelope(expected)
+	if importErr != nil {
+		t.Fatalf("unexpected reviewed nested execution import error: %+v", importErr)
+	}
+	if imported == nil || !reflect.DeepEqual(*imported, execution) {
+		t.Fatalf("unexpected imported reviewed nested execution: %+v", imported)
+	}
+}
+
+func TestSharedFixtureReviewedNestedExecutionTransportRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "reviewed_nested_execution_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		rejectionCase := rawCase.(map[string]any)
+		envelope := parseReviewedNestedExecutionEnvelope(rejectionCase["envelope"].(map[string]any))
+		expected := parseReviewTransportImportError(rejectionCase["expected_error"].(map[string]any))
+
+		imported, importErr := ImportReviewedNestedExecutionEnvelope(envelope)
+		if imported != nil || !reflect.DeepEqual(importErr, &expected) {
+			t.Fatalf("unexpected reviewed nested execution rejection: imported=%+v error=%+v", imported, importErr)
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -3511,6 +3561,39 @@ func parseProjectedChildReviewGroup(raw map[string]any) ProjectedChildReviewGrou
 	}
 }
 
+func parseDelegatedChildGroupReviewState(raw map[string]any) DelegatedChildGroupReviewState {
+	requestsRaw := raw["requests"].([]any)
+	requests := make([]ReviewRequest, 0, len(requestsRaw))
+	for _, item := range requestsRaw {
+		requests = append(requests, parseReviewRequest(item.(map[string]any)))
+	}
+
+	groupsRaw := raw["accepted_groups"].([]any)
+	acceptedGroups := make([]ProjectedChildReviewGroup, 0, len(groupsRaw))
+	for _, item := range groupsRaw {
+		acceptedGroups = append(acceptedGroups, parseProjectedChildReviewGroup(item.(map[string]any)))
+	}
+
+	decisionsRaw := raw["applied_decisions"].([]any)
+	appliedDecisions := make([]ReviewDecision, 0, len(decisionsRaw))
+	for _, item := range decisionsRaw {
+		appliedDecisions = append(appliedDecisions, parseReviewDecision(item.(map[string]any)))
+	}
+
+	diagnosticsRaw := raw["diagnostics"].([]any)
+	diagnostics := make([]Diagnostic, 0, len(diagnosticsRaw))
+	for _, item := range diagnosticsRaw {
+		diagnostics = append(diagnostics, parseDiagnostic(item.(map[string]any)))
+	}
+
+	return DelegatedChildGroupReviewState{
+		Requests:         requests,
+		AcceptedGroups:   acceptedGroups,
+		AppliedDecisions: appliedDecisions,
+		Diagnostics:      diagnostics,
+	}
+}
+
 func parseStringSlice(raw []any) []string {
 	values := make([]string, 0, len(raw))
 	for _, item := range raw {
@@ -3546,6 +3629,32 @@ func parseReviewReplayBundleEnvelope(raw map[string]any) ReviewReplayBundleEnvel
 		Kind:         raw["kind"].(string),
 		Version:      int(raw["version"].(float64)),
 		ReplayBundle: parseReviewReplayBundle(raw["replay_bundle"].(map[string]any)),
+	}
+}
+
+func parseReviewedNestedExecution(raw map[string]any) ReviewedNestedExecution {
+	appliedChildrenRaw := raw["applied_children"].([]any)
+	appliedChildren := make([]AppliedDelegatedChildOutput, 0, len(appliedChildrenRaw))
+	for _, item := range appliedChildrenRaw {
+		entry := item.(map[string]any)
+		appliedChildren = append(appliedChildren, AppliedDelegatedChildOutput{
+			OperationID: entry["operation_id"].(string),
+			Output:      entry["output"].(string),
+		})
+	}
+
+	return ReviewedNestedExecution{
+		Family:          raw["family"].(string),
+		ReviewState:     parseDelegatedChildGroupReviewState(raw["review_state"].(map[string]any)),
+		AppliedChildren: appliedChildren,
+	}
+}
+
+func parseReviewedNestedExecutionEnvelope(raw map[string]any) ReviewedNestedExecutionEnvelope {
+	return ReviewedNestedExecutionEnvelope{
+		Kind:      raw["kind"].(string),
+		Version:   int(raw["version"].(float64)),
+		Execution: parseReviewedNestedExecution(raw["execution"].(map[string]any)),
 	}
 }
 

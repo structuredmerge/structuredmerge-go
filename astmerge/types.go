@@ -383,6 +383,18 @@ type ReviewReplayBundleEnvelope struct {
 	ReplayBundle ReviewReplayBundle `json:"replay_bundle"`
 }
 
+type ReviewedNestedExecution struct {
+	Family          string                         `json:"family"`
+	ReviewState     DelegatedChildGroupReviewState `json:"review_state"`
+	AppliedChildren []AppliedDelegatedChildOutput  `json:"applied_children"`
+}
+
+type ReviewedNestedExecutionEnvelope struct {
+	Kind      string                  `json:"kind"`
+	Version   int                     `json:"version"`
+	Execution ReviewedNestedExecution `json:"execution"`
+}
+
 type ReviewHostHints struct {
 	Interactive             bool `json:"interactive"`
 	RequireExplicitContexts bool `json:"require_explicit_contexts"`
@@ -999,6 +1011,16 @@ func ReviewReplayBundleEnvelopeFor(
 	}
 }
 
+func ReviewedNestedExecutionEnvelopeFor(
+	execution ReviewedNestedExecution,
+) ReviewedNestedExecutionEnvelope {
+	return ReviewedNestedExecutionEnvelope{
+		Kind:      "reviewed_nested_execution",
+		Version:   ReviewTransportVersion,
+		Execution: execution,
+	}
+}
+
 func ImportConformanceManifestReviewStateEnvelope(
 	envelope ConformanceManifestReviewStateEnvelope,
 ) (*ConformanceManifestReviewState, *ReviewTransportImportError) {
@@ -1039,6 +1061,27 @@ func ImportReviewReplayBundleEnvelope(
 
 	bundle := envelope.ReplayBundle
 	return &bundle, nil
+}
+
+func ImportReviewedNestedExecutionEnvelope(
+	envelope ReviewedNestedExecutionEnvelope,
+) (*ReviewedNestedExecution, *ReviewTransportImportError) {
+	if envelope.Kind != "reviewed_nested_execution" {
+		return nil, &ReviewTransportImportError{
+			Category: ReviewTransportKindMismatch,
+			Message:  "expected reviewed_nested_execution envelope kind.",
+		}
+	}
+
+	if envelope.Version != ReviewTransportVersion {
+		return nil, &ReviewTransportImportError{
+			Category: ReviewTransportUnsupportedVersion,
+			Message:  "unsupported reviewed_nested_execution envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	execution := envelope.Execution
+	return &execution, nil
 }
 
 func ResolveConformanceFamilyContext(
