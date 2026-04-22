@@ -229,6 +229,66 @@ type TemplatePlanTokenStateEntry struct {
 	BlockReason             *TemplatePlanBlockReason     `json:"block_reason,omitempty"`
 }
 
+type TemplatePreparationAction string
+
+const (
+	TemplatePreparationBlocked       TemplatePreparationAction = "blocked"
+	TemplatePreparationResolveTokens TemplatePreparationAction = "resolve_tokens"
+	TemplatePreparationPassThrough   TemplatePreparationAction = "pass_through"
+)
+
+type TemplatePreparedEntry struct {
+	TemplateSourcePath      string                       `json:"template_source_path"`
+	LogicalDestinationPath  string                       `json:"logical_destination_path"`
+	DestinationPath         *string                      `json:"destination_path"`
+	Classification          TemplateTargetClassification `json:"classification"`
+	Strategy                TemplateStrategy             `json:"strategy"`
+	Action                  string                       `json:"action"`
+	DestinationExists       bool                         `json:"destination_exists"`
+	WriteAction             string                       `json:"write_action"`
+	TokenKeys               []string                     `json:"token_keys"`
+	UnresolvedTokenKeys     []string                     `json:"unresolved_token_keys"`
+	TokenResolutionRequired bool                         `json:"token_resolution_required"`
+	Blocked                 bool                         `json:"blocked"`
+	BlockReason             *TemplatePlanBlockReason     `json:"block_reason,omitempty"`
+	TemplateContent         string                       `json:"template_content"`
+	PreparedTemplateContent *string                      `json:"prepared_template_content"`
+	PreparationAction       TemplatePreparationAction    `json:"preparation_action"`
+}
+
+type TemplateExecutionAction string
+
+const (
+	TemplateExecutionBlocked       TemplateExecutionAction = "blocked"
+	TemplateExecutionOmit          TemplateExecutionAction = "omit"
+	TemplateExecutionKeep          TemplateExecutionAction = "keep"
+	TemplateExecutionRawCopy       TemplateExecutionAction = "raw_copy"
+	TemplateExecutionWritePrepared TemplateExecutionAction = "write_prepared_content"
+	TemplateExecutionMergePrepared TemplateExecutionAction = "merge_prepared_content"
+)
+
+type TemplateExecutionPlanEntry struct {
+	TemplateSourcePath      string                       `json:"template_source_path"`
+	LogicalDestinationPath  string                       `json:"logical_destination_path"`
+	DestinationPath         *string                      `json:"destination_path"`
+	Classification          TemplateTargetClassification `json:"classification"`
+	Strategy                TemplateStrategy             `json:"strategy"`
+	Action                  string                       `json:"action"`
+	DestinationExists       bool                         `json:"destination_exists"`
+	WriteAction             string                       `json:"write_action"`
+	TokenKeys               []string                     `json:"token_keys"`
+	UnresolvedTokenKeys     []string                     `json:"unresolved_token_keys"`
+	TokenResolutionRequired bool                         `json:"token_resolution_required"`
+	Blocked                 bool                         `json:"blocked"`
+	BlockReason             *TemplatePlanBlockReason     `json:"block_reason,omitempty"`
+	TemplateContent         string                       `json:"template_content"`
+	PreparedTemplateContent *string                      `json:"prepared_template_content"`
+	PreparationAction       TemplatePreparationAction    `json:"preparation_action"`
+	ExecutionAction         TemplateExecutionAction      `json:"execution_action"`
+	Ready                   bool                         `json:"ready"`
+	DestinationContent      *string                      `json:"destination_content"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -811,6 +871,29 @@ func UnresolvedTemplateTokenKeys(content string, replacements map[string]string,
 	return unresolved
 }
 
+func ResolveTemplateTokens(content string, replacements map[string]string, config *TemplateTokenConfig) string {
+	resolvedConfig := DefaultTemplateTokenConfig()
+	if config != nil {
+		resolvedConfig = *config
+	}
+
+	resolved := content
+	for _, key := range TemplateTokenKeys(content, &resolvedConfig) {
+		replacement, ok := replacements[key]
+		if !ok {
+			continue
+		}
+
+		resolved = strings.ReplaceAll(
+			resolved,
+			resolvedConfig.Pre+key+resolvedConfig.Post,
+			replacement,
+		)
+	}
+
+	return resolved
+}
+
 func SelectTemplateStrategy(path string, defaultStrategy TemplateStrategy, overrides []TemplateStrategyOverride) TemplateStrategy {
 	normalizedPath := strings.TrimPrefix(path, "./")
 	for _, override := range overrides {
@@ -934,6 +1017,112 @@ func EnrichTemplatePlanEntriesWithTokenState(
 			TokenResolutionRequired: tokenResolutionRequired,
 			Blocked:                 blocked,
 			BlockReason:             blockReason,
+		})
+	}
+
+	return results
+}
+
+func PrepareTemplateEntries(
+	entries []TemplatePlanTokenStateEntry,
+	templateContents map[string]string,
+	replacements map[string]string,
+	config *TemplateTokenConfig,
+) []TemplatePreparedEntry {
+	results := make([]TemplatePreparedEntry, 0, len(entries))
+
+	for _, entry := range entries {
+		templateContent := templateContents[entry.TemplateSourcePath]
+		var preparedTemplateContent *string
+		preparationAction := TemplatePreparationPassThrough
+
+		if entry.Blocked {
+			preparationAction = TemplatePreparationBlocked
+		} else if entry.TokenResolutionRequired {
+			resolved := ResolveTemplateTokens(templateContent, replacements, config)
+			preparedTemplateContent = &resolved
+			preparationAction = TemplatePreparationResolveTokens
+		} else {
+			resolved := templateContent
+			preparedTemplateContent = &resolved
+		}
+
+		results = append(results, TemplatePreparedEntry{
+			TemplateSourcePath:      entry.TemplateSourcePath,
+			LogicalDestinationPath:  entry.LogicalDestinationPath,
+			DestinationPath:         entry.DestinationPath,
+			Classification:          entry.Classification,
+			Strategy:                entry.Strategy,
+			Action:                  entry.Action,
+			DestinationExists:       entry.DestinationExists,
+			WriteAction:             entry.WriteAction,
+			TokenKeys:               entry.TokenKeys,
+			UnresolvedTokenKeys:     entry.UnresolvedTokenKeys,
+			TokenResolutionRequired: entry.TokenResolutionRequired,
+			Blocked:                 entry.Blocked,
+			BlockReason:             entry.BlockReason,
+			TemplateContent:         templateContent,
+			PreparedTemplateContent: preparedTemplateContent,
+			PreparationAction:       preparationAction,
+		})
+	}
+
+	return results
+}
+
+func PlanTemplateExecution(
+	entries []TemplatePreparedEntry,
+	destinationContents map[string]string,
+) []TemplateExecutionPlanEntry {
+	results := make([]TemplateExecutionPlanEntry, 0, len(entries))
+
+	for _, entry := range entries {
+		var destinationContent *string
+		if entry.DestinationPath != nil {
+			if content, ok := destinationContents[*entry.DestinationPath]; ok {
+				destinationContent = &content
+			}
+		}
+
+		executionAction := TemplateExecutionMergePrepared
+		switch {
+		case entry.Blocked:
+			executionAction = TemplateExecutionBlocked
+		case entry.DestinationPath == nil:
+			executionAction = TemplateExecutionOmit
+		case entry.WriteAction == "keep":
+			executionAction = TemplateExecutionKeep
+		case entry.Strategy == TemplateStrategyRawCopy:
+			executionAction = TemplateExecutionRawCopy
+		case entry.Strategy == TemplateStrategyAcceptTemplate:
+			executionAction = TemplateExecutionWritePrepared
+		default:
+			executionAction = TemplateExecutionMergePrepared
+		}
+		ready := executionAction != TemplateExecutionBlocked &&
+			executionAction != TemplateExecutionOmit &&
+			executionAction != TemplateExecutionKeep
+
+		results = append(results, TemplateExecutionPlanEntry{
+			TemplateSourcePath:      entry.TemplateSourcePath,
+			LogicalDestinationPath:  entry.LogicalDestinationPath,
+			DestinationPath:         entry.DestinationPath,
+			Classification:          entry.Classification,
+			Strategy:                entry.Strategy,
+			Action:                  entry.Action,
+			DestinationExists:       entry.DestinationExists,
+			WriteAction:             entry.WriteAction,
+			TokenKeys:               entry.TokenKeys,
+			UnresolvedTokenKeys:     entry.UnresolvedTokenKeys,
+			TokenResolutionRequired: entry.TokenResolutionRequired,
+			Blocked:                 entry.Blocked,
+			BlockReason:             entry.BlockReason,
+			TemplateContent:         entry.TemplateContent,
+			PreparedTemplateContent: entry.PreparedTemplateContent,
+			PreparationAction:       entry.PreparationAction,
+			ExecutionAction:         executionAction,
+			Ready:                   ready,
+			DestinationContent:      destinationContent,
 		})
 	}
 

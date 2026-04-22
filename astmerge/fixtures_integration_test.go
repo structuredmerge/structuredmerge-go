@@ -363,6 +363,31 @@ func TestTemplateEntryTokenStateFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateEntryPreparedContentFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_entry_prepared_content"))
+
+	plannedEntries := decodeFixtureValue[[]TemplatePlanTokenStateEntry](t, fixture["planned_entries"])
+	templateContents := decodeFixtureValueUntyped[map[string]string](fixture["template_contents"])
+	replacements := decodeFixtureValueUntyped[map[string]string](fixture["replacements"])
+	actual := PrepareTemplateEntries(plannedEntries, templateContents, replacements, nil)
+	expected := decodeFixtureValue[[]TemplatePreparedEntry](t, fixture["expected_entries"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected template entry prepared content to match fixture")
+	}
+}
+
+func TestTemplateExecutionPlanFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_execution_plan"))
+
+	preparedEntries := decodeFixtureValue[[]TemplatePreparedEntry](t, fixture["prepared_entries"])
+	destinationContents := decodeFixtureValueUntyped[map[string]string](fixture["destination_contents"])
+	actual := PlanTemplateExecution(preparedEntries, destinationContents)
+	expected := decodeFixtureValue[[]TemplateExecutionPlanEntry](t, fixture["expected_entries"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected template execution plan to match fixture")
+	}
+}
+
 func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_shape"))
 
