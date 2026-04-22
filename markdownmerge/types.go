@@ -676,6 +676,82 @@ func MergeMarkdownWithReviewedNestedOutputs(
 	)
 }
 
+func MergeMarkdownWithReviewedNestedOutputsFromReplayBundle(
+	templateSource string,
+	destinationSource string,
+	dialect MarkdownDialect,
+	bundle astmerge.ReviewReplayBundle,
+	backend MarkdownBackend,
+) astmerge.MergeResult[string] {
+	for _, execution := range bundle.ReviewedNestedExecutions {
+		if execution.Family == "markdown" {
+			children := make([]AppliedChildOutput, 0, len(execution.AppliedChildren))
+			for _, child := range execution.AppliedChildren {
+				children = append(children, AppliedChildOutput{
+					OperationID: child.OperationID,
+					Output:      child.Output,
+				})
+			}
+			return MergeMarkdownWithReviewedNestedOutputs(
+				templateSource,
+				destinationSource,
+				dialect,
+				execution.ReviewState,
+				children,
+				backend,
+			)
+		}
+	}
+
+	return astmerge.MergeResult[string]{
+		OK: false,
+		Diagnostics: []astmerge.Diagnostic{{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.CategoryConfigurationError,
+			Message:  "review replay bundle does not include a reviewed nested execution for markdown.",
+		}},
+		Policies: []astmerge.PolicyReference{},
+	}
+}
+
+func MergeMarkdownWithReviewedNestedOutputsFromReviewState(
+	templateSource string,
+	destinationSource string,
+	dialect MarkdownDialect,
+	state astmerge.ConformanceManifestReviewState,
+	backend MarkdownBackend,
+) astmerge.MergeResult[string] {
+	for _, execution := range state.ReviewedNestedExecutions {
+		if execution.Family == "markdown" {
+			children := make([]AppliedChildOutput, 0, len(execution.AppliedChildren))
+			for _, child := range execution.AppliedChildren {
+				children = append(children, AppliedChildOutput{
+					OperationID: child.OperationID,
+					Output:      child.Output,
+				})
+			}
+			return MergeMarkdownWithReviewedNestedOutputs(
+				templateSource,
+				destinationSource,
+				dialect,
+				execution.ReviewState,
+				children,
+				backend,
+			)
+		}
+	}
+
+	return astmerge.MergeResult[string]{
+		OK: false,
+		Diagnostics: []astmerge.Diagnostic{{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.CategoryConfigurationError,
+			Message:  "review state does not include a reviewed nested execution for markdown.",
+		}},
+		Policies: []astmerge.PolicyReference{},
+	}
+}
+
 func codeFenceFamily(infoString string) string {
 	switch strings.ToLower(infoString) {
 	case "ts", "typescript":

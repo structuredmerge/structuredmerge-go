@@ -707,6 +707,78 @@ func MergeRubyWithReviewedNestedOutputs(
 	)
 }
 
+func MergeRubyWithReviewedNestedOutputsFromReplayBundle(
+	templateSource string,
+	destinationSource string,
+	dialect RubyDialect,
+	bundle astmerge.ReviewReplayBundle,
+) astmerge.MergeResult[string] {
+	for _, execution := range bundle.ReviewedNestedExecutions {
+		if execution.Family == "ruby" {
+			children := make([]AppliedChildOutput, 0, len(execution.AppliedChildren))
+			for _, child := range execution.AppliedChildren {
+				children = append(children, AppliedChildOutput{
+					OperationID: child.OperationID,
+					Output:      child.Output,
+				})
+			}
+			return MergeRubyWithReviewedNestedOutputs(
+				templateSource,
+				destinationSource,
+				dialect,
+				execution.ReviewState,
+				children,
+			)
+		}
+	}
+
+	return astmerge.MergeResult[string]{
+		OK: false,
+		Diagnostics: []astmerge.Diagnostic{{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.CategoryConfigurationError,
+			Message:  "review replay bundle does not include a reviewed nested execution for ruby.",
+		}},
+		Policies: []astmerge.PolicyReference{},
+	}
+}
+
+func MergeRubyWithReviewedNestedOutputsFromReviewState(
+	templateSource string,
+	destinationSource string,
+	dialect RubyDialect,
+	state astmerge.ConformanceManifestReviewState,
+) astmerge.MergeResult[string] {
+	for _, execution := range state.ReviewedNestedExecutions {
+		if execution.Family == "ruby" {
+			children := make([]AppliedChildOutput, 0, len(execution.AppliedChildren))
+			for _, child := range execution.AppliedChildren {
+				children = append(children, AppliedChildOutput{
+					OperationID: child.OperationID,
+					Output:      child.Output,
+				})
+			}
+			return MergeRubyWithReviewedNestedOutputs(
+				templateSource,
+				destinationSource,
+				dialect,
+				execution.ReviewState,
+				children,
+			)
+		}
+	}
+
+	return astmerge.MergeResult[string]{
+		OK: false,
+		Diagnostics: []astmerge.Diagnostic{{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.CategoryConfigurationError,
+			Message:  "review state does not include a reviewed nested execution for ruby.",
+		}},
+		Policies: []astmerge.PolicyReference{},
+	}
+}
+
 func RubyDiscoveredSurfaces(analysis RubyAnalysis) []astmerge.DiscoveredSurface {
 	return analysis.DiscoveredSurfaces
 }

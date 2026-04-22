@@ -266,6 +266,48 @@ func TestRubyFixtures(t *testing.T) {
 		t.Fatalf("unexpected reviewed nested merge output:\n%s", *reviewedNestedMergeResult.Output)
 	}
 
+	reviewArtifactFixture := readRubyFixture(t, "ruby", "slice-310-reviewed-nested-review-artifact-application", "yard-example-reviewed-nested-review-artifact-application.json")
+	replayBundleSource, err := json.Marshal(reviewArtifactFixture["replay_bundle"])
+	if err != nil {
+		t.Fatalf("marshal reviewed nested replay bundle: %v", err)
+	}
+	var replayBundle astmerge.ReviewReplayBundle
+	if err := json.Unmarshal(replayBundleSource, &replayBundle); err != nil {
+		t.Fatalf("decode reviewed nested replay bundle: %v", err)
+	}
+	reviewStateArtifactSource, err := json.Marshal(reviewArtifactFixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal reviewed nested review state: %v", err)
+	}
+	var reviewStateArtifact astmerge.ConformanceManifestReviewState
+	if err := json.Unmarshal(reviewStateArtifactSource, &reviewStateArtifact); err != nil {
+		t.Fatalf("decode reviewed nested review state: %v", err)
+	}
+	replayArtifactResult := MergeRubyWithReviewedNestedOutputsFromReplayBundle(
+		reviewArtifactFixture["template"].(string),
+		reviewArtifactFixture["destination"].(string),
+		DialectRuby,
+		replayBundle,
+	)
+	if !replayArtifactResult.OK || replayArtifactResult.Output == nil {
+		t.Fatalf("expected replay-bundle reviewed nested merge success: %+v", replayArtifactResult)
+	}
+	if *replayArtifactResult.Output != reviewArtifactFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected replay-bundle reviewed nested merge output:\n%s", *replayArtifactResult.Output)
+	}
+	stateArtifactResult := MergeRubyWithReviewedNestedOutputsFromReviewState(
+		reviewArtifactFixture["template"].(string),
+		reviewArtifactFixture["destination"].(string),
+		DialectRuby,
+		reviewStateArtifact,
+	)
+	if !stateArtifactResult.OK || stateArtifactResult.Output == nil {
+		t.Fatalf("expected review-state reviewed nested merge success: %+v", stateArtifactResult)
+	}
+	if *stateArtifactResult.Output != reviewArtifactFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected review-state reviewed nested merge output:\n%s", *stateArtifactResult.Output)
+	}
+
 	invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
 	invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
 	if invalidTemplateResult.OK {
