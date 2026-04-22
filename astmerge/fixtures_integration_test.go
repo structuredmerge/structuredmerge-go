@@ -3285,6 +3285,24 @@ func TestSharedFixtureReviewStateReviewedNestedExecutions(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReviewReplayBundleReviewedNestedExecutionApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_reviewed_nested_execution_application"))
+	bundle := parseReviewReplayBundle(fixture["replay_bundle"].(map[string]any))
+	expected := fixture["expected_results"].([]any)
+
+	results := ExecuteReviewReplayBundleReviewedNestedExecutions(bundle, reviewedNestedExecutionCallbacksForFixture(t, expected))
+	assertReviewedNestedExecutionResults(t, results, expected)
+}
+
+func TestSharedFixtureReviewStateReviewedNestedExecutionApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_reviewed_nested_execution_application"))
+	state := parseConformanceManifestReviewState(fixture["review_state"].(map[string]any))
+	expected := fixture["expected_results"].([]any)
+
+	results := ExecuteReviewStateReviewedNestedExecutions(state, reviewedNestedExecutionCallbacksForFixture(t, expected))
+	assertReviewedNestedExecutionResults(t, results, expected)
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 
@@ -3295,6 +3313,100 @@ func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected [
 		expectedPolicy := expected[index].(map[string]any)
 		if string(policy.Surface) != expectedPolicy["surface"].(string) || policy.Name != expectedPolicy["name"].(string) {
 			t.Fatalf("unexpected policy at %d: %+v", index, policy)
+		}
+	}
+}
+
+func assertReviewedNestedExecutionResults(t *testing.T, results []ReviewedNestedExecutionResult[string], expected []any) {
+	t.Helper()
+
+	if len(results) != len(expected) {
+		t.Fatalf("unexpected reviewed nested execution results: %+v", results)
+	}
+
+	for index, run := range results {
+		expectedRun := expected[index].(map[string]any)
+		if run.Execution.Family != expectedRun["execution_family"].(string) {
+			t.Fatalf("unexpected execution family at %d: %+v", index, run)
+		}
+
+		expectedResult := expectedRun["result"].(map[string]any)
+		if run.Result.OK != expectedResult["ok"].(bool) {
+			t.Fatalf("unexpected result ok at %d: %+v", index, run)
+		}
+
+		expectedOutput, hasOutput := expectedResult["output"].(string)
+		switch {
+		case hasOutput && (run.Result.Output == nil || *run.Result.Output != expectedOutput):
+			t.Fatalf("unexpected result output at %d: %+v", index, run)
+		case !hasOutput && run.Result.Output != nil:
+			t.Fatalf("unexpected result output at %d: %+v", index, run)
+		}
+
+		if len(run.Result.Diagnostics) != len(expectedResult["diagnostics"].([]any)) {
+			t.Fatalf("unexpected result diagnostics at %d: %+v", index, run)
+		}
+		if len(run.Result.Policies) != len(expectedResult["policies"].([]any)) {
+			t.Fatalf("unexpected result policies at %d: %+v", index, run)
+		}
+	}
+}
+
+func reviewedNestedExecutionCallbacksForFixture(t *testing.T, expected []any) func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[string] {
+	t.Helper()
+
+	return func(execution ReviewedNestedExecution, index int) NestedMergeExecutionCallbacks[string] {
+		return NestedMergeExecutionCallbacks[string]{
+			MergeParent: func() MergeResult[string] {
+				output := execution.Family + "-merged-parent"
+				return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+			},
+			DiscoverOperations: func(string) NestedMergeDiscoveryResult {
+				operations := make([]DelegatedChildOperation, 0, len(execution.ReviewState.AcceptedGroups))
+				for _, group := range execution.ReviewState.AcceptedGroups {
+					switch execution.Family {
+					case "markdown":
+						operations = append(operations, DelegatedChildOperation{
+							OperationID:       group.ChildOperationID,
+							ParentOperationID: group.ParentOperationID,
+							RequestedStrategy: "delegate_child_surface",
+							LanguageChain:     []string{"markdown", "typescript"},
+							Surface: DiscoveredSurface{
+								SurfaceKind:            "fenced_code_block",
+								EffectiveLanguage:      "typescript",
+								Address:                group.DelegatedRuntimeSurfacePath,
+								Owner:                  SurfaceOwnerRef{Kind: SurfaceOwnerOwnedRegion, Address: "/code_fence/0"},
+								ReconstructionStrategy: "portable_write",
+								Metadata:               map[string]any{"family": "typescript"},
+							},
+						})
+					default:
+						operations = append(operations, DelegatedChildOperation{
+							OperationID:       group.ChildOperationID,
+							ParentOperationID: group.ParentOperationID,
+							RequestedStrategy: "delegate_child_surface",
+							LanguageChain:     []string{"ruby", "ruby"},
+							Surface: DiscoveredSurface{
+								SurfaceKind:            "yard_example",
+								EffectiveLanguage:      "ruby",
+								Address:                group.DelegatedRuntimeSurfacePath,
+								Owner:                  SurfaceOwnerRef{Kind: SurfaceOwnerOwnedRegion, Address: "/yard_example/1"},
+								ReconstructionStrategy: "portable_write",
+								Metadata:               map[string]any{"family": "ruby"},
+							},
+						})
+					}
+				}
+				return NestedMergeDiscoveryResult{OK: true, Diagnostics: []Diagnostic{}, Operations: operations}
+			},
+			ApplyResolvedOutputs: func(_ string, _ []DelegatedChildOperation, _ DelegatedChildApplyPlan, appliedChildren []AppliedDelegatedChildOutput) MergeResult[string] {
+				if !reflect.DeepEqual(appliedChildren, execution.AppliedChildren) {
+					t.Fatalf("unexpected applied children: %+v", appliedChildren)
+				}
+				expectedResult := expected[index].(map[string]any)["result"].(map[string]any)
+				output := expectedResult["output"].(string)
+				return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+			},
 		}
 	}
 }

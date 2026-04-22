@@ -390,6 +390,11 @@ type ReviewedNestedExecution struct {
 	AppliedChildren []AppliedDelegatedChildOutput  `json:"applied_children"`
 }
 
+type ReviewedNestedExecutionResult[T any] struct {
+	Execution ReviewedNestedExecution `json:"execution"`
+	Result    MergeResult[T]          `json:"result"`
+}
+
 type ReviewedNestedExecutionEnvelope struct {
 	Kind      string                  `json:"kind"`
 	Version   int                     `json:"version"`
@@ -924,6 +929,34 @@ func ExecuteReviewedNestedExecution[T any](
 		execution.AppliedChildren,
 		callbacks,
 	)
+}
+
+func ExecuteReviewedNestedExecutions[T any](
+	executions []ReviewedNestedExecution,
+	callbacksForExecution func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[T],
+) []ReviewedNestedExecutionResult[T] {
+	results := make([]ReviewedNestedExecutionResult[T], 0, len(executions))
+	for idx, execution := range executions {
+		results = append(results, ReviewedNestedExecutionResult[T]{
+			Execution: execution,
+			Result:    ExecuteReviewedNestedExecution(execution, callbacksForExecution(execution, idx)),
+		})
+	}
+	return results
+}
+
+func ExecuteReviewReplayBundleReviewedNestedExecutions[T any](
+	bundle ReviewReplayBundle,
+	callbacksForExecution func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[T],
+) []ReviewedNestedExecutionResult[T] {
+	return ExecuteReviewedNestedExecutions(bundle.ReviewedNestedExecutions, callbacksForExecution)
+}
+
+func ExecuteReviewStateReviewedNestedExecutions[T any](
+	state ConformanceManifestReviewState,
+	callbacksForExecution func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[T],
+) []ReviewedNestedExecutionResult[T] {
+	return ExecuteReviewedNestedExecutions(state.ReviewedNestedExecutions, callbacksForExecution)
 }
 
 func DefaultConformanceFamilyContext(

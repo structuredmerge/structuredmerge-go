@@ -295,3 +295,224 @@ func TestExecuteReviewedNestedExecutionUsesPayload(t *testing.T) {
 		t.Fatalf("unexpected reviewed nested execution result: %+v", result)
 	}
 }
+
+func TestExecuteReviewedNestedExecutionsPreservesOrder(t *testing.T) {
+	markdownAddress := "document[0] > fenced_code_block[/code_fence/0]"
+	rubyAddress := "document[0] > ruby_doc_comment[Greeter] > yard_example[1]"
+	runs := ExecuteReviewedNestedExecutions(
+		[]ReviewedNestedExecution{
+			ReviewedNestedExecutionFor(
+				"markdown",
+				DelegatedChildGroupReviewState{
+					Requests: []ReviewRequest{},
+					AcceptedGroups: []ProjectedChildReviewGroup{{
+						DelegatedApplyGroup:         "nested_markdown_child:0",
+						ParentOperationID:           "markdown-document-0",
+						ChildOperationID:            "markdown-fence-0",
+						DelegatedRuntimeSurfacePath: markdownAddress,
+						CaseIDs:                     []string{},
+						DelegatedCaseIDs:            []string{},
+					}},
+					AppliedDecisions: []ReviewDecision{{
+						RequestID: "projected_child_group:nested_markdown_child:0",
+						Action:    ReviewDecisionApplyDelegatedChildGroup,
+					}},
+					Diagnostics: []Diagnostic{},
+				},
+				[]AppliedDelegatedChildOutput{{OperationID: "markdown-fence-0", Output: "child-output\n"}},
+			),
+			ReviewedNestedExecutionFor(
+				"ruby",
+				DelegatedChildGroupReviewState{
+					Requests: []ReviewRequest{},
+					AcceptedGroups: []ProjectedChildReviewGroup{{
+						DelegatedApplyGroup:         "nested_ruby_child:0",
+						ParentOperationID:           "ruby-doc-comment-0",
+						ChildOperationID:            "yard-example-0",
+						DelegatedRuntimeSurfacePath: rubyAddress,
+						CaseIDs:                     []string{},
+						DelegatedCaseIDs:            []string{},
+					}},
+					AppliedDecisions: []ReviewDecision{{
+						RequestID: "projected_child_group:nested_ruby_child:0",
+						Action:    ReviewDecisionApplyDelegatedChildGroup,
+					}},
+					Diagnostics: []Diagnostic{},
+				},
+				[]AppliedDelegatedChildOutput{{OperationID: "yard-example-0", Output: "Greeter.new.wave\n"}},
+			),
+		},
+		func(execution ReviewedNestedExecution, _ int) NestedMergeExecutionCallbacks[string] {
+			return NestedMergeExecutionCallbacks[string]{
+				MergeParent: func() MergeResult[string] {
+					output := execution.Family + "-merged"
+					return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+				},
+				DiscoverOperations: func(string) NestedMergeDiscoveryResult {
+					switch execution.Family {
+					case "markdown":
+						return NestedMergeDiscoveryResult{
+							OK:          true,
+							Diagnostics: []Diagnostic{},
+							Operations:  []DelegatedChildOperation{nestedOperation(markdownAddress, "typescript")},
+						}
+					default:
+						return NestedMergeDiscoveryResult{
+							OK:          true,
+							Diagnostics: []Diagnostic{},
+							Operations: []DelegatedChildOperation{{
+								OperationID:       "yard-example-0",
+								ParentOperationID: "ruby-doc-comment-0",
+								RequestedStrategy: "delegate_child_surface",
+								LanguageChain:     []string{"ruby", "ruby"},
+								Surface: DiscoveredSurface{
+									SurfaceKind:       "yard_example",
+									EffectiveLanguage: "ruby",
+									Address:           rubyAddress,
+									Owner:             SurfaceOwnerRef{Kind: SurfaceOwnerOwnedRegion, Address: "/yard_example/1"},
+									ReconstructionStrategy: "portable_write",
+									Metadata: map[string]any{"family": "ruby"},
+								},
+							}},
+						}
+					}
+				},
+				ApplyResolvedOutputs: func(_ string, _ []DelegatedChildOperation, _ DelegatedChildApplyPlan, appliedChildren []AppliedDelegatedChildOutput) MergeResult[string] {
+					if len(appliedChildren) != len(execution.AppliedChildren) {
+						t.Fatalf("unexpected applied children: %+v", appliedChildren)
+					}
+					output := execution.Family + "-final"
+					return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+				},
+			}
+		},
+	)
+
+	if len(runs) != 2 || runs[0].Execution.Family != "markdown" || runs[1].Execution.Family != "ruby" {
+		t.Fatalf("unexpected reviewed nested execution order: %+v", runs)
+	}
+	if runs[0].Result.Output == nil || *runs[0].Result.Output != "markdown-final" || runs[1].Result.Output == nil || *runs[1].Result.Output != "ruby-final" {
+		t.Fatalf("unexpected reviewed nested execution results: %+v", runs)
+	}
+}
+
+func TestExecuteReviewReplayBundleReviewedNestedExecutionsUsesBundle(t *testing.T) {
+	runs := ExecuteReviewReplayBundleReviewedNestedExecutions(
+		ReviewReplayBundle{
+			ReplayContext: ReviewReplayContext{
+				Surface:                 "conformance_manifest",
+				Families:                []string{"text"},
+				RequireExplicitContexts: true,
+			},
+			Decisions: []ReviewDecision{{
+				RequestID: "family_context:text",
+				Action:    ReviewDecisionAcceptDefaultContext,
+			}},
+			ReviewedNestedExecutions: []ReviewedNestedExecution{
+				ReviewedNestedExecutionFor(
+					"markdown",
+					DelegatedChildGroupReviewState{
+						Requests: []ReviewRequest{},
+						AcceptedGroups: []ProjectedChildReviewGroup{{
+							DelegatedApplyGroup:         "nested_markdown_child:0",
+							ParentOperationID:           "markdown-document-0",
+							ChildOperationID:            "markdown-fence-0",
+							DelegatedRuntimeSurfacePath: "document[0] > fenced_code_block[/code_fence/0]",
+							CaseIDs:                     []string{},
+							DelegatedCaseIDs:            []string{},
+						}},
+						AppliedDecisions: []ReviewDecision{{
+							RequestID: "projected_child_group:nested_markdown_child:0",
+							Action:    ReviewDecisionApplyDelegatedChildGroup,
+						}},
+						Diagnostics: []Diagnostic{},
+					},
+					[]AppliedDelegatedChildOutput{{OperationID: "markdown-fence-0", Output: "child-output\n"}},
+				),
+			},
+		},
+		func(_ ReviewedNestedExecution, _ int) NestedMergeExecutionCallbacks[string] {
+			output := "final-parent"
+			return NestedMergeExecutionCallbacks[string]{
+				MergeParent: func() MergeResult[string] {
+					merged := "merged-parent"
+					return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &merged, Policies: []PolicyReference{}}
+				},
+				DiscoverOperations: func(string) NestedMergeDiscoveryResult {
+					return NestedMergeDiscoveryResult{OK: true, Diagnostics: []Diagnostic{}, Operations: []DelegatedChildOperation{nestedOperation("document[0] > fenced_code_block[/code_fence/0]", "typescript")}}
+				},
+				ApplyResolvedOutputs: func(string, []DelegatedChildOperation, DelegatedChildApplyPlan, []AppliedDelegatedChildOutput) MergeResult[string] {
+					return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+				},
+			}
+		},
+	)
+
+	if len(runs) != 1 || runs[0].Result.Output == nil || *runs[0].Result.Output != "final-parent" {
+		t.Fatalf("unexpected replay bundle reviewed nested execution results: %+v", runs)
+	}
+}
+
+func TestExecuteReviewStateReviewedNestedExecutionsUsesState(t *testing.T) {
+	runs := ExecuteReviewStateReviewedNestedExecutions(
+		ConformanceManifestReviewState{
+			Report: NamedConformanceSuiteReportEnvelope{
+				Entries: []NamedConformanceSuiteReport{},
+				Summary: ConformanceSuiteSummary{},
+			},
+			Diagnostics:      []Diagnostic{},
+			Requests:         []ReviewRequest{},
+			AppliedDecisions: []ReviewDecision{},
+			HostHints: ReviewHostHints{
+				Interactive:             false,
+				RequireExplicitContexts: false,
+			},
+			ReplayContext: ReviewReplayContext{
+				Surface:                 "conformance_manifest",
+				Families:                []string{},
+				RequireExplicitContexts: false,
+			},
+			ReviewedNestedExecutions: []ReviewedNestedExecution{
+				ReviewedNestedExecutionFor(
+					"markdown",
+					DelegatedChildGroupReviewState{
+						Requests: []ReviewRequest{},
+						AcceptedGroups: []ProjectedChildReviewGroup{{
+							DelegatedApplyGroup:         "nested_markdown_child:0",
+							ParentOperationID:           "markdown-document-0",
+							ChildOperationID:            "markdown-fence-0",
+							DelegatedRuntimeSurfacePath: "document[0] > fenced_code_block[/code_fence/0]",
+							CaseIDs:                     []string{},
+							DelegatedCaseIDs:            []string{},
+						}},
+						AppliedDecisions: []ReviewDecision{{
+							RequestID: "projected_child_group:nested_markdown_child:0",
+							Action:    ReviewDecisionApplyDelegatedChildGroup,
+						}},
+						Diagnostics: []Diagnostic{},
+					},
+					[]AppliedDelegatedChildOutput{{OperationID: "markdown-fence-0", Output: "child-output\n"}},
+				),
+			},
+		},
+		func(_ ReviewedNestedExecution, _ int) NestedMergeExecutionCallbacks[string] {
+			output := "final-parent"
+			return NestedMergeExecutionCallbacks[string]{
+				MergeParent: func() MergeResult[string] {
+					merged := "merged-parent"
+					return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &merged, Policies: []PolicyReference{}}
+				},
+				DiscoverOperations: func(string) NestedMergeDiscoveryResult {
+					return NestedMergeDiscoveryResult{OK: true, Diagnostics: []Diagnostic{}, Operations: []DelegatedChildOperation{nestedOperation("document[0] > fenced_code_block[/code_fence/0]", "typescript")}}
+				},
+				ApplyResolvedOutputs: func(string, []DelegatedChildOperation, DelegatedChildApplyPlan, []AppliedDelegatedChildOutput) MergeResult[string] {
+					return MergeResult[string]{OK: true, Diagnostics: []Diagnostic{}, Output: &output, Policies: []PolicyReference{}}
+				},
+			}
+		},
+	)
+
+	if len(runs) != 1 || runs[0].Result.Output == nil || *runs[0].Result.Output != "final-parent" {
+		t.Fatalf("unexpected review state reviewed nested execution results: %+v", runs)
+	}
+}
