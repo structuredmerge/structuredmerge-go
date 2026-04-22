@@ -3382,6 +3382,76 @@ func TestSharedFixtureReviewStateReviewedNestedExecutionApplication(t *testing.T
 	assertReviewedNestedExecutionResults(t, results, expected)
 }
 
+func TestSharedFixtureReviewReplayBundleEnvelopeReviewedNestedExecutionApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope_reviewed_nested_execution_application"))
+	envelope := parseReviewReplayBundleEnvelope(fixture["replay_bundle_envelope"].(map[string]any))
+	expected := fixture["expected_application"].(map[string]any)
+	expectedResults := expected["results"].([]any)
+
+	application := ExecuteReviewReplayBundleEnvelopeReviewedNestedExecutions(envelope, reviewedNestedExecutionCallbacksForFixture(t, expectedResults))
+	if !reflect.DeepEqual(application.Diagnostics, []Diagnostic{}) {
+		t.Fatalf("unexpected replay bundle envelope application diagnostics: %+v", application.Diagnostics)
+	}
+	assertReviewedNestedExecutionResults(t, application.Results, expectedResults)
+}
+
+func TestSharedFixtureReviewStateEnvelopeReviewedNestedExecutionApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_envelope_reviewed_nested_execution_application"))
+	envelope := parseConformanceManifestReviewStateEnvelope(fixture["review_state_envelope"].(map[string]any))
+	expected := fixture["expected_application"].(map[string]any)
+	expectedResults := expected["results"].([]any)
+
+	application := ExecuteReviewStateEnvelopeReviewedNestedExecutions(envelope, reviewedNestedExecutionCallbacksForFixture(t, expectedResults))
+	if !reflect.DeepEqual(application.Diagnostics, []Diagnostic{}) {
+		t.Fatalf("unexpected review state envelope application diagnostics: %+v", application.Diagnostics)
+	}
+	assertReviewedNestedExecutionResults(t, application.Results, expectedResults)
+}
+
+func TestSharedFixtureReviewReplayBundleEnvelopeReviewedNestedExecutionRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_replay_bundle_envelope_reviewed_nested_execution_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		fixtureCase := rawCase.(map[string]any)
+		envelope := parseReviewReplayBundleEnvelope(fixtureCase["replay_bundle_envelope"].(map[string]any))
+		expected := fixtureCase["expected_application"].(map[string]any)
+		expectedDiagnostics := make([]Diagnostic, 0, len(expected["diagnostics"].([]any)))
+		for _, rawDiagnostic := range expected["diagnostics"].([]any) {
+			expectedDiagnostics = append(expectedDiagnostics, parseDiagnostic(rawDiagnostic.(map[string]any)))
+		}
+
+		application := ExecuteReviewReplayBundleEnvelopeReviewedNestedExecutions[string](envelope, func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[string] {
+			t.Fatal("callbacks should not run for rejected replay bundle envelopes")
+			return NestedMergeExecutionCallbacks[string]{}
+		})
+
+		if !reflect.DeepEqual(application.Diagnostics, expectedDiagnostics) || len(application.Results) != 0 {
+			t.Fatalf("unexpected replay bundle envelope rejection application: %+v", application)
+		}
+	}
+}
+
+func TestSharedFixtureReviewStateEnvelopeReviewedNestedExecutionRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "review_state_envelope_reviewed_nested_execution_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		fixtureCase := rawCase.(map[string]any)
+		envelope := parseConformanceManifestReviewStateEnvelope(fixtureCase["review_state_envelope"].(map[string]any))
+		expected := fixtureCase["expected_application"].(map[string]any)
+		expectedDiagnostics := make([]Diagnostic, 0, len(expected["diagnostics"].([]any)))
+		for _, rawDiagnostic := range expected["diagnostics"].([]any) {
+			expectedDiagnostics = append(expectedDiagnostics, parseDiagnostic(rawDiagnostic.(map[string]any)))
+		}
+
+		application := ExecuteReviewStateEnvelopeReviewedNestedExecutions[string](envelope, func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[string] {
+			t.Fatal("callbacks should not run for rejected review state envelopes")
+			return NestedMergeExecutionCallbacks[string]{}
+		})
+
+		if !reflect.DeepEqual(application.Diagnostics, expectedDiagnostics) || len(application.Results) != 0 {
+			t.Fatalf("unexpected review state envelope rejection application: %+v", application)
+		}
+	}
+}
+
 func assertExpectedPolicies(t *testing.T, policies []PolicyReference, expected []any) {
 	t.Helper()
 

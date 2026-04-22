@@ -390,6 +390,11 @@ type ReviewedNestedExecution struct {
 	AppliedChildren []AppliedDelegatedChildOutput  `json:"applied_children"`
 }
 
+type ReviewedNestedExecutionApplication[T any] struct {
+	Diagnostics []Diagnostic                       `json:"diagnostics"`
+	Results     []ReviewedNestedExecutionResult[T] `json:"results"`
+}
+
 type ReviewedNestedExecutionResult[T any] struct {
 	Execution ReviewedNestedExecution `json:"execution"`
 	Result    MergeResult[T]          `json:"result"`
@@ -952,11 +957,55 @@ func ExecuteReviewReplayBundleReviewedNestedExecutions[T any](
 	return ExecuteReviewedNestedExecutions(bundle.ReviewedNestedExecutions, callbacksForExecution)
 }
 
+func ExecuteReviewReplayBundleEnvelopeReviewedNestedExecutions[T any](
+	envelope ReviewReplayBundleEnvelope,
+	callbacksForExecution func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[T],
+) ReviewedNestedExecutionApplication[T] {
+	bundle, importErr := ImportReviewReplayBundleEnvelope(envelope)
+	if importErr != nil {
+		return ReviewedNestedExecutionApplication[T]{
+			Diagnostics: []Diagnostic{{
+				Severity: SeverityError,
+				Category: DiagnosticCategory(importErr.Category),
+				Message:  importErr.Message,
+			}},
+			Results: []ReviewedNestedExecutionResult[T]{},
+		}
+	}
+
+	return ReviewedNestedExecutionApplication[T]{
+		Diagnostics: []Diagnostic{},
+		Results:     ExecuteReviewReplayBundleReviewedNestedExecutions(*bundle, callbacksForExecution),
+	}
+}
+
 func ExecuteReviewStateReviewedNestedExecutions[T any](
 	state ConformanceManifestReviewState,
 	callbacksForExecution func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[T],
 ) []ReviewedNestedExecutionResult[T] {
 	return ExecuteReviewedNestedExecutions(state.ReviewedNestedExecutions, callbacksForExecution)
+}
+
+func ExecuteReviewStateEnvelopeReviewedNestedExecutions[T any](
+	envelope ConformanceManifestReviewStateEnvelope,
+	callbacksForExecution func(ReviewedNestedExecution, int) NestedMergeExecutionCallbacks[T],
+) ReviewedNestedExecutionApplication[T] {
+	state, importErr := ImportConformanceManifestReviewStateEnvelope(envelope)
+	if importErr != nil {
+		return ReviewedNestedExecutionApplication[T]{
+			Diagnostics: []Diagnostic{{
+				Severity: SeverityError,
+				Category: DiagnosticCategory(importErr.Category),
+				Message:  importErr.Message,
+			}},
+			Results: []ReviewedNestedExecutionResult[T]{},
+		}
+	}
+
+	return ReviewedNestedExecutionApplication[T]{
+		Diagnostics: []Diagnostic{},
+		Results:     ExecuteReviewStateReviewedNestedExecutions(*state, callbacksForExecution),
+	}
 }
 
 func DefaultConformanceFamilyContext(
