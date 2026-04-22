@@ -289,6 +289,15 @@ type TemplateExecutionPlanEntry struct {
 	DestinationContent      *string                      `json:"destination_content"`
 }
 
+type TemplatePreviewResult struct {
+	ResultFiles  map[string]string `json:"result_files"`
+	CreatedPaths []string          `json:"created_paths"`
+	UpdatedPaths []string          `json:"updated_paths"`
+	KeptPaths    []string          `json:"kept_paths"`
+	BlockedPaths []string          `json:"blocked_paths"`
+	OmittedPaths []string          `json:"omitted_paths"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -1127,6 +1136,77 @@ func PlanTemplateExecution(
 	}
 
 	return results
+}
+
+func PlanTemplateTreeExecution(
+	templateSourcePaths []string,
+	templateContents map[string]string,
+	existingDestinationPaths []string,
+	destinationContents map[string]string,
+	context *TemplateDestinationContext,
+	defaultStrategy TemplateStrategy,
+	overrides []TemplateStrategyOverride,
+	replacements map[string]string,
+	config *TemplateTokenConfig,
+) []TemplateExecutionPlanEntry {
+	plannedEntries := PlanTemplateEntries(templateSourcePaths, context, defaultStrategy, overrides)
+	statefulEntries := EnrichTemplatePlanEntries(plannedEntries, existingDestinationPaths)
+	tokenStateEntries := EnrichTemplatePlanEntriesWithTokenState(
+		statefulEntries,
+		templateContents,
+		replacements,
+		config,
+	)
+	preparedEntries := PrepareTemplateEntries(tokenStateEntries, templateContents, replacements, config)
+
+	return PlanTemplateExecution(preparedEntries, destinationContents)
+}
+
+func PreviewTemplateExecution(entries []TemplateExecutionPlanEntry) TemplatePreviewResult {
+	result := TemplatePreviewResult{
+		ResultFiles:  map[string]string{},
+		CreatedPaths: []string{},
+		UpdatedPaths: []string{},
+		KeptPaths:    []string{},
+		BlockedPaths: []string{},
+		OmittedPaths: []string{},
+	}
+
+	for _, entry := range entries {
+		switch entry.ExecutionAction {
+		case TemplateExecutionBlocked:
+			if entry.DestinationPath != nil {
+				result.BlockedPaths = append(result.BlockedPaths, *entry.DestinationPath)
+			}
+		case TemplateExecutionOmit:
+			result.OmittedPaths = append(result.OmittedPaths, entry.LogicalDestinationPath)
+		case TemplateExecutionKeep:
+			if entry.DestinationPath != nil && entry.DestinationContent != nil {
+				result.ResultFiles[*entry.DestinationPath] = *entry.DestinationContent
+				result.KeptPaths = append(result.KeptPaths, *entry.DestinationPath)
+			}
+		case TemplateExecutionRawCopy, TemplateExecutionWritePrepared:
+			if entry.DestinationPath != nil && entry.PreparedTemplateContent != nil {
+				result.ResultFiles[*entry.DestinationPath] = *entry.PreparedTemplateContent
+				if entry.DestinationExists {
+					result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
+				} else {
+					result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
+				}
+			}
+		case TemplateExecutionMergePrepared:
+			if entry.DestinationPath != nil && entry.PreparedTemplateContent != nil && entry.DestinationContent == nil {
+				result.ResultFiles[*entry.DestinationPath] = *entry.PreparedTemplateContent
+				if entry.DestinationExists {
+					result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
+				} else {
+					result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
+				}
+			}
+		}
+	}
+
+	return result
 }
 
 func pathBase(path string) string {

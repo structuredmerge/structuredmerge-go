@@ -10,6 +10,36 @@ import (
 	"testing"
 )
 
+func readRelativeFileTree(t *testing.T, root string) map[string]string {
+	t.Helper()
+
+	files := map[string]string{}
+	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		relativePath, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+
+		source, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(relativePath)] = string(source)
+		return nil
+	}); err != nil {
+		t.Fatalf("walk fixture tree: %v", err)
+	}
+
+	return files
+}
+
 func readDiagnosticFixtureFromPath(t *testing.T, path string) map[string]any {
 	t.Helper()
 
@@ -386,6 +416,75 @@ func TestTemplateExecutionPlanFixture(t *testing.T) {
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("expected template execution plan to match fixture")
 	}
+}
+
+func TestMiniTemplateTreePlanFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	fixtureDir := filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	templateContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "template"))
+	destinationContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "destination"))
+	templateSourcePaths := mapsKeys(templateContents)
+	slices.Sort(templateSourcePaths)
+	existingDestinationPaths := mapsKeys(destinationContents)
+	slices.Sort(existingDestinationPaths)
+	context := decodeFixtureValueUntyped[TemplateDestinationContext](fixture["context"])
+	overrides := decodeFixtureValueUntyped[[]TemplateStrategyOverride](fixture["overrides"])
+	replacements := decodeFixtureValueUntyped[map[string]string](fixture["replacements"])
+	actual := PlanTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		existingDestinationPaths,
+		destinationContents,
+		&context,
+		TemplateStrategy(fixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		nil,
+	)
+	expected := decodeFixtureValue[[]TemplateExecutionPlanEntry](t, fixture["expected_entries"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected mini template tree plan to match fixture")
+	}
+}
+
+func TestMiniTemplateTreePreviewFixture(t *testing.T) {
+	planFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	previewFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_preview"))
+	fixtureDir := filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_plan"))
+	templateContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "template"))
+	destinationContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "destination"))
+	templateSourcePaths := mapsKeys(templateContents)
+	slices.Sort(templateSourcePaths)
+	existingDestinationPaths := mapsKeys(destinationContents)
+	slices.Sort(existingDestinationPaths)
+	context := decodeFixtureValueUntyped[TemplateDestinationContext](planFixture["context"])
+	overrides := decodeFixtureValueUntyped[[]TemplateStrategyOverride](planFixture["overrides"])
+	replacements := decodeFixtureValueUntyped[map[string]string](planFixture["replacements"])
+	executionPlan := PlanTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		existingDestinationPaths,
+		destinationContents,
+		&context,
+		TemplateStrategy(planFixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		nil,
+	)
+	actual := PreviewTemplateExecution(executionPlan)
+	expected := decodeFixtureValue[TemplatePreviewResult](t, previewFixture["expected_preview"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected mini template tree preview to match fixture")
+	}
+}
+
+func mapsKeys[V any](input map[string]V) []string {
+	keys := make([]string, 0, len(input))
+	for key := range input {
+		keys = append(keys, key)
+	}
+
+	return keys
 }
 
 func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
