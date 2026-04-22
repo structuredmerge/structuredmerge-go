@@ -270,7 +270,14 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactRejection(t *t
 }
 
 func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactEnvelopeApplication(t *testing.T) {
-	fixture := readGoldmarkFixture(t, "markdown", "slice-313-reviewed-nested-review-artifact-envelope-application", "fenced-code-reviewed-nested-review-artifact-envelope-application.json")
+	providerFixture := readGoldmarkFixture(t, "diagnostics", "slice-328-markdown-provider-reviewed-nested-review-artifact-envelope-application", "go-markdown-provider-reviewed-nested-review-artifact-envelope-application.json")
+	sharedFixturePathRaw := providerFixture["shared_fixture_path"].([]any)
+	sharedFixturePath := make([]string, 0, len(sharedFixturePathRaw))
+	for _, part := range sharedFixturePathRaw {
+		sharedFixturePath = append(sharedFixturePath, part.(string))
+	}
+	fixture := readGoldmarkFixture(t, sharedFixturePath...)
+	expected := providerFixture["providers"].(map[string]any)["goldmark"].(map[string]any)["expected"].(map[string]any)
 	replayEnvelopeSource, err := json.Marshal(fixture["replay_bundle_envelope"])
 	if err != nil {
 		t.Fatalf("marshal replay bundle envelope: %v", err)
@@ -295,7 +302,7 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactEnvelopeApplic
 		replayEnvelope,
 		"",
 	)
-	if !replayResult.OK || replayResult.Output == nil || *replayResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+	if !replayResult.OK || replayResult.Output == nil || *replayResult.Output != expected["output"].(string) {
 		t.Fatalf("unexpected replay-bundle-envelope reviewed nested merge output: %+v", replayResult)
 	}
 
@@ -306,7 +313,7 @@ func TestSharedFixtureMarkdownProviderReviewedNestedReviewArtifactEnvelopeApplic
 		reviewStateEnvelope,
 		"",
 	)
-	if !stateResult.OK || stateResult.Output == nil || *stateResult.Output != fixture["expected"].(map[string]any)["output"].(string) {
+	if !stateResult.OK || stateResult.Output == nil || *stateResult.Output != expected["output"].(string) {
 		t.Fatalf("unexpected review-state-envelope reviewed nested merge output: %+v", stateResult)
 	}
 }
