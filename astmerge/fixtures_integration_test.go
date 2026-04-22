@@ -1117,7 +1117,7 @@ func TestSlice200MarkdownFamilySuiteDefinitions(t *testing.T) {
 	if selectors := ConformanceSuiteSelectors(manifest); !reflect.DeepEqual(selectors, expectedSelectors) {
 		t.Fatalf("unexpected Markdown suite selectors: %+v", selectors)
 	}
-	expectedDefinition := ConformanceSuiteDefinition{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "markdown"}, Roles: []string{"analysis", "matching"}}
+	expectedDefinition := ConformanceSuiteDefinition{Kind: "portable", Subject: ConformanceSuiteSubject{Grammar: "markdown"}, Roles: []string{"analysis", "matching", "merge"}}
 	if definition := ConformanceSuiteDefinitionForSelector(manifest, expectedSelectors[0]); !reflect.DeepEqual(definition, &expectedDefinition) {
 		t.Fatalf("unexpected Markdown suite definition: %+v", definition)
 	}

@@ -158,6 +158,9 @@ func TestSharedFixtureMarkdownManifest(t *testing.T) {
 	if path := astmerge.ConformanceFixturePath(manifest, "markdown", "analysis"); path == nil || filepath.Join(path...) != filepath.Join("markdown", "slice-198-analysis", "headings-and-code-fences.json") {
 		t.Fatalf("unexpected analysis fixture path: %v", path)
 	}
+	if path := astmerge.ConformanceFixturePath(manifest, "markdown", "merge"); path == nil || filepath.Join(path...) != filepath.Join("markdown", "slice-286-merge", "section-merge.json") {
+		t.Fatalf("unexpected merge fixture path: %v", path)
+	}
 }
 
 func TestSharedFixtureMarkdownAnalysis(t *testing.T) {
@@ -190,6 +193,17 @@ func TestSharedFixtureMarkdownMatching(t *testing.T) {
 	}
 	if len(result.UnmatchedTemplate) != len(fixture["expected"].(map[string]any)["unmatched_template"].([]any)) {
 		t.Fatalf("unexpected unmatched template: %+v", result.UnmatchedTemplate)
+	}
+}
+
+func TestSharedFixtureMarkdownMerge(t *testing.T) {
+	fixture := readMarkdownFixture(t, "markdown", "slice-286-merge", "section-merge.json")
+	result := MergeMarkdown(fixture["template"].(string), fixture["destination"].(string), DialectMarkdown, BackendKreuzberg)
+	if !result.OK || result.Output == nil {
+		t.Fatalf("expected merge success: %+v", result)
+	}
+	if *result.Output != fixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected merge output:\n%s", *result.Output)
 	}
 }
 

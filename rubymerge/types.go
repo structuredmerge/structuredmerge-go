@@ -69,6 +69,15 @@ type commentEntry struct {
 	Raw  string
 }
 
+type rubyRequireEntry struct {
+	Text string
+}
+
+type rubyDeclarationEntry struct {
+	Path string
+	Text string
+}
+
 var (
 	requirePattern   = regexp.MustCompile(`^\s*require(?:_relative)?\s+["']([^"']+)["']`)
 	classPattern     = regexp.MustCompile(`^\s*class\s+([A-Z]\w*(?:::\w+)*)`)
@@ -362,6 +371,129 @@ func MatchRubyOwners(template RubyAnalysis, destination RubyAnalysis) RubyOwnerM
 		UnmatchedTemplate:    unmatchedTemplate,
 		UnmatchedDestination: unmatchedDestination,
 	}
+}
+
+func collectRubyRequireEntries(source string) []rubyRequireEntry {
+	lines := strings.Split(normalizeSource(source), "\n")
+	entries := make([]rubyRequireEntry, 0)
+	for _, line := range lines {
+		if requirePattern.MatchString(line) {
+			entries = append(entries, rubyRequireEntry{Text: strings.TrimRight(line, "\n")})
+		}
+	}
+	return entries
+}
+
+func collectRubyDeclarationEntries(source string) []rubyDeclarationEntry {
+	lines := strings.Split(normalizeSource(source), "\n")
+	entries := make([]rubyDeclarationEntry, 0)
+	pendingComments := make([]int, 0)
+
+	for index := 0; index < len(lines); index++ {
+		line := lines[index]
+		stripped := strings.TrimSpace(line)
+		if commentLine(line) {
+			pendingComments = append(pendingComments, index)
+			continue
+		}
+		if stripped == "" {
+			pendingComments = nil
+			continue
+		}
+		if requirePattern.MatchString(line) {
+			pendingComments = nil
+			continue
+		}
+
+		name := ""
+		switch {
+		case classPattern.MatchString(line):
+			name = classPattern.FindStringSubmatch(line)[1]
+		case modulePattern.MatchString(line):
+			name = modulePattern.FindStringSubmatch(line)[1]
+		case defPattern.MatchString(line):
+			name = defPattern.FindStringSubmatch(line)[1]
+		}
+		if name == "" {
+			pendingComments = nil
+			continue
+		}
+
+		start := index
+		if len(pendingComments) > 0 {
+			start = pendingComments[0]
+		}
+		depth := 1
+		cursor := index + 1
+		for ; cursor < len(lines); cursor++ {
+			candidate := strings.TrimSpace(lines[cursor])
+			if classPattern.MatchString(candidate) || modulePattern.MatchString(candidate) || defPattern.MatchString(candidate) {
+				depth++
+			}
+			if candidate == "end" {
+				depth--
+				if depth == 0 {
+					cursor++
+					break
+				}
+			}
+		}
+
+		entries = append(entries, rubyDeclarationEntry{
+			Path: "/declarations/" + name,
+			Text: strings.TrimSpace(strings.Join(lines[start:cursor], "\n")),
+		})
+		index = cursor - 1
+		pendingComments = nil
+	}
+
+	return entries
+}
+
+func MergeRuby(templateSource string, destinationSource string, dialect RubyDialect) astmerge.MergeResult[string] {
+	template := ParseRuby(templateSource, dialect)
+	if !template.OK || template.Analysis == nil {
+		return astmerge.MergeResult[string]{OK: false, Diagnostics: template.Diagnostics, Policies: []astmerge.PolicyReference{}}
+	}
+
+	destination := ParseRuby(destinationSource, dialect)
+	if !destination.OK || destination.Analysis == nil {
+		diagnostics := make([]astmerge.Diagnostic, 0, len(destination.Diagnostics))
+		for _, diagnostic := range destination.Diagnostics {
+			if diagnostic.Category == astmerge.CategoryParseError {
+				diagnostic.Category = astmerge.CategoryDestinationParseError
+			}
+			diagnostics = append(diagnostics, diagnostic)
+		}
+		return astmerge.MergeResult[string]{OK: false, Diagnostics: diagnostics, Policies: []astmerge.PolicyReference{}}
+	}
+
+	requires := collectRubyRequireEntries(destination.Analysis.Source)
+	destinationDeclarations := collectRubyDeclarationEntries(destination.Analysis.Source)
+	templateDeclarations := collectRubyDeclarationEntries(template.Analysis.Source)
+	destinationPaths := make(map[string]struct{}, len(destinationDeclarations))
+	sections := make([]string, 0, len(requires)+len(destinationDeclarations)+len(templateDeclarations))
+	if len(requires) > 0 {
+		requireLines := make([]string, 0, len(requires))
+		for _, entry := range requires {
+			requireLines = append(requireLines, entry.Text)
+		}
+		sections = append(sections, strings.TrimSpace(strings.Join(requireLines, "\n")))
+	}
+	for _, entry := range destinationDeclarations {
+		destinationPaths[entry.Path] = struct{}{}
+		sections = append(sections, entry.Text)
+	}
+	for _, entry := range templateDeclarations {
+		if _, ok := destinationPaths[entry.Path]; ok {
+			continue
+		}
+		sections = append(sections, entry.Text)
+	}
+
+	output := strings.TrimSpace(strings.Join(sections, "\n\n")) + "\n"
+	policies := []astmerge.PolicyReference{destinationWinsArrayPolicy()}
+	return astmerge.MergeResult[string]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Output: &output, Policies: policies}
 }
 
 func RubyDiscoveredSurfaces(analysis RubyAnalysis) []astmerge.DiscoveredSurface {

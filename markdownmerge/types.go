@@ -61,6 +61,11 @@ type MarkdownAnalysis struct {
 	Owners           []MarkdownOwner
 }
 
+type markdownSection struct {
+	Path string
+	Text string
+}
+
 type MarkdownEmbeddedFamilyCandidate struct {
 	Path     string `json:"path"`
 	Language string `json:"language"`
@@ -311,6 +316,118 @@ func MatchMarkdownOwners(template MarkdownAnalysis, destination MarkdownAnalysis
 	slices.Sort(result.UnmatchedTemplate)
 	slices.Sort(result.UnmatchedDestination)
 	return result
+}
+
+func markdownOwnerStartIndices(source string) map[string]int {
+	lines := strings.Split(NormalizeMarkdownSource(source), "\n")
+	starts := make(map[string]int)
+	headingIndex := 0
+	codeFenceIndex := 0
+
+	for index := 0; index < len(lines); index++ {
+		line := lines[index]
+		if heading := headingPattern.FindStringSubmatch(line); heading != nil {
+			starts[fmt.Sprintf("/heading/%d", headingIndex)] = index
+			headingIndex++
+			continue
+		}
+
+		fence := codeFencePattern.FindStringSubmatch(line)
+		if fence == nil {
+			continue
+		}
+
+		starts[fmt.Sprintf("/code_fence/%d", codeFenceIndex)] = index
+		codeFenceIndex++
+
+		marker := fence[1]
+		markerChar := marker[:1]
+		markerLength := len(marker)
+		for cursor := index + 1; cursor < len(lines); cursor++ {
+			trimmed := strings.TrimSpace(lines[cursor])
+			if len(trimmed) >= markerLength &&
+				strings.Trim(trimmed, markerChar) == "" &&
+				strings.HasPrefix(trimmed, strings.Repeat(markerChar, markerLength)) {
+				index = cursor
+				break
+			}
+			if cursor == len(lines)-1 {
+				index = cursor
+			}
+		}
+	}
+
+	return starts
+}
+
+func collectMarkdownSections(source string, owners []MarkdownOwner) []markdownSection {
+	lines := strings.Split(NormalizeMarkdownSource(source), "\n")
+	starts := markdownOwnerStartIndices(source)
+	type ownerStart struct {
+		Owner MarkdownOwner
+		Start int
+	}
+	ordered := make([]ownerStart, 0, len(owners))
+	for _, owner := range owners {
+		start, ok := starts[owner.Path]
+		if ok {
+			ordered = append(ordered, ownerStart{Owner: owner, Start: start})
+		}
+	}
+	slices.SortFunc(ordered, func(left, right ownerStart) int { return left.Start - right.Start })
+
+	sections := make([]markdownSection, 0, len(ordered))
+	for index, entry := range ordered {
+		endExclusive := len(lines)
+		if index+1 < len(ordered) {
+			endExclusive = ordered[index+1].Start
+		}
+		text := strings.TrimSpace(strings.Join(lines[entry.Start:endExclusive], "\n"))
+		sections = append(sections, markdownSection{Path: entry.Owner.Path, Text: text})
+	}
+	return sections
+}
+
+func MergeMarkdown(templateSource string, destinationSource string, dialect MarkdownDialect, backend ...MarkdownBackend) astmerge.MergeResult[string] {
+	resolvedBackend := BackendKreuzberg
+	if len(backend) > 0 {
+		resolvedBackend = backend[0]
+	}
+
+	template := ParseMarkdownWithBackend(templateSource, dialect, resolvedBackend)
+	if !template.OK || template.Analysis == nil {
+		return astmerge.MergeResult[string]{OK: false, Diagnostics: template.Diagnostics, Policies: []astmerge.PolicyReference{}}
+	}
+
+	destination := ParseMarkdownWithBackend(destinationSource, dialect, resolvedBackend)
+	if !destination.OK || destination.Analysis == nil {
+		return astmerge.MergeResult[string]{OK: false, Diagnostics: destination.Diagnostics, Policies: []astmerge.PolicyReference{}}
+	}
+
+	destinationSections := collectMarkdownSections(destination.Analysis.NormalizedSource, destination.Analysis.Owners)
+	templateSections := collectMarkdownSections(template.Analysis.NormalizedSource, template.Analysis.Owners)
+	destinationPaths := make(map[string]struct{}, len(destinationSections))
+	mergedSections := make([]string, 0, len(destinationSections)+len(templateSections))
+	for _, section := range destinationSections {
+		destinationPaths[section.Path] = struct{}{}
+		if section.Text != "" {
+			mergedSections = append(mergedSections, section.Text)
+		}
+	}
+	for _, section := range templateSections {
+		if _, ok := destinationPaths[section.Path]; ok || section.Text == "" {
+			continue
+		}
+		mergedSections = append(mergedSections, section.Text)
+	}
+
+	output := strings.TrimSpace(strings.Join(mergedSections, "\n\n")) + "\n"
+	return astmerge.MergeResult[string]{
+		OK:          true,
+		Diagnostics: []astmerge.Diagnostic{},
+		Output:      &output,
+		Policies:    []astmerge.PolicyReference{},
+	}
 }
 
 func codeFenceFamily(infoString string) string {

@@ -145,6 +145,9 @@ func TestRubyFixtures(t *testing.T) {
 	if path := astmerge.ConformanceFixturePath(manifest, "ruby", "matching"); path == nil || filepath.Join(path...) != filepath.Join("ruby", "slice-219-matching", "path-equality.json") {
 		t.Fatalf("unexpected ruby matching path: %v", path)
 	}
+	if path := astmerge.ConformanceFixturePath(manifest, "ruby", "merge"); path == nil || filepath.Join(path...) != filepath.Join("ruby", "slice-287-merge", "module-merge.json") {
+		t.Fatalf("unexpected ruby merge path: %v", path)
+	}
 
 	analysisFixture := readRubyFixture(t, "ruby", "slice-218-analysis", "module-owners.json")
 	analysis := ParseRuby(analysisFixture["source"].(string), DialectRuby)
@@ -161,6 +164,39 @@ func TestRubyFixtures(t *testing.T) {
 	match := MatchRubyOwners(*template.Analysis, *destination.Analysis)
 	if len(match.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
 		t.Fatalf("unexpected matches: %+v", match)
+	}
+
+	mergeFixture := readRubyFixture(t, "ruby", "slice-287-merge", "module-merge.json")
+	mergeResult := MergeRuby(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectRuby)
+	if !mergeResult.OK || mergeResult.Output == nil {
+		t.Fatalf("expected merge success: %+v", mergeResult)
+	}
+	if *mergeResult.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected merge output:\n%s", *mergeResult.Output)
+	}
+
+	invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
+	invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
+	if invalidTemplateResult.OK {
+		t.Fatalf("expected invalid template merge failure: %+v", invalidTemplateResult)
+	}
+	if actual := jsonReadyRuby(t, []map[string]any{{
+		"severity": invalidTemplateResult.Diagnostics[0].Severity,
+		"category": invalidTemplateResult.Diagnostics[0].Category,
+	}}); !reflect.DeepEqual(actual, invalidTemplateFixture["expected"].(map[string]any)["diagnostics"]) {
+		t.Fatalf("unexpected invalid template diagnostics: %+v", actual)
+	}
+
+	invalidDestinationFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-destination.json")
+	invalidDestinationResult := MergeRuby(invalidDestinationFixture["template"].(string), invalidDestinationFixture["destination"].(string), DialectRuby)
+	if invalidDestinationResult.OK {
+		t.Fatalf("expected invalid destination merge failure: %+v", invalidDestinationResult)
+	}
+	if actual := jsonReadyRuby(t, []map[string]any{{
+		"severity": invalidDestinationResult.Diagnostics[0].Severity,
+		"category": invalidDestinationResult.Diagnostics[0].Category,
+	}}); !reflect.DeepEqual(actual, invalidDestinationFixture["expected"].(map[string]any)["diagnostics"]) {
+		t.Fatalf("unexpected invalid destination diagnostics: %+v", actual)
 	}
 
 	surfacesFixture := readRubyFixture(t, "ruby", "slice-220-discovered-surfaces", "doc-comment-surfaces.json")

@@ -746,6 +746,7 @@ func ConformanceManifestReplayContext(
 		seen[definition.Subject.Grammar] = true
 		families = append(families, definition.Subject.Grammar)
 	}
+	slices.Sort(families)
 
 	return ReviewReplayContext{
 		Surface:                 "conformance_manifest",
