@@ -613,6 +613,69 @@ func MergeMarkdownWithNestedOutputs(
 	)
 }
 
+func MergeMarkdownWithReviewedNestedOutputs(
+	templateSource string,
+	destinationSource string,
+	dialect MarkdownDialect,
+	reviewState astmerge.DelegatedChildGroupReviewState,
+	appliedChildren []AppliedChildOutput,
+	backend MarkdownBackend,
+) astmerge.MergeResult[string] {
+	resolvedChildren := make([]astmerge.AppliedDelegatedChildOutput, 0, len(appliedChildren))
+	for _, child := range appliedChildren {
+		resolvedChildren = append(resolvedChildren, astmerge.AppliedDelegatedChildOutput{
+			OperationID: child.OperationID,
+			Output:      child.Output,
+		})
+	}
+
+	return astmerge.ExecuteReviewedNestedMerge(
+		reviewState,
+		"markdown",
+		resolvedChildren,
+		astmerge.NestedMergeExecutionCallbacks[string]{
+			MergeParent: func() astmerge.MergeResult[string] {
+				return MergeMarkdown(templateSource, destinationSource, dialect, backend)
+			},
+			DiscoverOperations: func(mergedOutput string) astmerge.NestedMergeDiscoveryResult {
+				analysis := ParseMarkdownWithBackend(mergedOutput, dialect, backend)
+				if !analysis.OK || analysis.Analysis == nil {
+					return astmerge.NestedMergeDiscoveryResult{
+						OK:          false,
+						Diagnostics: analysis.Diagnostics,
+					}
+				}
+
+				return astmerge.NestedMergeDiscoveryResult{
+					OK:          true,
+					Diagnostics: []astmerge.Diagnostic{},
+					Operations:  MarkdownDelegatedChildOperations(*analysis.Analysis, "markdown-document-0"),
+				}
+			},
+			ApplyResolvedOutputs: func(
+				mergedOutput string,
+				operations []astmerge.DelegatedChildOperation,
+				applyPlan astmerge.DelegatedChildApplyPlan,
+				appliedChildren []astmerge.AppliedDelegatedChildOutput,
+			) astmerge.MergeResult[string] {
+				translated := make([]AppliedChildOutput, 0, len(appliedChildren))
+				for _, child := range appliedChildren {
+					translated = append(translated, AppliedChildOutput{
+						OperationID: child.OperationID,
+						Output:      child.Output,
+					})
+				}
+				return ApplyMarkdownDelegatedChildOutputs(
+					mergedOutput,
+					operations,
+					applyPlan,
+					translated,
+				)
+			},
+		},
+	)
+}
+
 func codeFenceFamily(infoString string) string {
 	switch strings.ToLower(infoString) {
 	case "ts", "typescript":

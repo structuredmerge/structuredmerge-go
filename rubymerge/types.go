@@ -645,6 +645,68 @@ func MergeRubyWithNestedOutputs(
 	)
 }
 
+func MergeRubyWithReviewedNestedOutputs(
+	templateSource string,
+	destinationSource string,
+	dialect RubyDialect,
+	reviewState astmerge.DelegatedChildGroupReviewState,
+	appliedChildren []AppliedChildOutput,
+) astmerge.MergeResult[string] {
+	resolvedChildren := make([]astmerge.AppliedDelegatedChildOutput, 0, len(appliedChildren))
+	for _, child := range appliedChildren {
+		resolvedChildren = append(resolvedChildren, astmerge.AppliedDelegatedChildOutput{
+			OperationID: child.OperationID,
+			Output:      child.Output,
+		})
+	}
+
+	return astmerge.ExecuteReviewedNestedMerge(
+		reviewState,
+		"ruby",
+		resolvedChildren,
+		astmerge.NestedMergeExecutionCallbacks[string]{
+			MergeParent: func() astmerge.MergeResult[string] {
+				return MergeRuby(templateSource, destinationSource, dialect)
+			},
+			DiscoverOperations: func(mergedOutput string) astmerge.NestedMergeDiscoveryResult {
+				analysis := ParseRuby(mergedOutput, dialect)
+				if !analysis.OK || analysis.Analysis == nil {
+					return astmerge.NestedMergeDiscoveryResult{
+						OK:          false,
+						Diagnostics: analysis.Diagnostics,
+					}
+				}
+
+				return astmerge.NestedMergeDiscoveryResult{
+					OK:          true,
+					Diagnostics: []astmerge.Diagnostic{},
+					Operations:  RubyDelegatedChildOperations(*analysis.Analysis, "ruby-document-0"),
+				}
+			},
+			ApplyResolvedOutputs: func(
+				mergedOutput string,
+				operations []astmerge.DelegatedChildOperation,
+				applyPlan astmerge.DelegatedChildApplyPlan,
+				appliedChildren []astmerge.AppliedDelegatedChildOutput,
+			) astmerge.MergeResult[string] {
+				translated := make([]AppliedChildOutput, 0, len(appliedChildren))
+				for _, child := range appliedChildren {
+					translated = append(translated, AppliedChildOutput{
+						OperationID: child.OperationID,
+						Output:      child.Output,
+					})
+				}
+				return ApplyRubyDelegatedChildOutputs(
+					mergedOutput,
+					operations,
+					applyPlan,
+					translated,
+				)
+			},
+		},
+	)
+}
+
 func RubyDiscoveredSurfaces(analysis RubyAnalysis) []astmerge.DiscoveredSurface {
 	return analysis.DiscoveredSurfaces
 }

@@ -235,6 +235,37 @@ func TestRubyFixtures(t *testing.T) {
 		t.Fatalf("unexpected nested merge output:\n%s", *nestedMergeResult.Output)
 	}
 
+	reviewedNestedMergeFixture := readRubyFixture(t, "ruby", "slice-299-reviewed-nested-merge", "yard-example-reviewed-nested-merge.json")
+	reviewedStateSource, err := json.Marshal(reviewedNestedMergeFixture["review_state"])
+	if err != nil {
+		t.Fatalf("marshal reviewed nested merge state: %v", err)
+	}
+	var reviewedState astmerge.DelegatedChildGroupReviewState
+	if err := json.Unmarshal(reviewedStateSource, &reviewedState); err != nil {
+		t.Fatalf("decode reviewed nested merge state: %v", err)
+	}
+	reviewedChildrenSource, err := json.Marshal(reviewedNestedMergeFixture["applied_children"])
+	if err != nil {
+		t.Fatalf("marshal reviewed nested merge applied children: %v", err)
+	}
+	var reviewedChildren []AppliedChildOutput
+	if err := json.Unmarshal(reviewedChildrenSource, &reviewedChildren); err != nil {
+		t.Fatalf("decode reviewed nested merge applied children: %v", err)
+	}
+	reviewedNestedMergeResult := MergeRubyWithReviewedNestedOutputs(
+		reviewedNestedMergeFixture["template"].(string),
+		reviewedNestedMergeFixture["destination"].(string),
+		DialectRuby,
+		reviewedState,
+		reviewedChildren,
+	)
+	if !reviewedNestedMergeResult.OK || reviewedNestedMergeResult.Output == nil {
+		t.Fatalf("expected reviewed nested merge success: %+v", reviewedNestedMergeResult)
+	}
+	if *reviewedNestedMergeResult.Output != reviewedNestedMergeFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected reviewed nested merge output:\n%s", *reviewedNestedMergeResult.Output)
+	}
+
 	invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
 	invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
 	if invalidTemplateResult.OK {
