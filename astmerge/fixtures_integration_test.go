@@ -318,6 +318,18 @@ func TestTemplateEntryPlanFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateEntryPlanStateFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_entry_plan_state"))
+
+	plannedEntries := decodeFixtureValue[[]TemplatePlanEntry](t, fixture["planned_entries"])
+	existingDestinationPaths := decodeFixtureValueUntyped[[]string](fixture["existing_destination_paths"])
+	actual := EnrichTemplatePlanEntries(plannedEntries, existingDestinationPaths)
+	expected := decodeFixtureValue[[]TemplatePlanStateEntry](t, fixture["expected_entries"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected template entry plan state to match fixture")
+	}
+}
+
 func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_shape"))
 

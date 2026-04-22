@@ -186,6 +186,17 @@ type TemplatePlanEntry struct {
 	Action                 string                       `json:"action"`
 }
 
+type TemplatePlanStateEntry struct {
+	TemplateSourcePath     string                       `json:"template_source_path"`
+	LogicalDestinationPath string                       `json:"logical_destination_path"`
+	DestinationPath        *string                      `json:"destination_path"`
+	Classification         TemplateTargetClassification `json:"classification"`
+	Strategy               TemplateStrategy             `json:"strategy"`
+	Action                 string                       `json:"action"`
+	DestinationExists      bool                         `json:"destination_exists"`
+	WriteAction            string                       `json:"write_action"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -703,6 +714,42 @@ func PlanTemplateEntries(
 	}
 
 	return entries
+}
+
+func EnrichTemplatePlanEntries(entries []TemplatePlanEntry, existingDestinationPaths []string) []TemplatePlanStateEntry {
+	results := make([]TemplatePlanStateEntry, 0, len(entries))
+	existing := map[string]bool{}
+	for _, path := range existingDestinationPaths {
+		existing[path] = true
+	}
+
+	for _, entry := range entries {
+		destinationExists := false
+		writeAction := "omit"
+		if entry.DestinationPath != nil {
+			destinationExists = existing[*entry.DestinationPath]
+			if entry.Strategy == TemplateStrategyKeepDestination {
+				writeAction = "keep"
+			} else if destinationExists {
+				writeAction = "update"
+			} else {
+				writeAction = "create"
+			}
+		}
+
+		results = append(results, TemplatePlanStateEntry{
+			TemplateSourcePath:     entry.TemplateSourcePath,
+			LogicalDestinationPath: entry.LogicalDestinationPath,
+			DestinationPath:        entry.DestinationPath,
+			Classification:         entry.Classification,
+			Strategy:               entry.Strategy,
+			Action:                 entry.Action,
+			DestinationExists:      destinationExists,
+			WriteAction:            writeAction,
+		})
+	}
+
+	return results
 }
 
 func pathBase(path string) string {
