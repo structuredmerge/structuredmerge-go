@@ -2,6 +2,7 @@ package astmerge
 
 import (
 	"encoding/json"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -163,6 +164,15 @@ type TemplateDestinationContext struct {
 	ProjectName string `json:"project_name,omitempty"`
 }
 
+type TemplateTokenConfig struct {
+	Pre            string   `json:"pre"`
+	Post           string   `json:"post"`
+	Separators     []string `json:"separators"`
+	MinSegments    int      `json:"min_segments"`
+	MaxSegments    *int     `json:"max_segments,omitempty"`
+	SegmentPattern string   `json:"segment_pattern"`
+}
+
 type TemplateStrategy string
 
 const (
@@ -195,6 +205,28 @@ type TemplatePlanStateEntry struct {
 	Action                 string                       `json:"action"`
 	DestinationExists      bool                         `json:"destination_exists"`
 	WriteAction            string                       `json:"write_action"`
+}
+
+type TemplatePlanBlockReason string
+
+const (
+	TemplatePlanBlockReasonUnresolvedTokens TemplatePlanBlockReason = "unresolved_tokens"
+)
+
+type TemplatePlanTokenStateEntry struct {
+	TemplateSourcePath      string                       `json:"template_source_path"`
+	LogicalDestinationPath  string                       `json:"logical_destination_path"`
+	DestinationPath         *string                      `json:"destination_path"`
+	Classification          TemplateTargetClassification `json:"classification"`
+	Strategy                TemplateStrategy             `json:"strategy"`
+	Action                  string                       `json:"action"`
+	DestinationExists       bool                         `json:"destination_exists"`
+	WriteAction             string                       `json:"write_action"`
+	TokenKeys               []string                     `json:"token_keys"`
+	UnresolvedTokenKeys     []string                     `json:"unresolved_token_keys"`
+	TokenResolutionRequired bool                         `json:"token_resolution_required"`
+	Blocked                 bool                         `json:"blocked"`
+	BlockReason             *TemplatePlanBlockReason     `json:"block_reason,omitempty"`
 }
 
 type ConformanceOutcome string
@@ -671,6 +703,114 @@ func ResolveTemplateDestinationPath(path string, context *TemplateDestinationCon
 	return &resolved
 }
 
+func DefaultTemplateTokenConfig() TemplateTokenConfig {
+	return TemplateTokenConfig{
+		Pre:            "{",
+		Post:           "}",
+		Separators:     []string{"|", ":"},
+		MinSegments:    2,
+		SegmentPattern: "[A-Za-z0-9_]",
+	}
+}
+
+func templateTokenSeparatorAt(config TemplateTokenConfig, boundaryIndex int) string {
+	if boundaryIndex < len(config.Separators) {
+		return config.Separators[boundaryIndex]
+	}
+
+	return config.Separators[len(config.Separators)-1]
+}
+
+func validTemplateTokenKey(key string, config TemplateTokenConfig) bool {
+	if key == "" {
+		return false
+	}
+
+	segmentCharacter := regexp.MustCompile("^" + config.SegmentPattern + "$")
+	index := 0
+	segments := 0
+	boundaryIndex := 0
+
+	for index < len(key) {
+		segmentStart := index
+		for index < len(key) && segmentCharacter.MatchString(string(key[index])) {
+			index++
+		}
+
+		if index == segmentStart {
+			return false
+		}
+
+		segments++
+		if index == len(key) {
+			break
+		}
+
+		separator := templateTokenSeparatorAt(config, boundaryIndex)
+		if separator == "" || !strings.HasPrefix(key[index:], separator) {
+			return false
+		}
+
+		index += len(separator)
+		boundaryIndex++
+	}
+
+	if segments < config.MinSegments {
+		return false
+	}
+
+	return config.MaxSegments == nil || segments <= *config.MaxSegments
+}
+
+func TemplateTokenKeys(content string, config *TemplateTokenConfig) []string {
+	resolvedConfig := DefaultTemplateTokenConfig()
+	if config != nil {
+		resolvedConfig = *config
+	}
+	if content == "" || !strings.Contains(content, resolvedConfig.Pre) {
+		return []string{}
+	}
+
+	keys := make([]string, 0)
+	seen := map[string]bool{}
+	offset := 0
+	for offset < len(content) {
+		tokenStart := strings.Index(content[offset:], resolvedConfig.Pre)
+		if tokenStart == -1 {
+			break
+		}
+		tokenStart += offset
+		contentStart := tokenStart + len(resolvedConfig.Pre)
+		tokenEnd := strings.Index(content[contentStart:], resolvedConfig.Post)
+		if tokenEnd == -1 {
+			break
+		}
+		tokenEnd += contentStart
+
+		key := content[contentStart:tokenEnd]
+		if validTemplateTokenKey(key, resolvedConfig) && !seen[key] {
+			seen[key] = true
+			keys = append(keys, key)
+		}
+
+		offset = tokenEnd + len(resolvedConfig.Post)
+	}
+
+	return keys
+}
+
+func UnresolvedTemplateTokenKeys(content string, replacements map[string]string, config *TemplateTokenConfig) []string {
+	keys := TemplateTokenKeys(content, config)
+	unresolved := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if _, ok := replacements[key]; !ok {
+			unresolved = append(unresolved, key)
+		}
+	}
+
+	return unresolved
+}
+
 func SelectTemplateStrategy(path string, defaultStrategy TemplateStrategy, overrides []TemplateStrategyOverride) TemplateStrategy {
 	normalizedPath := strings.TrimPrefix(path, "./")
 	for _, override := range overrides {
@@ -746,6 +886,54 @@ func EnrichTemplatePlanEntries(entries []TemplatePlanEntry, existingDestinationP
 			Action:                 entry.Action,
 			DestinationExists:      destinationExists,
 			WriteAction:            writeAction,
+		})
+	}
+
+	return results
+}
+
+func EnrichTemplatePlanEntriesWithTokenState(
+	entries []TemplatePlanStateEntry,
+	templateContents map[string]string,
+	replacements map[string]string,
+	config *TemplateTokenConfig,
+) []TemplatePlanTokenStateEntry {
+	results := make([]TemplatePlanTokenStateEntry, 0, len(entries))
+
+	for _, entry := range entries {
+		content := templateContents[entry.TemplateSourcePath]
+		tokenKeys := TemplateTokenKeys(content, config)
+		unresolvedTokenKeys := make([]string, 0, len(tokenKeys))
+		for _, key := range tokenKeys {
+			if _, ok := replacements[key]; !ok {
+				unresolvedTokenKeys = append(unresolvedTokenKeys, key)
+			}
+		}
+
+		tokenResolutionRequired := entry.DestinationPath != nil &&
+			entry.Strategy != TemplateStrategyKeepDestination &&
+			entry.Strategy != TemplateStrategyRawCopy
+		blocked := tokenResolutionRequired && len(unresolvedTokenKeys) > 0
+		var blockReason *TemplatePlanBlockReason
+		if blocked {
+			reason := TemplatePlanBlockReasonUnresolvedTokens
+			blockReason = &reason
+		}
+
+		results = append(results, TemplatePlanTokenStateEntry{
+			TemplateSourcePath:      entry.TemplateSourcePath,
+			LogicalDestinationPath:  entry.LogicalDestinationPath,
+			DestinationPath:         entry.DestinationPath,
+			Classification:          entry.Classification,
+			Strategy:                entry.Strategy,
+			Action:                  entry.Action,
+			DestinationExists:       entry.DestinationExists,
+			WriteAction:             entry.WriteAction,
+			TokenKeys:               tokenKeys,
+			UnresolvedTokenKeys:     unresolvedTokenKeys,
+			TokenResolutionRequired: tokenResolutionRequired,
+			Blocked:                 blocked,
+			BlockReason:             blockReason,
 		})
 	}
 

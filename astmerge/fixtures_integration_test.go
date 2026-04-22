@@ -237,6 +237,26 @@ func TestSharedFixtureFamilyFeatureProfile(t *testing.T) {
 	assertExpectedPolicies(t, profile.SupportedPolicies, expected["supported_policies"].([]any))
 }
 
+func TestTemplateTokenKeysFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_token_keys"))
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		content := testCase["content"].(string)
+		var config *TemplateTokenConfig
+		if rawConfig, ok := testCase["config"]; ok {
+			decoded := decodeFixtureValueUntyped[TemplateTokenConfig](rawConfig)
+			config = &decoded
+		}
+
+		actual := TemplateTokenKeys(content, config)
+		expected := decodeFixtureValue[[]string](t, testCase["expected_token_keys"])
+		if !reflect.DeepEqual(actual, expected) {
+			t.Fatalf("expected token keys for %q to match fixture", content)
+		}
+	}
+}
+
 func TestTemplateSourcePathMappingFixture(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_source_path_mapping"))
 
@@ -327,6 +347,19 @@ func TestTemplateEntryPlanStateFixture(t *testing.T) {
 	expected := decodeFixtureValue[[]TemplatePlanStateEntry](t, fixture["expected_entries"])
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("expected template entry plan state to match fixture")
+	}
+}
+
+func TestTemplateEntryTokenStateFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_entry_token_state"))
+
+	plannedEntries := decodeFixtureValue[[]TemplatePlanStateEntry](t, fixture["planned_entries"])
+	templateContents := decodeFixtureValueUntyped[map[string]string](fixture["template_contents"])
+	replacements := decodeFixtureValueUntyped[map[string]string](fixture["replacements"])
+	actual := EnrichTemplatePlanEntriesWithTokenState(plannedEntries, templateContents, replacements, nil)
+	expected := decodeFixtureValue[[]TemplatePlanTokenStateEntry](t, fixture["expected_entries"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected template entry token state to match fixture")
 	}
 }
 
