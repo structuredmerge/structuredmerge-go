@@ -159,6 +159,24 @@ type TemplateTargetClassification struct {
 	Dialect         string `json:"dialect"`
 }
 
+type TemplateDestinationContext struct {
+	ProjectName string `json:"project_name,omitempty"`
+}
+
+type TemplateStrategy string
+
+const (
+	TemplateStrategyMerge           TemplateStrategy = "merge"
+	TemplateStrategyAcceptTemplate  TemplateStrategy = "accept_template"
+	TemplateStrategyKeepDestination TemplateStrategy = "keep_destination"
+	TemplateStrategyRawCopy         TemplateStrategy = "raw_copy"
+)
+
+type TemplateStrategyOverride struct {
+	Path     string           `json:"path"`
+	Strategy TemplateStrategy `json:"strategy"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -613,6 +631,39 @@ func ClassifyTemplateTargetPath(path string) TemplateTargetClassification {
 	default:
 		return classify("text", "text", "text")
 	}
+}
+
+func ResolveTemplateDestinationPath(path string, context *TemplateDestinationContext) *string {
+	switch path {
+	case ".kettle-jem.yml":
+		return nil
+	case ".env.local":
+		resolved := ".env.local.example"
+		return &resolved
+	case "gem.gemspec":
+		if context != nil && strings.TrimSpace(context.ProjectName) != "" {
+			resolved := strings.TrimSpace(context.ProjectName) + ".gemspec"
+			return &resolved
+		}
+	}
+
+	resolved := path
+	return &resolved
+}
+
+func SelectTemplateStrategy(path string, defaultStrategy TemplateStrategy, overrides []TemplateStrategyOverride) TemplateStrategy {
+	normalizedPath := strings.TrimPrefix(path, "./")
+	for _, override := range overrides {
+		if strings.TrimPrefix(override.Path, "./") == normalizedPath {
+			return override.Strategy
+		}
+	}
+
+	if defaultStrategy == "" {
+		return TemplateStrategyMerge
+	}
+
+	return defaultStrategy
 }
 
 func pathBase(path string) string {

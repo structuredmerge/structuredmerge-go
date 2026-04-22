@@ -262,6 +262,44 @@ func TestTemplateTargetClassificationFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDestinationMappingFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_destination_mapping"))
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		context := decodeFixtureValueUntyped[TemplateDestinationContext](testCase["context"])
+		actual := ResolveTemplateDestinationPath(testCase["logical_destination_path"].(string), &context)
+		expectedRaw := testCase["expected_destination_path"]
+		if expectedRaw == nil {
+			if actual != nil {
+				t.Fatalf("expected nil destination path for %q", testCase["logical_destination_path"])
+			}
+			continue
+		}
+
+		if actual == nil || *actual != expectedRaw.(string) {
+			t.Fatalf("expected %q, got %#v", expectedRaw.(string), actual)
+		}
+	}
+}
+
+func TestTemplateStrategySelectionFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_strategy_selection"))
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		overrides := decodeFixtureValueUntyped[[]TemplateStrategyOverride](testCase["overrides"])
+		actual := SelectTemplateStrategy(
+			testCase["destination_path"].(string),
+			TemplateStrategy(testCase["default_strategy"].(string)),
+			overrides,
+		)
+		if string(actual) != testCase["expected_strategy"].(string) {
+			t.Fatalf("expected %q, got %q", testCase["expected_strategy"], actual)
+		}
+	}
+}
+
 func TestSharedFixtureConformanceRunnerShape(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runner_shape"))
 
