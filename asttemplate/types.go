@@ -881,6 +881,67 @@ func RunTemplateDirectorySessionWithOptions(options DirectorySessionOptions) (Se
 	)
 }
 
+func normalizeSessionMode(mode DirectorySessionMode) DirectorySessionMode {
+	switch mode {
+	case DirectorySessionModeApply, DirectorySessionModeReapply:
+		return mode
+	default:
+		return DirectorySessionModePlan
+	}
+}
+
+func ReportTemplateDirectorySessionOptionsConfiguration(options DirectorySessionOptions) SessionDiagnosticsReport {
+	diagnostics := []SessionDiagnostic{}
+	if options.DestinationRoot == "" {
+		diagnostics = append(diagnostics, SessionDiagnostic{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.CategoryConfigurationError,
+			Reason:   "missing_destination_root",
+			Message:  "missing destination_root for template session",
+		})
+	}
+	if options.TemplateRoot == "" {
+		diagnostics = append(diagnostics, SessionDiagnostic{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.CategoryConfigurationError,
+			Reason:   "missing_template_root",
+			Message:  "missing template_root for template session",
+		})
+	}
+	slices.SortFunc(diagnostics, func(a, b SessionDiagnostic) int {
+		return strings.Compare(a.Reason, b.Reason)
+	})
+	return SessionDiagnosticsReport{
+		Mode:        normalizeSessionMode(options.Mode),
+		Ready:       len(diagnostics) == 0,
+		Diagnostics: diagnostics,
+	}
+}
+
+func ReportTemplateDirectorySessionProfileConfiguration(
+	profiles map[string]DirectorySessionProfile,
+	profileName string,
+	overrides DirectorySessionOptions,
+) SessionDiagnosticsReport {
+	report := ReportTemplateDirectorySessionOptionsConfiguration(overrides)
+	if profile, ok := profiles[profileName]; ok {
+		report.Mode = normalizeSessionMode(firstNonEmptySessionMode(overrides.Mode, profile.Mode))
+	} else {
+		report.Diagnostics = append(report.Diagnostics, SessionDiagnostic{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.CategoryConfigurationError,
+			Reason:   "missing_profile",
+			Message:  "unknown template session profile: " + profileName,
+		})
+		report.Mode = normalizeSessionMode(overrides.Mode)
+	}
+	slices.SortFunc(report.Diagnostics, func(a, b SessionDiagnostic) int {
+		return strings.Compare(a.Reason, b.Reason)
+	})
+	report.Ready = len(report.Diagnostics) == 0
+	return report
+}
+
 func ResolveTemplateDirectorySessionOptions(
 	profiles map[string]DirectorySessionProfile,
 	profileName string,
@@ -936,6 +997,15 @@ func RunTemplateDirectorySessionWithProfile(
 	}
 	outcome, err := RunTemplateDirectorySessionWithOptions(options)
 	return outcome, true, err
+}
+
+func firstNonEmptySessionMode(values ...DirectorySessionMode) DirectorySessionMode {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return DirectorySessionModePlan
 }
 
 func cloneStringMap(values map[string]string) map[string]string {

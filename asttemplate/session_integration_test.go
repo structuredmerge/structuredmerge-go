@@ -552,6 +552,43 @@ func TestTemplateDirectorySessionProfileReportFixture(t *testing.T) {
 	_ = os.RemoveAll(tempRoot)
 }
 
+func TestTemplateDirectorySessionConfigurationReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-364-template-directory-session-configuration-report", "template-directory-session-configuration-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	optionsValid := fixture["options_valid"].(map[string]any)
+	assertJSONEqual(t, optionsValid["expected"], asttemplate.ReportTemplateDirectorySessionOptionsConfiguration(
+		decodeSessionOptionsFromFixture(t, optionsValid["options"]),
+	))
+
+	optionsMissingRoots := fixture["options_missing_roots"].(map[string]any)
+	assertJSONEqual(t, optionsMissingRoots["expected"], asttemplate.ReportTemplateDirectorySessionOptionsConfiguration(
+		decodeSessionOptionsFromFixture(t, optionsMissingRoots["options"]),
+	))
+
+	profileValid := fixture["profile_valid"].(map[string]any)
+	assertJSONEqual(t, profileValid["expected"], asttemplate.ReportTemplateDirectorySessionProfileConfiguration(
+		profiles,
+		profileValid["profile"].(string),
+		decodeSessionOptionsFromFixture(t, profileValid["overrides"]),
+	))
+
+	profileMissingProfile := fixture["profile_missing_profile"].(map[string]any)
+	assertJSONEqual(t, profileMissingProfile["expected"], asttemplate.ReportTemplateDirectorySessionProfileConfiguration(
+		profiles,
+		profileMissingProfile["profile"].(string),
+		decodeSessionOptionsFromFixture(t, profileMissingProfile["overrides"]),
+	))
+
+	profileMissingRoots := fixture["profile_missing_roots"].(map[string]any)
+	assertJSONEqual(t, profileMissingRoots["expected"], asttemplate.ReportTemplateDirectorySessionProfileConfiguration(
+		profiles,
+		profileMissingRoots["profile"].(string),
+		decodeSessionOptionsFromFixture(t, profileMissingRoots["overrides"]),
+	))
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -630,6 +667,23 @@ func decodeOptionalFamilies(t *testing.T, raw any) []string {
 func decodeSessionOptions(t *testing.T, raw any, templateRoot string, destinationRoot string) asttemplate.DirectorySessionOptions {
 	t.Helper()
 	section := raw.(map[string]any)
+	return asttemplate.DirectorySessionOptions{
+		Mode:            asttemplate.DirectorySessionMode(section["mode"].(string)),
+		TemplateRoot:    templateRoot,
+		DestinationRoot: destinationRoot,
+		Context:         decodeContext(t, section["context"]),
+		DefaultStrategy: decodeStrategy(t, section["default_strategy"]),
+		Overrides:       decodeOverrides(t, section["overrides"]),
+		Replacements:    decodeReplacements(t, section["replacements"]),
+		AllowedFamilies: decodeOptionalFamilies(t, section["allowed_families"]),
+	}
+}
+
+func decodeSessionOptionsFromFixture(t *testing.T, raw any) asttemplate.DirectorySessionOptions {
+	t.Helper()
+	section := raw.(map[string]any)
+	templateRoot, _ := section["template_root"].(string)
+	destinationRoot, _ := section["destination_root"].(string)
 	return asttemplate.DirectorySessionOptions{
 		Mode:            asttemplate.DirectorySessionMode(section["mode"].(string)),
 		TemplateRoot:    templateRoot,
