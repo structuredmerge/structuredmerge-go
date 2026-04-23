@@ -130,6 +130,12 @@ type SessionEntrypointReport struct {
 	RunnerRequest SessionRunnerRequest `json:"runner_request"`
 }
 
+type SessionResolutionReport struct {
+	SourceKind     string               `json:"source_kind"`
+	RunnerRequest  SessionRunnerRequest `json:"runner_request"`
+	SessionRequest SessionRequestReport `json:"session_request"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1206,6 +1212,36 @@ func ReportTemplateDirectorySessionEntrypoint(entrypoint SessionEntrypoint) Sess
 		SourceKind:    "",
 		RunnerRequest: SessionRunnerRequest{},
 	}
+}
+
+func ReportTemplateDirectorySessionResolution(
+	entrypoint SessionEntrypoint,
+	profiles map[string]DirectorySessionProfile,
+) SessionResolutionReport {
+	entrypointReport := ReportTemplateDirectorySessionEntrypoint(entrypoint)
+	return SessionResolutionReport{
+		SourceKind:     entrypointReport.SourceKind,
+		RunnerRequest:  entrypointReport.RunnerRequest,
+		SessionRequest: reportSessionRequestFromRunnerRequest(entrypointReport.RunnerRequest, profiles),
+	}
+}
+
+func reportSessionRequestFromRunnerRequest(
+	request SessionRunnerRequest,
+	profiles map[string]DirectorySessionProfile,
+) SessionRequestReport {
+	if request.RequestKind == "profile" {
+		overrides := DirectorySessionOptions{}
+		if request.Overrides != nil {
+			overrides = decodeSessionRunnerOptions(request.Overrides, true)
+		}
+		return ReportTemplateDirectorySessionProfileRequest(profiles, request.ProfileName, overrides)
+	}
+	options := DirectorySessionOptions{}
+	if request.Options != nil {
+		options = decodeSessionRunnerOptions(request.Options, false)
+	}
+	return ReportTemplateDirectorySessionOptionsRequest(options)
 }
 
 func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {

@@ -928,6 +928,36 @@ func TestTemplateDirectorySessionEntrypointReportFixture(t *testing.T) {
 	))
 }
 
+func TestTemplateDirectorySessionResolutionReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-375-template-directory-session-resolution-report", "template-directory-session-resolution-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	payloadReady := fixture["payload_ready"].(map[string]any)
+	assertJSONEqual(t, payloadReady["expected"], asttemplate.ReportTemplateDirectorySessionResolution(
+		decodeSessionEntrypoint(t, payloadReady["input"]),
+		profiles,
+	))
+
+	requestBlocked := fixture["request_blocked"].(map[string]any)
+	assertJSONEqual(t, requestBlocked["expected"], asttemplate.ReportTemplateDirectorySessionResolution(
+		decodeSessionEntrypoint(t, requestBlocked["input"]),
+		profiles,
+	))
+
+	requestReady := fixture["request_ready"].(map[string]any)
+	assertJSONEqual(t, requestReady["expected"], asttemplate.ReportTemplateDirectorySessionResolution(
+		decodeSessionEntrypoint(t, requestReady["input"]),
+		profiles,
+	))
+
+	payloadBlocked := fixture["payload_blocked"].(map[string]any)
+	assertJSONEqual(t, payloadBlocked["expected"], asttemplate.ReportTemplateDirectorySessionResolution(
+		decodeSessionEntrypoint(t, payloadBlocked["input"]),
+		profiles,
+	))
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
