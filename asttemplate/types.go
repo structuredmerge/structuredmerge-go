@@ -88,6 +88,16 @@ type DirectorySessionOptions struct {
 	Config          *astmerge.TemplateTokenConfig        `json:"config,omitempty"`
 }
 
+type DirectorySessionProfile struct {
+	Mode            DirectorySessionMode                 `json:"mode"`
+	Context         *astmerge.TemplateDestinationContext `json:"context"`
+	DefaultStrategy astmerge.TemplateStrategy            `json:"default_strategy"`
+	Overrides       []astmerge.TemplateStrategyOverride  `json:"overrides"`
+	Replacements    map[string]string                    `json:"replacements"`
+	AllowedFamilies []string                             `json:"allowed_families"`
+	Config          *astmerge.TemplateTokenConfig        `json:"config,omitempty"`
+}
+
 func ReportTemplateDirectorySession(mode DirectorySessionMode, entries []astmerge.TemplateExecutionPlanEntry, result *astmerge.TemplateTreeRunResult) DirectorySessionReport {
 	return DirectorySessionReport{
 		Mode:         mode,
@@ -869,4 +879,72 @@ func RunTemplateDirectorySessionWithOptions(options DirectorySessionOptions) (Se
 		options.AllowedFamilies,
 		options.Config,
 	)
+}
+
+func ResolveTemplateDirectorySessionOptions(
+	profiles map[string]DirectorySessionProfile,
+	profileName string,
+	overrides DirectorySessionOptions,
+) (DirectorySessionOptions, bool) {
+	profile, ok := profiles[profileName]
+	if !ok {
+		return DirectorySessionOptions{}, false
+	}
+	options := DirectorySessionOptions{
+		Mode:            profile.Mode,
+		TemplateRoot:    overrides.TemplateRoot,
+		DestinationRoot: overrides.DestinationRoot,
+		Context:         profile.Context,
+		DefaultStrategy: profile.DefaultStrategy,
+		Overrides:       append([]astmerge.TemplateStrategyOverride{}, profile.Overrides...),
+		Replacements:    cloneStringMap(profile.Replacements),
+		AllowedFamilies: append([]string{}, profile.AllowedFamilies...),
+		Config:          profile.Config,
+	}
+	if overrides.Mode != "" {
+		options.Mode = overrides.Mode
+	}
+	if overrides.Context != nil {
+		options.Context = overrides.Context
+	}
+	if overrides.DefaultStrategy != "" {
+		options.DefaultStrategy = overrides.DefaultStrategy
+	}
+	if overrides.Overrides != nil {
+		options.Overrides = overrides.Overrides
+	}
+	if overrides.Replacements != nil {
+		options.Replacements = overrides.Replacements
+	}
+	if overrides.AllowedFamilies != nil {
+		options.AllowedFamilies = overrides.AllowedFamilies
+	}
+	if overrides.Config != nil {
+		options.Config = overrides.Config
+	}
+	return options, true
+}
+
+func RunTemplateDirectorySessionWithProfile(
+	profiles map[string]DirectorySessionProfile,
+	profileName string,
+	overrides DirectorySessionOptions,
+) (SessionOutcomeReport, bool, error) {
+	options, ok := ResolveTemplateDirectorySessionOptions(profiles, profileName, overrides)
+	if !ok {
+		return SessionOutcomeReport{}, false, nil
+	}
+	outcome, err := RunTemplateDirectorySessionWithOptions(options)
+	return outcome, true, err
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	cloned := make(map[string]string, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
 }

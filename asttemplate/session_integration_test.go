@@ -498,6 +498,60 @@ func TestTemplateDirectorySessionOptionsReportFixture(t *testing.T) {
 	_ = os.RemoveAll(tempRoot)
 }
 
+func TestTemplateDirectorySessionProfileReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-363-template-directory-session-profile-report", "template-directory-session-profile-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	planRun := fixture["plan_run"].(map[string]any)
+	planOutcome, ok, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+		profiles,
+		planRun["profile"].(string),
+		asttemplate.DirectorySessionOptions{
+			TemplateRoot:    filepath.Join(fixtureRoot, "dry-run", "template"),
+			DestinationRoot: filepath.Join(fixtureRoot, "dry-run", "destination"),
+		},
+	)
+	if err != nil || !ok {
+		t.Fatalf("plan profile failed: %v", err)
+	}
+	assertJSONEqual(t, planRun["expected"], planOutcome)
+
+	tempRoot := filepath.Join(repoRoot(t), "go", "asttemplate", "tmp", t.Name(), "profiles")
+	_ = os.RemoveAll(tempRoot)
+	if err := copyTree(filepath.Join(fixtureRoot, "apply-run", "destination"), tempRoot); err != nil {
+		t.Fatalf("copy destination: %v", err)
+	}
+
+	applyRun := fixture["apply_run"].(map[string]any)
+	applyOutcome, ok, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+		profiles,
+		applyRun["profile"].(string),
+		asttemplate.DirectorySessionOptions{
+			TemplateRoot:    filepath.Join(fixtureRoot, "apply-run", "template"),
+			DestinationRoot: tempRoot,
+		},
+	)
+	if err != nil || !ok {
+		t.Fatalf("apply profile failed: %v", err)
+	}
+	assertJSONEqual(t, applyRun["expected"], applyOutcome)
+
+	reapplyRun := fixture["reapply_run"].(map[string]any)
+	reapplyOverrides := decodeSessionOptions(t, reapplyRun["overrides"], filepath.Join(fixtureRoot, "apply-run", "template"), tempRoot)
+	reapplyOutcome, ok, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+		profiles,
+		reapplyRun["profile"].(string),
+		reapplyOverrides,
+	)
+	if err != nil || !ok {
+		t.Fatalf("reapply profile failed: %v", err)
+	}
+	assertJSONEqual(t, reapplyRun["expected"], reapplyOutcome)
+	_ = os.RemoveAll(tempRoot)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -586,6 +640,24 @@ func decodeSessionOptions(t *testing.T, raw any, templateRoot string, destinatio
 		Replacements:    decodeReplacements(t, section["replacements"]),
 		AllowedFamilies: decodeOptionalFamilies(t, section["allowed_families"]),
 	}
+}
+
+func decodeSessionProfiles(t *testing.T, raw any) map[string]asttemplate.DirectorySessionProfile {
+	t.Helper()
+	sections := raw.(map[string]any)
+	profiles := map[string]asttemplate.DirectorySessionProfile{}
+	for name, value := range sections {
+		section := value.(map[string]any)
+		profiles[name] = asttemplate.DirectorySessionProfile{
+			Mode:            asttemplate.DirectorySessionMode(section["mode"].(string)),
+			Context:         decodeContext(t, section["context"]),
+			DefaultStrategy: decodeStrategy(t, section["default_strategy"]),
+			Overrides:       decodeOverrides(t, section["overrides"]),
+			Replacements:    decodeReplacements(t, section["replacements"]),
+			AllowedFamilies: decodeOptionalFamilies(t, section["allowed_families"]),
+		}
+	}
+	return profiles
 }
 
 func assertJSONEqual(t *testing.T, expected any, actual any) {
