@@ -2,6 +2,7 @@ package asttemplate
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/markdownmerge"
@@ -52,6 +53,21 @@ type SessionStatusReport struct {
 	BlockedPaths      []string             `json:"blocked_paths"`
 	PlannedWriteCount int                  `json:"planned_write_count"`
 	WrittenCount      int                  `json:"written_count"`
+}
+
+type SessionDiagnostic struct {
+	Severity astmerge.DiagnosticSeverity `json:"severity"`
+	Category astmerge.DiagnosticCategory `json:"category"`
+	Reason   string                      `json:"reason"`
+	Path     string                      `json:"path,omitempty"`
+	Family   string                      `json:"family,omitempty"`
+	Message  string                      `json:"message"`
+}
+
+type SessionDiagnosticsReport struct {
+	Mode        DirectorySessionMode `json:"mode"`
+	Ready       bool                 `json:"ready"`
+	Diagnostics []SessionDiagnostic  `json:"diagnostics"`
 }
 
 func ReportTemplateDirectorySession(mode DirectorySessionMode, entries []astmerge.TemplateExecutionPlanEntry, result *astmerge.TemplateTreeRunResult) DirectorySessionReport {
@@ -502,4 +518,132 @@ func sessionEnvelopeModeAndRunner(sessionReport any) (DirectorySessionMode, astm
 	default:
 		return DirectorySessionModePlan, astmerge.TemplateDirectoryRunnerReport{}
 	}
+}
+
+func ReportTemplateDirectorySessionDiagnostics(
+	mode DirectorySessionMode,
+	entries []astmerge.TemplateExecutionPlanEntry,
+	result *astmerge.TemplateTreeRunResult,
+	capabilities AdapterCapabilityReport,
+) SessionDiagnosticsReport {
+	diagnostics := []SessionDiagnostic{}
+	missingFamilies := map[string]struct{}{}
+	for _, family := range capabilities.MissingFamilies {
+		missingFamilies[family] = struct{}{}
+	}
+	blockedByPath := map[string]struct{}{}
+	if result != nil {
+		for _, path := range result.ApplyResult.BlockedPaths {
+			blockedByPath[path] = struct{}{}
+		}
+	}
+	for _, entry := range entries {
+		path := entry.LogicalDestinationPath
+		if entry.DestinationPath != nil {
+			path = *entry.DestinationPath
+		}
+		if entry.Blocked && entry.BlockReason != nil && *entry.BlockReason == astmerge.TemplatePlanBlockReasonUnresolvedTokens {
+			diagnostics = append(diagnostics, SessionDiagnostic{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.CategoryConfigurationError,
+				Reason:   "unresolved_tokens",
+				Path:     path,
+				Message:  "unresolved template tokens block " + path,
+			})
+		}
+		if _, ok := missingFamilies[entry.Classification.Family]; ok &&
+			entry.ExecutionAction == astmerge.TemplateExecutionMergePrepared {
+			if result == nil || len(blockedByPath) == 0 {
+				diagnostics = append(diagnostics, SessionDiagnostic{
+					Severity: astmerge.SeverityError,
+					Category: astmerge.CategoryConfigurationError,
+					Reason:   "missing_family_adapter",
+					Path:     path,
+					Family:   entry.Classification.Family,
+					Message:  "missing family adapter for " + entry.Classification.Family + " blocks " + path,
+				})
+				continue
+			}
+			if _, blocked := blockedByPath[path]; blocked {
+				diagnostics = append(diagnostics, SessionDiagnostic{
+					Severity: astmerge.SeverityError,
+					Category: astmerge.CategoryConfigurationError,
+					Reason:   "missing_family_adapter",
+					Path:     path,
+					Family:   entry.Classification.Family,
+					Message:  "missing family adapter for " + entry.Classification.Family + " blocks " + path,
+				})
+			}
+		}
+	}
+	slices.SortFunc(diagnostics, func(a, b SessionDiagnostic) int {
+		if a.Path != b.Path {
+			return strings.Compare(a.Path, b.Path)
+		}
+		if a.Reason != b.Reason {
+			return strings.Compare(a.Reason, b.Reason)
+		}
+		return strings.Compare(a.Family, b.Family)
+	})
+	return SessionDiagnosticsReport{
+		Mode:        mode,
+		Ready:       len(diagnostics) == 0,
+		Diagnostics: diagnostics,
+	}
+}
+
+func PlanTemplateDirectorySessionDiagnosticsFromDirectories(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionDiagnosticsReport, error) {
+	entries, err := astmerge.PlanTemplateTreeExecutionFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		config,
+	)
+	if err != nil {
+		return SessionDiagnosticsReport{}, err
+	}
+	capabilities := ReportAdapterCapabilities(entries, DefaultFamilyMergeAdapterRegistry(allowedFamilies...))
+	return ReportTemplateDirectorySessionDiagnostics(DirectorySessionModePlan, entries, nil, capabilities), nil
+}
+
+func ApplyTemplateDirectorySessionDiagnosticsWithDefaultRegistryToDirectory(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionDiagnosticsReport, error) {
+	registry := DefaultFamilyMergeAdapterRegistry(allowedFamilies...)
+	result, err := astmerge.ApplyTemplateTreeExecutionToDirectory(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+			return MergePreparedContentFromRegistry(registry, entry)
+		},
+		config,
+	)
+	if err != nil {
+		return SessionDiagnosticsReport{}, err
+	}
+	capabilities := ReportAdapterCapabilities(result.ExecutionPlan, registry)
+	return ReportTemplateDirectorySessionDiagnostics(DirectorySessionModeApply, result.ExecutionPlan, &result, capabilities), nil
 }
