@@ -125,6 +125,11 @@ type SessionEntrypoint struct {
 	Request *SessionRunnerRequest `json:"request,omitempty"`
 }
 
+type SessionEntrypointReport struct {
+	SourceKind    string               `json:"source_kind"`
+	RunnerRequest SessionRunnerRequest `json:"runner_request"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1180,6 +1185,27 @@ func RunTemplateDirectorySessionEntrypoint(
 		return RunTemplateDirectorySessionRunnerRequest(*entrypoint.Request, profiles)
 	}
 	return SessionOutcomeReport{}, nil
+}
+
+func ReportTemplateDirectorySessionEntrypoint(entrypoint SessionEntrypoint) SessionEntrypointReport {
+	if entrypoint.Payload != nil {
+		return SessionEntrypointReport{
+			SourceKind: "payload",
+			RunnerRequest: ReportTemplateDirectorySessionRunnerInput(
+				ReportTemplateDirectorySessionRunnerPayload(*entrypoint.Payload),
+			),
+		}
+	}
+	if entrypoint.Request != nil {
+		return SessionEntrypointReport{
+			SourceKind:    "request",
+			RunnerRequest: *entrypoint.Request,
+		}
+	}
+	return SessionEntrypointReport{
+		SourceKind:    "",
+		RunnerRequest: SessionRunnerRequest{},
+	}
 }
 
 func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {

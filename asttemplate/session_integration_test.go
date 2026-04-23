@@ -903,6 +903,31 @@ func TestTemplateDirectorySessionEntrypointOutcomeReportFixture(t *testing.T) {
 	assertJSONEqual(t, payloadBlocked["expected"], payloadBlockedOutcome)
 }
 
+func TestTemplateDirectorySessionEntrypointReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-374-template-directory-session-entrypoint-report", "template-directory-session-entrypoint-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+
+	payloadReady := fixture["payload_ready"].(map[string]any)
+	assertJSONEqual(t, payloadReady["expected"], asttemplate.ReportTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypoint(t, payloadReady["input"]),
+	))
+
+	requestBlocked := fixture["request_blocked"].(map[string]any)
+	assertJSONEqual(t, requestBlocked["expected"], asttemplate.ReportTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypoint(t, requestBlocked["input"]),
+	))
+
+	requestReady := fixture["request_ready"].(map[string]any)
+	assertJSONEqual(t, requestReady["expected"], asttemplate.ReportTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypoint(t, requestReady["input"]),
+	))
+
+	payloadBlocked := fixture["payload_blocked"].(map[string]any)
+	assertJSONEqual(t, payloadBlocked["expected"], asttemplate.ReportTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypoint(t, payloadBlocked["input"]),
+	))
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1092,6 +1117,22 @@ func decodeSessionRunnerRequestFromFixture(t *testing.T, raw any, fixtureRoot st
 	return request
 }
 
+func decodeSessionRunnerRequest(t *testing.T, raw any) asttemplate.SessionRunnerRequest {
+	t.Helper()
+	section := raw.(map[string]any)
+	request := asttemplate.SessionRunnerRequest{
+		RequestKind: stringOrZero(section["request_kind"]),
+		ProfileName: stringOrZero(section["profile_name"]),
+	}
+	if rawOptions, ok := section["options"]; ok && rawOptions != nil {
+		request.Options = cloneAnyMap(rawOptions)
+	}
+	if rawOverrides, ok := section["overrides"]; ok && rawOverrides != nil {
+		request.Overrides = cloneAnyMap(rawOverrides)
+	}
+	return request
+}
+
 func decodeSessionRunnerInput(t *testing.T, raw any) asttemplate.SessionRunnerInput {
 	t.Helper()
 	section := raw.(map[string]any)
@@ -1149,6 +1190,21 @@ func decodeSessionEntrypointFromFixture(t *testing.T, raw any, fixtureRoot strin
 	}
 	if request, ok := section["request"]; ok && request != nil {
 		resolved := decodeSessionRunnerRequestFromFixture(t, request, fixtureRoot)
+		entrypoint.Request = &resolved
+	}
+	return entrypoint
+}
+
+func decodeSessionEntrypoint(t *testing.T, raw any) asttemplate.SessionEntrypoint {
+	t.Helper()
+	section := raw.(map[string]any)
+	entrypoint := asttemplate.SessionEntrypoint{}
+	if payload, ok := section["payload"]; ok && payload != nil {
+		resolved := decodeSessionRunnerPayload(t, payload)
+		entrypoint.Payload = &resolved
+	}
+	if request, ok := section["request"]; ok && request != nil {
+		resolved := decodeSessionRunnerRequest(t, request)
 		entrypoint.Request = &resolved
 	}
 	return entrypoint
