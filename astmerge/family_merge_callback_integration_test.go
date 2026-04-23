@@ -472,3 +472,75 @@ func TestMiniTemplateTreeDirectoryPlanReportFixture(t *testing.T) {
 		t.Fatalf("expected directory plan report to match fixture")
 	}
 }
+
+func TestMiniTemplateTreeDirectoryRunnerReportFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_directory_runner_report"))
+
+	dryRun := decodeFixtureValue[map[string]any](t, fixture["dry_run"])
+	dryRunDir := filepath.Join(filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_directory_runner_report")), "dry-run")
+	dryRunContext := decodeFixtureValue[astmerge.TemplateDestinationContext](t, dryRun["context"])
+	dryRunOverrides := decodeFixtureValue[[]astmerge.TemplateStrategyOverride](t, dryRun["overrides"])
+	dryRunReplacements := decodeFixtureValue[map[string]string](t, dryRun["replacements"])
+	dryRunPlan, err := astmerge.PlanTemplateTreeExecutionFromDirectories(
+		filepath.Join(dryRunDir, "template"),
+		filepath.Join(dryRunDir, "destination"),
+		&dryRunContext,
+		astmerge.TemplateStrategy(dryRun["default_strategy"].(string)),
+		dryRunOverrides,
+		dryRunReplacements,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("plan dry-run template tree from directories: %v", err)
+	}
+	dryRunActual := astmerge.ReportTemplateDirectoryRunner(dryRunPlan, nil)
+	dryRunExpected := decodeFixtureValue[astmerge.TemplateDirectoryRunnerReport](t, dryRun["expected"])
+	if !reflect.DeepEqual(dryRunActual, dryRunExpected) {
+		t.Fatalf("expected dry-run directory runner report to match fixture")
+	}
+
+	applyRun := decodeFixtureValue[map[string]any](t, fixture["apply_run"])
+	applyRunDir := filepath.Join(filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_directory_runner_report")), "apply-run")
+	applyContext := decodeFixtureValue[astmerge.TemplateDestinationContext](t, applyRun["context"])
+	applyOverrides := decodeFixtureValue[[]astmerge.TemplateStrategyOverride](t, applyRun["overrides"])
+	applyReplacements := decodeFixtureValue[map[string]string](t, applyRun["replacements"])
+	tempRoot := repoTempDir(t)
+	destinationRoot := filepath.Join(tempRoot, "destination")
+	initialDestination, err := astmerge.ReadRelativeFileTree(filepath.Join(applyRunDir, "destination"))
+	if err != nil {
+		t.Fatalf("read apply-run destination tree: %v", err)
+	}
+	if err := astmerge.WriteRelativeFileTree(destinationRoot, initialDestination); err != nil {
+		t.Fatalf("seed apply-run destination tree: %v", err)
+	}
+	applyPlan, err := astmerge.PlanTemplateTreeExecutionFromDirectories(
+		filepath.Join(applyRunDir, "template"),
+		destinationRoot,
+		&applyContext,
+		astmerge.TemplateStrategy(applyRun["default_strategy"].(string)),
+		applyOverrides,
+		applyReplacements,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("plan apply-run template tree from directories: %v", err)
+	}
+	applyResult, err := astmerge.ApplyTemplateTreeExecutionToDirectory(
+		filepath.Join(applyRunDir, "template"),
+		destinationRoot,
+		&applyContext,
+		astmerge.TemplateStrategy(applyRun["default_strategy"].(string)),
+		applyOverrides,
+		applyReplacements,
+		multiFamilyMergeCallback,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("apply apply-run template tree to directory: %v", err)
+	}
+	applyActual := astmerge.ReportTemplateDirectoryRunner(applyPlan, &applyResult)
+	applyExpected := decodeFixtureValue[astmerge.TemplateDirectoryRunnerReport](t, applyRun["expected"])
+	if !reflect.DeepEqual(applyActual, applyExpected) {
+		t.Fatalf("expected apply-run directory runner report to match fixture")
+	}
+}

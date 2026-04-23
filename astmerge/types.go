@@ -407,6 +407,13 @@ type TemplateDirectoryPlanReport struct {
 	Summary TemplateDirectoryPlanReportSummary `json:"summary"`
 }
 
+type TemplateDirectoryRunnerReport struct {
+	PlanReport  TemplateDirectoryPlanReport   `json:"plan_report"`
+	Preview     *TemplatePreviewResult        `json:"preview"`
+	RunReport   *TemplateTreeRunReport        `json:"run_report"`
+	ApplyReport *TemplateDirectoryApplyReport `json:"apply_report"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -1797,6 +1804,21 @@ func ReportTemplateDirectoryPlan(entries []TemplateExecutionPlanEntry) TemplateD
 	}
 
 	return TemplateDirectoryPlanReport{Entries: reportEntries, Summary: summary}
+}
+
+func ReportTemplateDirectoryRunner(entries []TemplateExecutionPlanEntry, result *TemplateTreeRunResult) TemplateDirectoryRunnerReport {
+	preview := PreviewTemplateExecution(entries)
+	report := TemplateDirectoryRunnerReport{
+		PlanReport: ReportTemplateDirectoryPlan(entries),
+		Preview:    &preview,
+	}
+	if result != nil {
+		runReport := ReportTemplateTreeRun(*result)
+		applyReport := ReportTemplateDirectoryApply(*result)
+		report.RunReport = &runReport
+		report.ApplyReport = &applyReport
+	}
+	return report
 }
 
 func pathBase(path string) string {
