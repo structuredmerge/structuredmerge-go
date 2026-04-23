@@ -136,6 +136,14 @@ type SessionResolutionReport struct {
 	SessionRequest SessionRequestReport `json:"session_request"`
 }
 
+type SessionInspectionReport struct {
+	EntrypointReport    SessionEntrypointReport  `json:"entrypoint_report"`
+	SessionResolution   SessionResolutionReport  `json:"session_resolution"`
+	AdapterCapabilities AdapterCapabilityReport  `json:"adapter_capabilities"`
+	Status              SessionStatusReport      `json:"status"`
+	Diagnostics         SessionDiagnosticsReport `json:"diagnostics"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1242,6 +1250,89 @@ func reportSessionRequestFromRunnerRequest(
 		options = decodeSessionRunnerOptions(request.Options, false)
 	}
 	return ReportTemplateDirectorySessionOptionsRequest(options)
+}
+
+func ReportTemplateDirectorySessionInspection(
+	entrypoint SessionEntrypoint,
+	profiles map[string]DirectorySessionProfile,
+) (SessionInspectionReport, error) {
+	entrypointReport := ReportTemplateDirectorySessionEntrypoint(entrypoint)
+	sessionResolution := ReportTemplateDirectorySessionResolution(entrypoint, profiles)
+	if !sessionResolution.SessionRequest.Ready || sessionResolution.SessionRequest.ResolvedOptions == nil {
+		return SessionInspectionReport{
+			EntrypointReport:  entrypointReport,
+			SessionResolution: sessionResolution,
+			AdapterCapabilities: AdapterCapabilityReport{
+				RequiredFamilies: []string{},
+				AdapterFamilies:  []string{},
+				MissingFamilies:  []string{},
+				Ready:            false,
+			},
+			Status: SessionStatusReport{
+				Mode:              sessionResolution.SessionRequest.Mode,
+				Ready:             false,
+				MissingFamilies:   []string{},
+				BlockedPaths:      []string{},
+				PlannedWriteCount: 0,
+				WrittenCount:      0,
+			},
+			Diagnostics: SessionDiagnosticsReport{
+				Mode:        sessionResolution.SessionRequest.Mode,
+				Ready:       false,
+				Diagnostics: sessionResolution.SessionRequest.Diagnostics,
+			},
+		}, nil
+	}
+
+	resolved := *sessionResolution.SessionRequest.ResolvedOptions
+	capabilities, err := ReportDefaultAdapterCapabilitiesFromDirectories(
+		resolved.TemplateRoot,
+		resolved.DestinationRoot,
+		resolved.Context,
+		resolved.DefaultStrategy,
+		resolved.Overrides,
+		resolved.Replacements,
+		resolved.AllowedFamilies,
+		resolved.Config,
+	)
+	if err != nil {
+		return SessionInspectionReport{}, err
+	}
+	sessionReport, err := PlanTemplateDirectorySessionFromDirectories(
+		resolved.TemplateRoot,
+		resolved.DestinationRoot,
+		resolved.Context,
+		resolved.DefaultStrategy,
+		resolved.Overrides,
+		resolved.Replacements,
+		resolved.Config,
+	)
+	if err != nil {
+		return SessionInspectionReport{}, err
+	}
+	status := ReportTemplateDirectorySessionStatus(
+		ReportTemplateDirectorySessionEnvelope(sessionReport, capabilities),
+	)
+	diagnostics, err := PlanTemplateDirectorySessionDiagnosticsFromDirectories(
+		resolved.TemplateRoot,
+		resolved.DestinationRoot,
+		resolved.Context,
+		resolved.DefaultStrategy,
+		resolved.Overrides,
+		resolved.Replacements,
+		resolved.AllowedFamilies,
+		resolved.Config,
+	)
+	if err != nil {
+		return SessionInspectionReport{}, err
+	}
+	return SessionInspectionReport{
+		EntrypointReport:    entrypointReport,
+		SessionResolution:   sessionResolution,
+		AdapterCapabilities: capabilities,
+		Status:              status,
+		Diagnostics:         diagnostics,
+	}, nil
 }
 
 func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {

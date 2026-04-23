@@ -958,6 +958,53 @@ func TestTemplateDirectorySessionResolutionReportFixture(t *testing.T) {
 	))
 }
 
+func TestTemplateDirectorySessionInspectionReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-376-template-directory-session-inspection-report", "template-directory-session-inspection-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	payloadReady := fixture["payload_ready"].(map[string]any)
+	payloadReadyActual, err := asttemplate.ReportTemplateDirectorySessionInspection(
+		decodeSessionEntrypointFromFixture(t, payloadReady["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("payload ready inspection failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(payloadReady["expected"], fixtureRoot), payloadReadyActual)
+
+	requestBlocked := fixture["request_blocked"].(map[string]any)
+	requestBlockedActual, err := asttemplate.ReportTemplateDirectorySessionInspection(
+		decodeSessionEntrypointFromFixture(t, requestBlocked["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("request blocked inspection failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(requestBlocked["expected"], fixtureRoot), requestBlockedActual)
+
+	requestReady := fixture["request_ready"].(map[string]any)
+	requestReadyActual, err := asttemplate.ReportTemplateDirectorySessionInspection(
+		decodeSessionEntrypointFromFixture(t, requestReady["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("request ready inspection failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(requestReady["expected"], fixtureRoot), requestReadyActual)
+
+	payloadBlocked := fixture["payload_blocked"].(map[string]any)
+	payloadBlockedActual, err := asttemplate.ReportTemplateDirectorySessionInspection(
+		decodeSessionEntrypointFromFixture(t, payloadBlocked["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("payload blocked inspection failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(payloadBlocked["expected"], fixtureRoot), payloadBlockedActual)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1261,6 +1308,49 @@ func cloneAnyMap(raw any) map[string]any {
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func resolveSessionInspectionExpectedFixturePaths(raw any, fixtureRoot string) any {
+	section := cloneAnyMap(raw)
+	if section == nil {
+		return raw
+	}
+	if entrypointReport, ok := section["entrypoint_report"].(map[string]any); ok {
+		if runnerRequest, ok := entrypointReport["runner_request"]; ok {
+			entrypointReport["runner_request"] = resolveRunnerRequestFixturePaths(runnerRequest, fixtureRoot)
+		}
+	}
+	if sessionResolution, ok := section["session_resolution"].(map[string]any); ok {
+		if runnerRequest, ok := sessionResolution["runner_request"]; ok {
+			sessionResolution["runner_request"] = resolveRunnerRequestFixturePaths(runnerRequest, fixtureRoot)
+		}
+		if sessionRequest, ok := sessionResolution["session_request"].(map[string]any); ok {
+			if resolvedOptions, ok := sessionRequest["resolved_options"]; ok && resolvedOptions != nil {
+				sessionRequest["resolved_options"] = resolveRunnerRequestFixturePaths(resolvedOptions, fixtureRoot)
+			}
+		}
+	}
+	return section
+}
+
+func resolveRunnerRequestFixturePaths(raw any, fixtureRoot string) any {
+	section := cloneAnyMap(raw)
+	if section == nil {
+		return raw
+	}
+	if options, ok := section["options"]; ok && options != nil {
+		section["options"] = resolveRunnerRequestFixturePaths(options, fixtureRoot)
+	}
+	if overrides, ok := section["overrides"]; ok && overrides != nil {
+		section["overrides"] = resolveRunnerRequestFixturePaths(overrides, fixtureRoot)
+	}
+	if templateRoot, ok := section["template_root"].(string); ok && templateRoot != "" {
+		section["template_root"] = filepath.Join(fixtureRoot, templateRoot)
+	}
+	if destinationRoot, ok := section["destination_root"].(string); ok && destinationRoot != "" {
+		section["destination_root"] = filepath.Join(fixtureRoot, destinationRoot)
+	}
+	return section
 }
 
 func decodeOptionalContext(t *testing.T, raw any) *astmerge.TemplateDestinationContext {
