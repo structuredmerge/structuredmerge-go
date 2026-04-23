@@ -45,6 +45,15 @@ type SessionEnvelopeReport struct {
 	AdapterCapabilities AdapterCapabilityReport `json:"adapter_capabilities"`
 }
 
+type SessionStatusReport struct {
+	Mode              DirectorySessionMode `json:"mode"`
+	Ready             bool                 `json:"ready"`
+	MissingFamilies   []string             `json:"missing_families"`
+	BlockedPaths      []string             `json:"blocked_paths"`
+	PlannedWriteCount int                  `json:"planned_write_count"`
+	WrittenCount      int                  `json:"written_count"`
+}
+
 func ReportTemplateDirectorySession(mode DirectorySessionMode, entries []astmerge.TemplateExecutionPlanEntry, result *astmerge.TemplateTreeRunResult) DirectorySessionReport {
 	return DirectorySessionReport{
 		Mode:         mode,
@@ -441,4 +450,56 @@ func ApplyTemplateDirectorySessionEnvelopeWithDefaultRegistryToDirectory(
 		return SessionEnvelopeReport{}, err
 	}
 	return ReportTemplateDirectorySessionEnvelope(sessionReport, capabilities), nil
+}
+
+func ReportTemplateDirectorySessionStatus(envelope SessionEnvelopeReport) SessionStatusReport {
+	mode, runnerReport := sessionEnvelopeModeAndRunner(envelope.SessionReport)
+	blockedPathSet := map[string]struct{}{}
+	for _, entry := range runnerReport.PlanReport.Entries {
+		if entry.Status == astmerge.TemplateDirectoryPlanBlocked && entry.DestinationPath != nil {
+			blockedPathSet[*entry.DestinationPath] = struct{}{}
+		}
+	}
+	if runnerReport.ApplyReport != nil {
+		for _, entry := range runnerReport.ApplyReport.Entries {
+			if entry.Status == astmerge.TemplateTreeRunBlocked && entry.DestinationPath != nil {
+				blockedPathSet[*entry.DestinationPath] = struct{}{}
+			}
+		}
+	}
+	blockedPaths := make([]string, 0, len(blockedPathSet))
+	for path := range blockedPathSet {
+		blockedPaths = append(blockedPaths, path)
+	}
+	slices.Sort(blockedPaths)
+	plannedWriteCount := runnerReport.PlanReport.Summary.Create + runnerReport.PlanReport.Summary.Update
+	writtenCount := 0
+	if runnerReport.ApplyReport != nil {
+		writtenCount = runnerReport.ApplyReport.Summary.Written
+	}
+	missingFamilies := append([]string{}, envelope.AdapterCapabilities.MissingFamilies...)
+	slices.Sort(missingFamilies)
+	return SessionStatusReport{
+		Mode:              mode,
+		Ready:             envelope.AdapterCapabilities.Ready && len(blockedPaths) == 0,
+		MissingFamilies:   missingFamilies,
+		BlockedPaths:      blockedPaths,
+		PlannedWriteCount: plannedWriteCount,
+		WrittenCount:      writtenCount,
+	}
+}
+
+func sessionEnvelopeModeAndRunner(sessionReport any) (DirectorySessionMode, astmerge.TemplateDirectoryRunnerReport) {
+	switch report := sessionReport.(type) {
+	case DirectorySessionReport:
+		return report.Mode, report.RunnerReport
+	case *DirectorySessionReport:
+		return report.Mode, report.RunnerReport
+	case DirectoryRegistrySessionReport:
+		return report.Mode, report.RunnerReport
+	case *DirectoryRegistrySessionReport:
+		return report.Mode, report.RunnerReport
+	default:
+		return DirectorySessionModePlan, astmerge.TemplateDirectoryRunnerReport{}
+	}
 }

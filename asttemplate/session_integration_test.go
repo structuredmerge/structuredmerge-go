@@ -260,6 +260,52 @@ func TestTemplateDirectorySessionEnvelopeReportFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionStatusReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-358-template-directory-session-status-report", "template-directory-session-status-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	dryRun := fixture["dry_run"].(map[string]any)
+	dryEnvelope, err := asttemplate.PlanTemplateDirectorySessionEnvelopeFromDirectories(
+		filepath.Join(fixtureRoot, "dry-run", "template"),
+		filepath.Join(fixtureRoot, "dry-run", "destination"),
+		decodeContext(t, dryRun["context"]),
+		decodeStrategy(t, dryRun["default_strategy"]),
+		decodeOverrides(t, dryRun["overrides"]),
+		decodeReplacements(t, dryRun["replacements"]),
+		decodeOptionalFamilies(t, dryRun["allowed_families"]),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("dry-run status failed: %v", err)
+	}
+	assertJSONEqual(t, dryRun["expected"], asttemplate.ReportTemplateDirectorySessionStatus(dryEnvelope))
+
+	for _, key := range []string{"apply_run", "filtered_discovery"} {
+		section := fixture[key].(map[string]any)
+		tempRoot := filepath.Join(repoRoot(t), "go", "asttemplate", "tmp", t.Name(), key)
+		_ = os.RemoveAll(tempRoot)
+		if err := copyTree(filepath.Join(fixtureRoot, "apply-run", "destination"), tempRoot); err != nil {
+			t.Fatalf("copy destination: %v", err)
+		}
+		envelope, err := asttemplate.ApplyTemplateDirectorySessionEnvelopeWithDefaultRegistryToDirectory(
+			filepath.Join(fixtureRoot, "apply-run", "template"),
+			tempRoot,
+			decodeContext(t, section["context"]),
+			decodeStrategy(t, section["default_strategy"]),
+			decodeOverrides(t, section["overrides"]),
+			decodeReplacements(t, section["replacements"]),
+			decodeOptionalFamilies(t, section["allowed_families"]),
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("%s status failed: %v", key, err)
+		}
+		assertJSONEqual(t, section["expected"], asttemplate.ReportTemplateDirectorySessionStatus(envelope))
+		_ = os.RemoveAll(tempRoot)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
