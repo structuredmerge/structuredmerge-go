@@ -640,6 +640,36 @@ func TestTemplateDirectorySessionOptionsConfigurationOutcomeReportFixture(t *tes
 	assertJSONEqual(t, missingDestinationRoot["expected"], missingDestinationRootOutcome)
 }
 
+func TestTemplateDirectorySessionRequestReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-367-template-directory-session-request-report", "template-directory-session-request-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	optionsValid := fixture["options_valid"].(map[string]any)
+	assertJSONEqual(t, optionsValid["expected"], asttemplate.ReportTemplateDirectorySessionOptionsRequest(
+		decodeSessionOptionsFromFixture(t, optionsValid["options"]),
+	))
+
+	optionsInvalid := fixture["options_invalid"].(map[string]any)
+	assertJSONEqual(t, optionsInvalid["expected"], asttemplate.ReportTemplateDirectorySessionOptionsRequest(
+		decodeSessionOptionsFromFixture(t, optionsInvalid["options"]),
+	))
+
+	profileValid := fixture["profile_valid"].(map[string]any)
+	assertJSONEqual(t, profileValid["expected"], asttemplate.ReportTemplateDirectorySessionProfileRequest(
+		profiles,
+		profileValid["profile"].(string),
+		decodeSessionOptionsFromFixture(t, profileValid["overrides"]),
+	))
+
+	profileInvalid := fixture["profile_invalid"].(map[string]any)
+	assertJSONEqual(t, profileInvalid["expected"], asttemplate.ReportTemplateDirectorySessionProfileRequest(
+		profiles,
+		profileInvalid["profile"].(string),
+		decodeSessionOptionsFromFixture(t, profileInvalid["overrides"]),
+	))
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -735,15 +765,35 @@ func decodeSessionOptionsFromFixture(t *testing.T, raw any) asttemplate.Director
 	section := raw.(map[string]any)
 	templateRoot, _ := section["template_root"].(string)
 	destinationRoot, _ := section["destination_root"].(string)
+	var context *astmerge.TemplateDestinationContext
+	if rawContext, ok := section["context"]; ok {
+		context = decodeContext(t, rawContext)
+	}
+	var defaultStrategy astmerge.TemplateStrategy
+	if rawStrategy, ok := section["default_strategy"]; ok {
+		defaultStrategy = decodeStrategy(t, rawStrategy)
+	}
+	var overrides []astmerge.TemplateStrategyOverride
+	if rawOverrides, ok := section["overrides"]; ok {
+		overrides = decodeOverrides(t, rawOverrides)
+	}
+	var replacements map[string]string
+	if rawReplacements, ok := section["replacements"]; ok {
+		replacements = decodeReplacements(t, rawReplacements)
+	}
+	var allowedFamilies []string
+	if rawFamilies, ok := section["allowed_families"]; ok {
+		allowedFamilies = decodeOptionalFamilies(t, rawFamilies)
+	}
 	return asttemplate.DirectorySessionOptions{
 		Mode:            asttemplate.DirectorySessionMode(section["mode"].(string)),
 		TemplateRoot:    templateRoot,
 		DestinationRoot: destinationRoot,
-		Context:         decodeContext(t, section["context"]),
-		DefaultStrategy: decodeStrategy(t, section["default_strategy"]),
-		Overrides:       decodeOverrides(t, section["overrides"]),
-		Replacements:    decodeReplacements(t, section["replacements"]),
-		AllowedFamilies: decodeOptionalFamilies(t, section["allowed_families"]),
+		Context:         context,
+		DefaultStrategy: defaultStrategy,
+		Overrides:       overrides,
+		Replacements:    replacements,
+		AllowedFamilies: allowedFamilies,
 	}
 }
 

@@ -76,6 +76,15 @@ type SessionOutcomeReport struct {
 	Diagnostics   SessionDiagnosticsReport `json:"diagnostics"`
 }
 
+type SessionRequestReport struct {
+	RequestKind     string                   `json:"request_kind"`
+	ProfileName     string                   `json:"profile_name,omitempty"`
+	Mode            DirectorySessionMode     `json:"mode"`
+	Ready           bool                     `json:"ready"`
+	Diagnostics     []SessionDiagnostic      `json:"diagnostics"`
+	ResolvedOptions *DirectorySessionOptions `json:"resolved_options"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -868,20 +877,25 @@ func RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
 }
 
 func RunTemplateDirectorySessionWithOptions(options DirectorySessionOptions) (SessionOutcomeReport, error) {
-	configuration := ReportTemplateDirectorySessionOptionsConfiguration(options)
-	if !configuration.Ready {
-		return reportTemplateDirectorySessionConfigurationOutcome(configuration.Mode, configuration), nil
+	request := ReportTemplateDirectorySessionOptionsRequest(options)
+	if !request.Ready {
+		return reportTemplateDirectorySessionConfigurationOutcome(request.Mode, SessionDiagnosticsReport{
+			Mode:        request.Mode,
+			Ready:       request.Ready,
+			Diagnostics: request.Diagnostics,
+		}), nil
 	}
+	resolved := *request.ResolvedOptions
 	return RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
-		options.Mode,
-		options.TemplateRoot,
-		options.DestinationRoot,
-		options.Context,
-		options.DefaultStrategy,
-		options.Overrides,
-		options.Replacements,
-		options.AllowedFamilies,
-		options.Config,
+		resolved.Mode,
+		resolved.TemplateRoot,
+		resolved.DestinationRoot,
+		resolved.Context,
+		resolved.DefaultStrategy,
+		resolved.Overrides,
+		resolved.Replacements,
+		resolved.AllowedFamilies,
+		resolved.Config,
 	)
 }
 
@@ -946,6 +960,45 @@ func ReportTemplateDirectorySessionProfileConfiguration(
 	return report
 }
 
+func ReportTemplateDirectorySessionOptionsRequest(options DirectorySessionOptions) SessionRequestReport {
+	configuration := ReportTemplateDirectorySessionOptionsConfiguration(options)
+	var resolved *DirectorySessionOptions
+	if configuration.Ready {
+		copy := options
+		resolved = &copy
+	}
+	return SessionRequestReport{
+		RequestKind:     "options",
+		Mode:            configuration.Mode,
+		Ready:           configuration.Ready,
+		Diagnostics:     configuration.Diagnostics,
+		ResolvedOptions: resolved,
+	}
+}
+
+func ReportTemplateDirectorySessionProfileRequest(
+	profiles map[string]DirectorySessionProfile,
+	profileName string,
+	overrides DirectorySessionOptions,
+) SessionRequestReport {
+	configuration := ReportTemplateDirectorySessionProfileConfiguration(profiles, profileName, overrides)
+	var resolved *DirectorySessionOptions
+	if configuration.Ready {
+		if options, ok := ResolveTemplateDirectorySessionOptions(profiles, profileName, overrides); ok {
+			copy := options
+			resolved = &copy
+		}
+	}
+	return SessionRequestReport{
+		RequestKind:     "profile",
+		ProfileName:     profileName,
+		Mode:            configuration.Mode,
+		Ready:           configuration.Ready,
+		Diagnostics:     configuration.Diagnostics,
+		ResolvedOptions: resolved,
+	}
+}
+
 func reportTemplateDirectorySessionConfigurationOutcome(
 	mode DirectorySessionMode,
 	diagnostics SessionDiagnosticsReport,
@@ -979,9 +1032,9 @@ func ResolveTemplateDirectorySessionOptions(
 		DestinationRoot: overrides.DestinationRoot,
 		Context:         profile.Context,
 		DefaultStrategy: profile.DefaultStrategy,
-		Overrides:       append([]astmerge.TemplateStrategyOverride{}, profile.Overrides...),
+		Overrides:       cloneStrategyOverrides(profile.Overrides),
 		Replacements:    cloneStringMap(profile.Replacements),
-		AllowedFamilies: append([]string{}, profile.AllowedFamilies...),
+		AllowedFamilies: cloneStringSlice(profile.AllowedFamilies),
 		Config:          profile.Config,
 	}
 	if overrides.Mode != "" {
@@ -1013,25 +1066,15 @@ func RunTemplateDirectorySessionWithProfile(
 	profileName string,
 	overrides DirectorySessionOptions,
 ) (SessionOutcomeReport, error) {
-	configuration := ReportTemplateDirectorySessionProfileConfiguration(profiles, profileName, overrides)
-	if !configuration.Ready {
-		return reportTemplateDirectorySessionConfigurationOutcome(configuration.Mode, configuration), nil
+	request := ReportTemplateDirectorySessionProfileRequest(profiles, profileName, overrides)
+	if !request.Ready {
+		return reportTemplateDirectorySessionConfigurationOutcome(request.Mode, SessionDiagnosticsReport{
+			Mode:        request.Mode,
+			Ready:       request.Ready,
+			Diagnostics: request.Diagnostics,
+		}), nil
 	}
-	options, ok := ResolveTemplateDirectorySessionOptions(profiles, profileName, overrides)
-	if !ok {
-		diagnostics := SessionDiagnosticsReport{
-			Mode:  normalizeSessionMode(overrides.Mode),
-			Ready: false,
-			Diagnostics: []SessionDiagnostic{{
-				Severity: astmerge.SeverityError,
-				Category: astmerge.CategoryConfigurationError,
-				Reason:   "missing_profile",
-				Message:  "unknown template session profile: " + profileName,
-			}},
-		}
-		return reportTemplateDirectorySessionConfigurationOutcome(diagnostics.Mode, diagnostics), nil
-	}
-	return RunTemplateDirectorySessionWithOptions(options)
+	return RunTemplateDirectorySessionWithOptions(*request.ResolvedOptions)
 }
 
 func firstNonEmptySessionMode(values ...DirectorySessionMode) DirectorySessionMode {
@@ -1051,5 +1094,23 @@ func cloneStringMap(values map[string]string) map[string]string {
 	for key, value := range values {
 		cloned[key] = value
 	}
+	return cloned
+}
+
+func cloneStringSlice(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	cloned := make([]string, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func cloneStrategyOverrides(values []astmerge.TemplateStrategyOverride) []astmerge.TemplateStrategyOverride {
+	if values == nil {
+		return nil
+	}
+	cloned := make([]astmerge.TemplateStrategyOverride, len(values))
+	copy(cloned, values)
 	return cloned
 }
