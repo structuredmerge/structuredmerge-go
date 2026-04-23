@@ -445,3 +445,30 @@ func TestMiniTemplateTreeDirectoryApplyReportFixture(t *testing.T) {
 		t.Fatalf("expected second directory apply report to match fixture")
 	}
 }
+
+func TestMiniTemplateTreeDirectoryPlanReportFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_directory_plan_report"))
+	fixtureDir := filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_directory_plan_report"))
+	context := decodeFixtureValue[astmerge.TemplateDestinationContext](t, fixture["context"])
+	overrides := decodeFixtureValue[[]astmerge.TemplateStrategyOverride](t, fixture["overrides"])
+	replacements := decodeFixtureValue[map[string]string](t, fixture["replacements"])
+
+	executionPlan, err := astmerge.PlanTemplateTreeExecutionFromDirectories(
+		filepath.Join(fixtureDir, "template"),
+		filepath.Join(fixtureDir, "destination"),
+		&context,
+		astmerge.TemplateStrategy(fixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("plan template tree from directories: %v", err)
+	}
+
+	actual := astmerge.ReportTemplateDirectoryPlan(executionPlan)
+	expected := decodeFixtureValue[astmerge.TemplateDirectoryPlanReport](t, fixture["expected"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected directory plan report to match fixture")
+	}
+}

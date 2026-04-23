@@ -374,6 +374,39 @@ type TemplateDirectoryApplyReport struct {
 	Summary TemplateDirectoryApplyReportSummary `json:"summary"`
 }
 
+type TemplateDirectoryPlanStatus string
+
+const (
+	TemplateDirectoryPlanCreate  TemplateDirectoryPlanStatus = "create"
+	TemplateDirectoryPlanUpdate  TemplateDirectoryPlanStatus = "update"
+	TemplateDirectoryPlanKeep    TemplateDirectoryPlanStatus = "keep"
+	TemplateDirectoryPlanBlocked TemplateDirectoryPlanStatus = "blocked"
+	TemplateDirectoryPlanOmitted TemplateDirectoryPlanStatus = "omitted"
+)
+
+type TemplateDirectoryPlanReportEntry struct {
+	TemplateSourcePath     string                      `json:"template_source_path"`
+	LogicalDestinationPath string                      `json:"logical_destination_path"`
+	DestinationPath        *string                     `json:"destination_path"`
+	ExecutionAction        TemplateExecutionAction     `json:"execution_action"`
+	WriteAction            string                      `json:"write_action"`
+	Status                 TemplateDirectoryPlanStatus `json:"status"`
+	Previewable            bool                        `json:"previewable"`
+}
+
+type TemplateDirectoryPlanReportSummary struct {
+	Create  int `json:"create"`
+	Update  int `json:"update"`
+	Keep    int `json:"keep"`
+	Blocked int `json:"blocked"`
+	Omitted int `json:"omitted"`
+}
+
+type TemplateDirectoryPlanReport struct {
+	Entries []TemplateDirectoryPlanReportEntry `json:"entries"`
+	Summary TemplateDirectoryPlanReportSummary `json:"summary"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -1519,6 +1552,39 @@ func RunTemplateTreeExecutionFromDirectories(
 	), nil
 }
 
+func PlanTemplateTreeExecutionFromDirectories(
+	templateRoot string,
+	destinationRoot string,
+	context *TemplateDestinationContext,
+	defaultStrategy TemplateStrategy,
+	overrides []TemplateStrategyOverride,
+	replacements map[string]string,
+	config *TemplateTokenConfig,
+) ([]TemplateExecutionPlanEntry, error) {
+	templateContents, err := ReadRelativeFileTree(templateRoot)
+	if err != nil {
+		return nil, err
+	}
+	destinationContents, err := ReadRelativeFileTree(destinationRoot)
+	if err != nil {
+		return nil, err
+	}
+	templateSourcePaths := mapsKeys(templateContents)
+	slices.Sort(templateSourcePaths)
+
+	return PlanTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		mapsKeysSorted(destinationContents),
+		destinationContents,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		config,
+	), nil
+}
+
 func ApplyTemplateTreeExecutionToDirectory(
 	templateRoot string,
 	destinationRoot string,
@@ -1678,6 +1744,61 @@ func ReportTemplateDirectoryApply(result TemplateTreeRunResult) TemplateDirector
 	}
 }
 
+func ReportTemplateDirectoryPlan(entries []TemplateExecutionPlanEntry) TemplateDirectoryPlanReport {
+	reportEntries := make([]TemplateDirectoryPlanReportEntry, 0, len(entries))
+	summary := TemplateDirectoryPlanReportSummary{}
+
+	for _, entry := range entries {
+		status := TemplateDirectoryPlanUpdate
+		previewable := false
+		switch entry.ExecutionAction {
+		case TemplateExecutionBlocked:
+			status = TemplateDirectoryPlanBlocked
+		case TemplateExecutionOmit:
+			status = TemplateDirectoryPlanOmitted
+			previewable = true
+		case TemplateExecutionKeep:
+			status = TemplateDirectoryPlanKeep
+			previewable = true
+		case TemplateExecutionRawCopy, TemplateExecutionWritePrepared:
+			if entry.WriteAction == "create" {
+				status = TemplateDirectoryPlanCreate
+			}
+			previewable = true
+		case TemplateExecutionMergePrepared:
+			if entry.WriteAction == "create" {
+				status = TemplateDirectoryPlanCreate
+				previewable = true
+			}
+		}
+
+		switch status {
+		case TemplateDirectoryPlanCreate:
+			summary.Create++
+		case TemplateDirectoryPlanUpdate:
+			summary.Update++
+		case TemplateDirectoryPlanKeep:
+			summary.Keep++
+		case TemplateDirectoryPlanBlocked:
+			summary.Blocked++
+		case TemplateDirectoryPlanOmitted:
+			summary.Omitted++
+		}
+
+		reportEntries = append(reportEntries, TemplateDirectoryPlanReportEntry{
+			TemplateSourcePath:     entry.TemplateSourcePath,
+			LogicalDestinationPath: entry.LogicalDestinationPath,
+			DestinationPath:        entry.DestinationPath,
+			ExecutionAction:        entry.ExecutionAction,
+			WriteAction:            entry.WriteAction,
+			Status:                 status,
+			Previewable:            previewable,
+		})
+	}
+
+	return TemplateDirectoryPlanReport{Entries: reportEntries, Summary: summary}
+}
+
 func pathBase(path string) string {
 	idx := strings.LastIndex(path, "/")
 	if idx == -1 {
@@ -1685,6 +1806,12 @@ func pathBase(path string) string {
 	}
 
 	return path[idx+1:]
+}
+
+func mapsKeysSorted[V any](input map[string]V) []string {
+	keys := mapsKeys(input)
+	slices.Sort(keys)
+	return keys
 }
 
 func recordTemplateApplyOutput(result *TemplateApplyResult, entry TemplateExecutionPlanEntry, output string) {
