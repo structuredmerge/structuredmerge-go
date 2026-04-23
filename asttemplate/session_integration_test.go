@@ -759,6 +759,31 @@ func TestTemplateDirectorySessionRequestRunnerReportFixture(t *testing.T) {
 	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
 }
 
+func TestTemplateDirectorySessionRunnerInputReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-370-template-directory-session-runner-input-report", "template-directory-session-runner-input-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+
+	optionsReady := fixture["options_ready"].(map[string]any)
+	assertJSONEqual(t, optionsReady["expected"], asttemplate.ReportTemplateDirectorySessionRunnerInput(
+		decodeSessionRunnerInput(t, optionsReady["input"]),
+	))
+
+	optionsBlocked := fixture["options_blocked"].(map[string]any)
+	assertJSONEqual(t, optionsBlocked["expected"], asttemplate.ReportTemplateDirectorySessionRunnerInput(
+		decodeSessionRunnerInput(t, optionsBlocked["input"]),
+	))
+
+	profileReady := fixture["profile_ready"].(map[string]any)
+	assertJSONEqual(t, profileReady["expected"], asttemplate.ReportTemplateDirectorySessionRunnerInput(
+		decodeSessionRunnerInput(t, profileReady["input"]),
+	))
+
+	profileBlocked := fixture["profile_blocked"].(map[string]any)
+	assertJSONEqual(t, profileBlocked["expected"], asttemplate.ReportTemplateDirectorySessionRunnerInput(
+		decodeSessionRunnerInput(t, profileBlocked["input"]),
+	))
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -940,26 +965,84 @@ func decodeSessionRunnerRequestFromFixture(t *testing.T, raw any, fixtureRoot st
 		ProfileName: stringOrZero(section["profile_name"]),
 	}
 	if rawOptions, ok := section["options"]; ok && rawOptions != nil {
-		options := decodeSessionOptionsFromFixture(t, rawOptions)
-		if options.TemplateRoot != "" {
-			options.TemplateRoot = filepath.Join(fixtureRoot, options.TemplateRoot)
-		}
-		if options.DestinationRoot != "" {
-			options.DestinationRoot = filepath.Join(fixtureRoot, options.DestinationRoot)
-		}
-		request.Options = &options
+		request.Options = cloneFixturePathMap(rawOptions, fixtureRoot)
 	}
 	if rawOverrides, ok := section["overrides"]; ok && rawOverrides != nil {
-		overrides := decodeSessionOptionsFromFixture(t, rawOverrides)
-		if overrides.TemplateRoot != "" {
-			overrides.TemplateRoot = filepath.Join(fixtureRoot, overrides.TemplateRoot)
-		}
-		if overrides.DestinationRoot != "" {
-			overrides.DestinationRoot = filepath.Join(fixtureRoot, overrides.DestinationRoot)
-		}
-		request.Overrides = &overrides
+		request.Overrides = cloneFixturePathMap(rawOverrides, fixtureRoot)
 	}
 	return request
+}
+
+func decodeSessionRunnerInput(t *testing.T, raw any) asttemplate.SessionRunnerInput {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionRunnerInput{
+		RequestKind:     stringOrZero(section["request_kind"]),
+		ProfileName:     stringOrZero(section["profile_name"]),
+		Mode:            asttemplate.DirectorySessionMode(section["mode"].(string)),
+		TemplateRoot:    stringOrZero(section["template_root"]),
+		DestinationRoot: stringOrZero(section["destination_root"]),
+		Context:         decodeOptionalContext(t, section["context"]),
+		DefaultStrategy: decodeOptionalStrategy(t, section["default_strategy"]),
+		Overrides:       decodeOptionalOverrides(t, section["overrides"]),
+		Replacements:    decodeOptionalReplacements(t, section["replacements"]),
+		AllowedFamilies: decodeOptionalFamilies(t, section["allowed_families"]),
+	}
+}
+
+func cloneFixturePathMap(raw any, fixtureRoot string) map[string]any {
+	section := cloneAnyMap(raw)
+	if templateRoot, ok := section["template_root"].(string); ok && templateRoot != "" {
+		section["template_root"] = filepath.Join(fixtureRoot, templateRoot)
+	}
+	if destinationRoot, ok := section["destination_root"].(string); ok && destinationRoot != "" {
+		section["destination_root"] = filepath.Join(fixtureRoot, destinationRoot)
+	}
+	return section
+}
+
+func cloneAnyMap(raw any) map[string]any {
+	section, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	cloned := make(map[string]any, len(section))
+	for key, value := range section {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func decodeOptionalContext(t *testing.T, raw any) *astmerge.TemplateDestinationContext {
+	t.Helper()
+	if raw == nil {
+		return nil
+	}
+	return decodeContext(t, raw)
+}
+
+func decodeOptionalStrategy(t *testing.T, raw any) astmerge.TemplateStrategy {
+	t.Helper()
+	if raw == nil {
+		return ""
+	}
+	return decodeStrategy(t, raw)
+}
+
+func decodeOptionalOverrides(t *testing.T, raw any) []astmerge.TemplateStrategyOverride {
+	t.Helper()
+	if raw == nil {
+		return nil
+	}
+	return decodeOverrides(t, raw)
+}
+
+func decodeOptionalReplacements(t *testing.T, raw any) map[string]string {
+	t.Helper()
+	if raw == nil {
+		return nil
+	}
+	return decodeReplacements(t, raw)
 }
 
 func decodeSessionDiagnostics(t *testing.T, raw any) []asttemplate.SessionDiagnostic {

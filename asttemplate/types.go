@@ -86,10 +86,23 @@ type SessionRequestReport struct {
 }
 
 type SessionRunnerRequest struct {
-	RequestKind string                   `json:"request_kind"`
-	ProfileName string                   `json:"profile_name,omitempty"`
-	Options     *DirectorySessionOptions `json:"options,omitempty"`
-	Overrides   *DirectorySessionOptions `json:"overrides,omitempty"`
+	RequestKind string         `json:"request_kind"`
+	ProfileName string         `json:"profile_name,omitempty"`
+	Options     map[string]any `json:"options,omitempty"`
+	Overrides   map[string]any `json:"overrides,omitempty"`
+}
+
+type SessionRunnerInput struct {
+	RequestKind     string                               `json:"request_kind"`
+	ProfileName     string                               `json:"profile_name,omitempty"`
+	Mode            DirectorySessionMode                 `json:"mode"`
+	TemplateRoot    string                               `json:"template_root"`
+	DestinationRoot string                               `json:"destination_root"`
+	Context         *astmerge.TemplateDestinationContext `json:"context"`
+	DefaultStrategy astmerge.TemplateStrategy            `json:"default_strategy"`
+	Overrides       []astmerge.TemplateStrategyOverride  `json:"overrides"`
+	Replacements    map[string]string                    `json:"replacements"`
+	AllowedFamilies []string                             `json:"allowed_families"`
 }
 
 type DirectorySessionOptions struct {
@@ -1054,7 +1067,7 @@ func RunTemplateDirectorySessionRunnerRequest(
 	if request.RequestKind == "profile" {
 		overrides := DirectorySessionOptions{}
 		if request.Overrides != nil {
-			overrides = *request.Overrides
+			overrides = decodeSessionRunnerOptions(request.Overrides)
 		}
 		return RunTemplateDirectorySessionRequest(
 			ReportTemplateDirectorySessionProfileRequest(profiles, request.ProfileName, overrides),
@@ -1062,9 +1075,166 @@ func RunTemplateDirectorySessionRunnerRequest(
 	}
 	options := DirectorySessionOptions{}
 	if request.Options != nil {
-		options = *request.Options
+		options = decodeSessionRunnerOptions(request.Options)
 	}
 	return RunTemplateDirectorySessionRequest(ReportTemplateDirectorySessionOptionsRequest(options))
+}
+
+func ReportTemplateDirectorySessionRunnerInput(input SessionRunnerInput) SessionRunnerRequest {
+	if input.RequestKind == "profile" {
+		return SessionRunnerRequest{
+			RequestKind: input.RequestKind,
+			ProfileName: input.ProfileName,
+			Overrides:   reportSessionRunnerInputOverrides(input),
+		}
+	}
+	return SessionRunnerRequest{
+		RequestKind: input.RequestKind,
+		Options:     reportSessionRunnerInputOptions(input),
+	}
+}
+
+func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {
+	return map[string]any{
+		"mode":             input.Mode,
+		"template_root":    input.TemplateRoot,
+		"destination_root": input.DestinationRoot,
+		"context":          input.Context,
+		"default_strategy": defaultTemplateStrategy(input.DefaultStrategy),
+		"overrides":        cloneStrategyOverrides(input.Overrides),
+		"replacements":     cloneStringMap(input.Replacements),
+		"allowed_families": cloneStringSlice(input.AllowedFamilies),
+	}
+}
+
+func reportSessionRunnerInputOverrides(input SessionRunnerInput) map[string]any {
+	overrides := map[string]any{
+		"mode":             input.Mode,
+		"template_root":    input.TemplateRoot,
+		"destination_root": input.DestinationRoot,
+	}
+	if input.Context != nil && input.Context.ProjectName != "" {
+		overrides["context"] = input.Context
+	}
+	if input.DefaultStrategy != "" {
+		overrides["default_strategy"] = input.DefaultStrategy
+	}
+	if len(input.Overrides) > 0 {
+		overrides["overrides"] = cloneStrategyOverrides(input.Overrides)
+	}
+	if len(input.Replacements) > 0 {
+		overrides["replacements"] = cloneStringMap(input.Replacements)
+	}
+	if input.AllowedFamilies != nil {
+		overrides["allowed_families"] = cloneStringSlice(input.AllowedFamilies)
+	}
+	return overrides
+}
+
+func decodeSessionRunnerOptions(raw map[string]any) DirectorySessionOptions {
+	options := DirectorySessionOptions{
+		DefaultStrategy: astmerge.TemplateStrategyMerge,
+	}
+	if mode, ok := raw["mode"].(string); ok && mode != "" {
+		options.Mode = DirectorySessionMode(mode)
+	}
+	if templateRoot, ok := raw["template_root"].(string); ok {
+		options.TemplateRoot = templateRoot
+	}
+	if destinationRoot, ok := raw["destination_root"].(string); ok {
+		options.DestinationRoot = destinationRoot
+	}
+	if context, ok := raw["context"]; ok && context != nil {
+		options.Context = decodeTemplateDestinationContextMap(context)
+	}
+	if strategy, ok := raw["default_strategy"].(string); ok && strategy != "" {
+		options.DefaultStrategy = astmerge.TemplateStrategy(strategy)
+	}
+	if overrides, ok := raw["overrides"]; ok && overrides != nil {
+		options.Overrides = decodeTemplateStrategyOverrides(overrides)
+	}
+	if replacements, ok := raw["replacements"]; ok && replacements != nil {
+		options.Replacements = decodeStringMap(replacements)
+	}
+	if allowedFamilies, ok := raw["allowed_families"]; ok {
+		options.AllowedFamilies = decodeStringSlice(allowedFamilies)
+	}
+	return options
+}
+
+func decodeTemplateDestinationContextMap(raw any) *astmerge.TemplateDestinationContext {
+	section, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	context := &astmerge.TemplateDestinationContext{}
+	if projectName, ok := section["project_name"].(string); ok && projectName != "" {
+		context.ProjectName = projectName
+	}
+	if context.ProjectName == "" {
+		return &astmerge.TemplateDestinationContext{}
+	}
+	return context
+}
+
+func decodeTemplateStrategyOverrides(raw any) []astmerge.TemplateStrategyOverride {
+	items, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	overrides := make([]astmerge.TemplateStrategyOverride, 0, len(items))
+	for _, item := range items {
+		section, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		overrides = append(overrides, astmerge.TemplateStrategyOverride{
+			Path:     stringOrAny(section["path"]),
+			Strategy: astmerge.TemplateStrategy(stringOrAny(section["strategy"])),
+		})
+	}
+	return overrides
+}
+
+func decodeStringMap(raw any) map[string]string {
+	section, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	values := make(map[string]string, len(section))
+	for key, value := range section {
+		values[key] = stringOrAny(value)
+	}
+	return values
+}
+
+func decodeStringSlice(raw any) []string {
+	if raw == nil {
+		return nil
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		values = append(values, stringOrAny(item))
+	}
+	return values
+}
+
+func stringOrAny(raw any) string {
+	if value, ok := raw.(string); ok {
+		return value
+	}
+	return ""
+}
+
+func defaultTemplateStrategy(strategy astmerge.TemplateStrategy) astmerge.TemplateStrategy {
+	if strategy == "" {
+		return astmerge.TemplateStrategyMerge
+	}
+	return strategy
 }
 
 func ResolveTemplateDirectorySessionOptions(
