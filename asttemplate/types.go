@@ -150,6 +150,12 @@ type SessionDispatchReport struct {
 	Outcome    *SessionOutcomeReport    `json:"outcome"`
 }
 
+type SessionCommand struct {
+	Operation string                `json:"operation"`
+	Payload   *SessionRunnerPayload `json:"payload,omitempty"`
+	Request   *SessionRunnerRequest `json:"request,omitempty"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1378,6 +1384,16 @@ func RunTemplateDirectorySessionDispatch(
 			Outcome:    &outcome,
 		}, nil
 	}
+}
+
+func RunTemplateDirectorySessionCommand(
+	command SessionCommand,
+	profiles map[string]DirectorySessionProfile,
+) (SessionDispatchReport, error) {
+	return RunTemplateDirectorySessionDispatch(command.Operation, SessionEntrypoint{
+		Payload: command.Payload,
+		Request: command.Request,
+	}, profiles)
 }
 
 func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {

@@ -1060,6 +1060,23 @@ func TestTemplateDirectorySessionDispatchReportFixture(t *testing.T) {
 	assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(runPayloadBlocked["expected"], fixtureRoot), runPayloadBlockedActual)
 }
 
+func TestTemplateDirectorySessionCommandReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-378-template-directory-session-command-report", "template-directory-session-command-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	for _, key := range []string{"inspect_payload_ready", "run_request_ready", "run_payload_blocked"} {
+		section := fixture[key].(map[string]any)
+		command := decodeSessionCommandFromFixture(t, section["input"], fixtureRoot)
+		actual, err := asttemplate.RunTemplateDirectorySessionCommand(command, profiles)
+		if err != nil {
+			t.Fatalf("%s command failed: %v", key, err)
+		}
+		assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(section["expected"], fixtureRoot), actual)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1349,6 +1366,23 @@ func decodeSessionDispatchInputFromFixture(t *testing.T, raw any, fixtureRoot st
 		"operation":  stringOrZero(section["operation"]),
 		"entrypoint": decodeSessionEntrypointFromFixture(t, section["entrypoint"], fixtureRoot),
 	}
+}
+
+func decodeSessionCommandFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionCommand {
+	t.Helper()
+	section := raw.(map[string]any)
+	command := asttemplate.SessionCommand{
+		Operation: stringOrZero(section["operation"]),
+	}
+	if payload, ok := section["payload"]; ok && payload != nil {
+		resolved := decodeSessionRunnerPayloadFromFixture(t, payload, fixtureRoot)
+		command.Payload = &resolved
+	}
+	if request, ok := section["request"]; ok && request != nil {
+		resolved := decodeSessionRunnerRequestFromFixture(t, request, fixtureRoot)
+		command.Request = &resolved
+	}
+	return command
 }
 
 func cloneFixturePathMap(raw any, fixtureRoot string) map[string]any {
