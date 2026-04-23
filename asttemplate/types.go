@@ -40,6 +40,11 @@ type AdapterCapabilityReport struct {
 	Ready            bool     `json:"ready"`
 }
 
+type SessionEnvelopeReport struct {
+	SessionReport       any                     `json:"session_report"`
+	AdapterCapabilities AdapterCapabilityReport `json:"adapter_capabilities"`
+}
+
 func ReportTemplateDirectorySession(mode DirectorySessionMode, entries []astmerge.TemplateExecutionPlanEntry, result *astmerge.TemplateTreeRunResult) DirectorySessionReport {
 	return DirectorySessionReport{
 		Mode:         mode,
@@ -349,4 +354,91 @@ func ReportDefaultAdapterCapabilitiesFromDirectories(
 		DefaultFamilyMergeAdapterRegistry(allowedFamilies...),
 		config,
 	)
+}
+
+func ReportTemplateDirectorySessionEnvelope(
+	sessionReport any,
+	adapterCapabilities AdapterCapabilityReport,
+) SessionEnvelopeReport {
+	return SessionEnvelopeReport{
+		SessionReport:       sessionReport,
+		AdapterCapabilities: adapterCapabilities,
+	}
+}
+
+func PlanTemplateDirectorySessionEnvelopeFromDirectories(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionEnvelopeReport, error) {
+	sessionReport, err := PlanTemplateDirectorySessionFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		config,
+	)
+	if err != nil {
+		return SessionEnvelopeReport{}, err
+	}
+	capabilities, err := ReportDefaultAdapterCapabilitiesFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		allowedFamilies,
+		config,
+	)
+	if err != nil {
+		return SessionEnvelopeReport{}, err
+	}
+	return ReportTemplateDirectorySessionEnvelope(sessionReport, capabilities), nil
+}
+
+func ApplyTemplateDirectorySessionEnvelopeWithDefaultRegistryToDirectory(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionEnvelopeReport, error) {
+	sessionReport, err := ApplyTemplateDirectorySessionWithDefaultRegistryToDirectory(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		allowedFamilies,
+		config,
+	)
+	if err != nil {
+		return SessionEnvelopeReport{}, err
+	}
+	capabilities, err := ReportDefaultAdapterCapabilitiesFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		allowedFamilies,
+		config,
+	)
+	if err != nil {
+		return SessionEnvelopeReport{}, err
+	}
+	return ReportTemplateDirectorySessionEnvelope(sessionReport, capabilities), nil
 }
