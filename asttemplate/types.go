@@ -757,3 +757,90 @@ func ApplyTemplateDirectorySessionOutcomeWithDefaultRegistryToDirectory(
 		diagnostics,
 	), nil
 }
+
+func ReapplyTemplateDirectorySessionOutcomeWithDefaultRegistryToDirectory(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionOutcomeReport, error) {
+	registry := DefaultFamilyMergeAdapterRegistry(allowedFamilies...)
+	result, err := astmerge.ApplyTemplateTreeExecutionToDirectory(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+			return MergePreparedContentFromRegistry(registry, entry)
+		},
+		config,
+	)
+	if err != nil {
+		return SessionOutcomeReport{}, err
+	}
+	sessionReport := ReportTemplateDirectoryRegistrySession(DirectorySessionModeReapply, result.ExecutionPlan, &result, registry)
+	capabilities := ReportAdapterCapabilities(result.ExecutionPlan, registry)
+	status := ReportTemplateDirectorySessionStatus(ReportTemplateDirectorySessionEnvelope(sessionReport, capabilities))
+	diagnostics := ReportTemplateDirectorySessionDiagnostics(DirectorySessionModeReapply, result.ExecutionPlan, &result, capabilities)
+	return ReportTemplateDirectorySessionOutcome(
+		sessionReport,
+		status,
+		diagnostics,
+	), nil
+}
+
+func RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
+	mode DirectorySessionMode,
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionOutcomeReport, error) {
+	switch mode {
+	case DirectorySessionModePlan:
+		return PlanTemplateDirectorySessionOutcomeFromDirectories(
+			templateRoot,
+			destinationRoot,
+			context,
+			defaultStrategy,
+			overrides,
+			replacements,
+			allowedFamilies,
+			config,
+		)
+	case DirectorySessionModeApply:
+		return ApplyTemplateDirectorySessionOutcomeWithDefaultRegistryToDirectory(
+			templateRoot,
+			destinationRoot,
+			context,
+			defaultStrategy,
+			overrides,
+			replacements,
+			allowedFamilies,
+			config,
+		)
+	case DirectorySessionModeReapply:
+		return ReapplyTemplateDirectorySessionOutcomeWithDefaultRegistryToDirectory(
+			templateRoot,
+			destinationRoot,
+			context,
+			defaultStrategy,
+			overrides,
+			replacements,
+			allowedFamilies,
+			config,
+		)
+	default:
+		return SessionOutcomeReport{}, nil
+	}
+}

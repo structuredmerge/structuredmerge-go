@@ -398,6 +398,69 @@ func TestTemplateDirectorySessionOutcomeReportFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionRunnerReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-361-template-directory-session-runner-report", "template-directory-session-runner-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	planRun := fixture["plan_run"].(map[string]any)
+	planOutcome, err := asttemplate.RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
+		asttemplate.DirectorySessionModePlan,
+		filepath.Join(fixtureRoot, "dry-run", "template"),
+		filepath.Join(fixtureRoot, "dry-run", "destination"),
+		decodeContext(t, planRun["context"]),
+		decodeStrategy(t, planRun["default_strategy"]),
+		decodeOverrides(t, planRun["overrides"]),
+		decodeReplacements(t, planRun["replacements"]),
+		decodeOptionalFamilies(t, planRun["allowed_families"]),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("plan runner failed: %v", err)
+	}
+	assertJSONEqual(t, planRun["expected"], planOutcome)
+
+	applyRun := fixture["apply_run"].(map[string]any)
+	tempRoot := filepath.Join(repoRoot(t), "go", "asttemplate", "tmp", t.Name(), "runner")
+	_ = os.RemoveAll(tempRoot)
+	if err := copyTree(filepath.Join(fixtureRoot, "apply-run", "destination"), tempRoot); err != nil {
+		t.Fatalf("copy destination: %v", err)
+	}
+	applyOutcome, err := asttemplate.RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
+		asttemplate.DirectorySessionModeApply,
+		filepath.Join(fixtureRoot, "apply-run", "template"),
+		tempRoot,
+		decodeContext(t, applyRun["context"]),
+		decodeStrategy(t, applyRun["default_strategy"]),
+		decodeOverrides(t, applyRun["overrides"]),
+		decodeReplacements(t, applyRun["replacements"]),
+		decodeOptionalFamilies(t, applyRun["allowed_families"]),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("apply runner failed: %v", err)
+	}
+	assertJSONEqual(t, applyRun["expected"], applyOutcome)
+
+	reapplyRun := fixture["reapply_run"].(map[string]any)
+	reapplyOutcome, err := asttemplate.RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
+		asttemplate.DirectorySessionModeReapply,
+		filepath.Join(fixtureRoot, "apply-run", "template"),
+		tempRoot,
+		decodeContext(t, reapplyRun["context"]),
+		decodeStrategy(t, reapplyRun["default_strategy"]),
+		decodeOverrides(t, reapplyRun["overrides"]),
+		decodeReplacements(t, reapplyRun["replacements"]),
+		decodeOptionalFamilies(t, reapplyRun["allowed_families"]),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("reapply runner failed: %v", err)
+	}
+	assertJSONEqual(t, reapplyRun["expected"], reapplyOutcome)
+	_ = os.RemoveAll(tempRoot)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
