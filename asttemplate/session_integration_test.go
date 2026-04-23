@@ -784,6 +784,31 @@ func TestTemplateDirectorySessionRunnerInputReportFixture(t *testing.T) {
 	))
 }
 
+func TestTemplateDirectorySessionRunnerPayloadReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-371-template-directory-session-runner-payload-report", "template-directory-session-runner-payload-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+
+	optionsExplicit := fixture["options_explicit"].(map[string]any)
+	assertJSONEqual(t, optionsExplicit["expected"], asttemplate.ReportTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayload(t, optionsExplicit["input"]),
+	))
+
+	optionsInferred := fixture["options_inferred"].(map[string]any)
+	assertJSONEqual(t, optionsInferred["expected"], asttemplate.ReportTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayload(t, optionsInferred["input"]),
+	))
+
+	profileDefaultName := fixture["profile_default_name"].(map[string]any)
+	assertJSONEqual(t, profileDefaultName["expected"], asttemplate.ReportTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayload(t, profileDefaultName["input"]),
+	))
+
+	profileExplicitName := fixture["profile_explicit_name"].(map[string]any)
+	assertJSONEqual(t, profileExplicitName["expected"], asttemplate.ReportTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayload(t, profileExplicitName["input"]),
+	))
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -987,6 +1012,24 @@ func decodeSessionRunnerInput(t *testing.T, raw any) asttemplate.SessionRunnerIn
 		Overrides:       decodeOptionalOverrides(t, section["overrides"]),
 		Replacements:    decodeOptionalReplacements(t, section["replacements"]),
 		AllowedFamilies: decodeOptionalFamilies(t, section["allowed_families"]),
+	}
+}
+
+func decodeSessionRunnerPayload(t *testing.T, raw any) asttemplate.SessionRunnerPayload {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionRunnerPayload{
+		RequestKind:        stringOrZero(section["request_kind"]),
+		DefaultProfileName: stringOrZero(section["default_profile_name"]),
+		ProfileName:        stringOrZero(section["profile_name"]),
+		Mode:               asttemplate.DirectorySessionMode(section["mode"].(string)),
+		TemplateRoot:       stringOrZero(section["template_root"]),
+		DestinationRoot:    stringOrZero(section["destination_root"]),
+		Context:            decodeOptionalContext(t, section["context"]),
+		DefaultStrategy:    decodeOptionalStrategy(t, section["default_strategy"]),
+		Overrides:          decodeOptionalOverrides(t, section["overrides"]),
+		Replacements:       decodeOptionalReplacements(t, section["replacements"]),
+		AllowedFamilies:    decodeOptionalFamilies(t, section["allowed_families"]),
 	}
 }
 

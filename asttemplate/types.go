@@ -105,6 +105,20 @@ type SessionRunnerInput struct {
 	AllowedFamilies []string                             `json:"allowed_families"`
 }
 
+type SessionRunnerPayload struct {
+	RequestKind        string                               `json:"request_kind,omitempty"`
+	DefaultProfileName string                               `json:"default_profile_name,omitempty"`
+	ProfileName        string                               `json:"profile_name,omitempty"`
+	Mode               DirectorySessionMode                 `json:"mode"`
+	TemplateRoot       string                               `json:"template_root"`
+	DestinationRoot    string                               `json:"destination_root"`
+	Context            *astmerge.TemplateDestinationContext `json:"context"`
+	DefaultStrategy    astmerge.TemplateStrategy            `json:"default_strategy"`
+	Overrides          []astmerge.TemplateStrategyOverride  `json:"overrides"`
+	Replacements       map[string]string                    `json:"replacements"`
+	AllowedFamilies    []string                             `json:"allowed_families"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1091,6 +1105,49 @@ func ReportTemplateDirectorySessionRunnerInput(input SessionRunnerInput) Session
 	return SessionRunnerRequest{
 		RequestKind: input.RequestKind,
 		Options:     reportSessionRunnerInputOptions(input),
+	}
+}
+
+func ReportTemplateDirectorySessionRunnerPayload(payload SessionRunnerPayload) SessionRunnerInput {
+	requestKind := payload.RequestKind
+	if requestKind == "" {
+		if payload.ProfileName != "" || payload.DefaultProfileName != "" {
+			requestKind = "profile"
+		} else {
+			requestKind = "options"
+		}
+	}
+	profileName := payload.ProfileName
+	if profileName == "" {
+		profileName = payload.DefaultProfileName
+	}
+	context := payload.Context
+	if context == nil {
+		context = &astmerge.TemplateDestinationContext{}
+	}
+	defaultStrategy := payload.DefaultStrategy
+	if defaultStrategy == "" {
+		defaultStrategy = astmerge.TemplateStrategyMerge
+	}
+	overrides := cloneStrategyOverrides(payload.Overrides)
+	if overrides == nil {
+		overrides = []astmerge.TemplateStrategyOverride{}
+	}
+	replacements := cloneStringMap(payload.Replacements)
+	if replacements == nil {
+		replacements = map[string]string{}
+	}
+	return SessionRunnerInput{
+		RequestKind:     requestKind,
+		ProfileName:     profileName,
+		Mode:            payload.Mode,
+		TemplateRoot:    payload.TemplateRoot,
+		DestinationRoot: payload.DestinationRoot,
+		Context:         context,
+		DefaultStrategy: defaultStrategy,
+		Overrides:       overrides,
+		Replacements:    replacements,
+		AllowedFamilies: cloneStringSlice(payload.AllowedFamilies),
 	}
 }
 
