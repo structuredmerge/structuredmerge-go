@@ -856,6 +856,53 @@ func TestTemplateDirectorySessionRunnerPayloadOutcomeReportFixture(t *testing.T)
 	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
 }
 
+func TestTemplateDirectorySessionEntrypointOutcomeReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-373-template-directory-session-entrypoint-outcome-report", "template-directory-session-entrypoint-outcome-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	payloadReady := fixture["payload_ready"].(map[string]any)
+	payloadReadyOutcome, err := asttemplate.RunTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypointFromFixture(t, payloadReady["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("payload ready entrypoint failed: %v", err)
+	}
+	assertJSONEqual(t, payloadReady["expected"], payloadReadyOutcome)
+
+	requestBlocked := fixture["request_blocked"].(map[string]any)
+	requestBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypointFromFixture(t, requestBlocked["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("request blocked entrypoint failed: %v", err)
+	}
+	assertJSONEqual(t, requestBlocked["expected"], requestBlockedOutcome)
+
+	requestReady := fixture["request_ready"].(map[string]any)
+	requestReadyOutcome, err := asttemplate.RunTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypointFromFixture(t, requestReady["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("request ready entrypoint failed: %v", err)
+	}
+	assertJSONEqual(t, requestReady["expected"], requestReadyOutcome)
+
+	payloadBlocked := fixture["payload_blocked"].(map[string]any)
+	payloadBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionEntrypoint(
+		decodeSessionEntrypointFromFixture(t, payloadBlocked["input"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("payload blocked entrypoint failed: %v", err)
+	}
+	assertJSONEqual(t, payloadBlocked["expected"], payloadBlockedOutcome)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1090,6 +1137,21 @@ func decodeSessionRunnerPayloadFromFixture(t *testing.T, raw any, fixtureRoot st
 		payload.DestinationRoot = filepath.Join(fixtureRoot, payload.DestinationRoot)
 	}
 	return payload
+}
+
+func decodeSessionEntrypointFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionEntrypoint {
+	t.Helper()
+	section := raw.(map[string]any)
+	entrypoint := asttemplate.SessionEntrypoint{}
+	if payload, ok := section["payload"]; ok && payload != nil {
+		resolved := decodeSessionRunnerPayloadFromFixture(t, payload, fixtureRoot)
+		entrypoint.Payload = &resolved
+	}
+	if request, ok := section["request"]; ok && request != nil {
+		resolved := decodeSessionRunnerRequestFromFixture(t, request, fixtureRoot)
+		entrypoint.Request = &resolved
+	}
+	return entrypoint
 }
 
 func cloneFixturePathMap(raw any, fixtureRoot string) map[string]any {

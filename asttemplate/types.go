@@ -120,6 +120,11 @@ type SessionRunnerPayload struct {
 	AllowedFamilies    []string                             `json:"allowed_families"`
 }
 
+type SessionEntrypoint struct {
+	Payload *SessionRunnerPayload `json:"payload,omitempty"`
+	Request *SessionRunnerRequest `json:"request,omitempty"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1162,6 +1167,19 @@ func RunTemplateDirectorySessionRunnerPayload(
 		),
 		profiles,
 	)
+}
+
+func RunTemplateDirectorySessionEntrypoint(
+	entrypoint SessionEntrypoint,
+	profiles map[string]DirectorySessionProfile,
+) (SessionOutcomeReport, error) {
+	if entrypoint.Payload != nil {
+		return RunTemplateDirectorySessionRunnerPayload(*entrypoint.Payload, profiles)
+	}
+	if entrypoint.Request != nil {
+		return RunTemplateDirectorySessionRunnerRequest(*entrypoint.Request, profiles)
+	}
+	return SessionOutcomeReport{}, nil
 }
 
 func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {
