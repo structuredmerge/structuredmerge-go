@@ -1005,6 +1005,61 @@ func TestTemplateDirectorySessionInspectionReportFixture(t *testing.T) {
 	assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(payloadBlocked["expected"], fixtureRoot), payloadBlockedActual)
 }
 
+func TestTemplateDirectorySessionDispatchReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-377-template-directory-session-dispatch-report", "template-directory-session-dispatch-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	inspectPayloadReady := fixture["inspect_payload_ready"].(map[string]any)
+	inspectPayloadReadyInput := decodeSessionDispatchInputFromFixture(t, inspectPayloadReady["input"], fixtureRoot)
+	inspectPayloadReadyActual, err := asttemplate.RunTemplateDirectorySessionDispatch(
+		inspectPayloadReadyInput["operation"].(string),
+		inspectPayloadReadyInput["entrypoint"].(asttemplate.SessionEntrypoint),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("inspect payload ready dispatch failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(inspectPayloadReady["expected"], fixtureRoot), inspectPayloadReadyActual)
+
+	inspectRequestBlocked := fixture["inspect_request_blocked"].(map[string]any)
+	inspectRequestBlockedInput := decodeSessionDispatchInputFromFixture(t, inspectRequestBlocked["input"], fixtureRoot)
+	inspectRequestBlockedActual, err := asttemplate.RunTemplateDirectorySessionDispatch(
+		inspectRequestBlockedInput["operation"].(string),
+		inspectRequestBlockedInput["entrypoint"].(asttemplate.SessionEntrypoint),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("inspect request blocked dispatch failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(inspectRequestBlocked["expected"], fixtureRoot), inspectRequestBlockedActual)
+
+	runRequestReady := fixture["run_request_ready"].(map[string]any)
+	runRequestReadyInput := decodeSessionDispatchInputFromFixture(t, runRequestReady["input"], fixtureRoot)
+	runRequestReadyActual, err := asttemplate.RunTemplateDirectorySessionDispatch(
+		runRequestReadyInput["operation"].(string),
+		runRequestReadyInput["entrypoint"].(asttemplate.SessionEntrypoint),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("run request ready dispatch failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(runRequestReady["expected"], fixtureRoot), runRequestReadyActual)
+
+	runPayloadBlocked := fixture["run_payload_blocked"].(map[string]any)
+	runPayloadBlockedInput := decodeSessionDispatchInputFromFixture(t, runPayloadBlocked["input"], fixtureRoot)
+	runPayloadBlockedActual, err := asttemplate.RunTemplateDirectorySessionDispatch(
+		runPayloadBlockedInput["operation"].(string),
+		runPayloadBlockedInput["entrypoint"].(asttemplate.SessionEntrypoint),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("run payload blocked dispatch failed: %v", err)
+	}
+	assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(runPayloadBlocked["expected"], fixtureRoot), runPayloadBlockedActual)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1287,6 +1342,15 @@ func decodeSessionEntrypoint(t *testing.T, raw any) asttemplate.SessionEntrypoin
 	return entrypoint
 }
 
+func decodeSessionDispatchInputFromFixture(t *testing.T, raw any, fixtureRoot string) map[string]any {
+	t.Helper()
+	section := raw.(map[string]any)
+	return map[string]any{
+		"operation":  stringOrZero(section["operation"]),
+		"entrypoint": decodeSessionEntrypointFromFixture(t, section["entrypoint"], fixtureRoot),
+	}
+}
+
 func cloneFixturePathMap(raw any, fixtureRoot string) map[string]any {
 	section := cloneAnyMap(raw)
 	if templateRoot, ok := section["template_root"].(string); ok && templateRoot != "" {
@@ -1327,6 +1391,37 @@ func resolveSessionInspectionExpectedFixturePaths(raw any, fixtureRoot string) a
 		if sessionRequest, ok := sessionResolution["session_request"].(map[string]any); ok {
 			if resolvedOptions, ok := sessionRequest["resolved_options"]; ok && resolvedOptions != nil {
 				sessionRequest["resolved_options"] = resolveRunnerRequestFixturePaths(resolvedOptions, fixtureRoot)
+			}
+		}
+	}
+	return section
+}
+
+func resolveSessionDispatchExpectedFixturePaths(raw any, fixtureRoot string) any {
+	section := cloneAnyMap(raw)
+	if section == nil {
+		return raw
+	}
+	if inspection, ok := section["inspection"]; ok && inspection != nil {
+		section["inspection"] = resolveSessionInspectionExpectedFixturePaths(inspection, fixtureRoot)
+	}
+	if outcome, ok := section["outcome"]; ok && outcome != nil {
+		section["outcome"] = resolveSessionOutcomeExpectedFixturePaths(outcome, fixtureRoot)
+	}
+	return section
+}
+
+func resolveSessionOutcomeExpectedFixturePaths(raw any, fixtureRoot string) any {
+	section := cloneAnyMap(raw)
+	if section == nil {
+		return raw
+	}
+	if sessionReport, ok := section["session_report"].(map[string]any); ok {
+		if runnerReport, ok := sessionReport["runner_report"].(map[string]any); ok {
+			if preview, ok := runnerReport["preview"].(map[string]any); ok {
+				if resultFiles, ok := preview["result_files"].(map[string]any); ok {
+					preview["result_files"] = cloneAnyMap(resultFiles)
+				}
 			}
 		}
 	}

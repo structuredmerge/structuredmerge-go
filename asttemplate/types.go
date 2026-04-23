@@ -144,6 +144,12 @@ type SessionInspectionReport struct {
 	Diagnostics         SessionDiagnosticsReport `json:"diagnostics"`
 }
 
+type SessionDispatchReport struct {
+	Operation  string                   `json:"operation"`
+	Inspection *SessionInspectionReport `json:"inspection"`
+	Outcome    *SessionOutcomeReport    `json:"outcome"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1333,6 +1339,45 @@ func ReportTemplateDirectorySessionInspection(
 		Status:              status,
 		Diagnostics:         diagnostics,
 	}, nil
+}
+
+func RunTemplateDirectorySessionDispatch(
+	operation string,
+	entrypoint SessionEntrypoint,
+	profiles map[string]DirectorySessionProfile,
+) (SessionDispatchReport, error) {
+	switch operation {
+	case "inspect":
+		inspection, err := ReportTemplateDirectorySessionInspection(entrypoint, profiles)
+		if err != nil {
+			return SessionDispatchReport{}, err
+		}
+		return SessionDispatchReport{
+			Operation:  operation,
+			Inspection: &inspection,
+			Outcome:    nil,
+		}, nil
+	case "run":
+		outcome, err := RunTemplateDirectorySessionEntrypoint(entrypoint, profiles)
+		if err != nil {
+			return SessionDispatchReport{}, err
+		}
+		return SessionDispatchReport{
+			Operation:  operation,
+			Inspection: nil,
+			Outcome:    &outcome,
+		}, nil
+	default:
+		outcome, err := RunTemplateDirectorySessionEntrypoint(entrypoint, profiles)
+		if err != nil {
+			return SessionDispatchReport{}, err
+		}
+		return SessionDispatchReport{
+			Operation:  operation,
+			Inspection: nil,
+			Outcome:    &outcome,
+		}, nil
+	}
 }
 
 func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {
