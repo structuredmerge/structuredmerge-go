@@ -2,6 +2,8 @@ package astmerge
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -1239,7 +1241,10 @@ func PreviewTemplateExecution(entries []TemplateExecutionPlanEntry) TemplatePrev
 		case TemplateExecutionRawCopy, TemplateExecutionWritePrepared:
 			if entry.DestinationPath != nil && entry.PreparedTemplateContent != nil {
 				result.ResultFiles[*entry.DestinationPath] = *entry.PreparedTemplateContent
-				if entry.DestinationExists {
+				if entry.DestinationExists && entry.DestinationContent != nil &&
+					*entry.DestinationContent == *entry.PreparedTemplateContent {
+					result.KeptPaths = append(result.KeptPaths, *entry.DestinationPath)
+				} else if entry.DestinationExists {
 					result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
 				} else {
 					result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
@@ -1289,24 +1294,14 @@ func ApplyTemplateExecution(
 			}
 		case TemplateExecutionRawCopy, TemplateExecutionWritePrepared:
 			if entry.DestinationPath != nil && entry.PreparedTemplateContent != nil {
-				result.ResultFiles[*entry.DestinationPath] = *entry.PreparedTemplateContent
-				if entry.DestinationExists {
-					result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
-				} else {
-					result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
-				}
+				recordTemplateApplyOutput(&result, entry, *entry.PreparedTemplateContent)
 			}
 		case TemplateExecutionMergePrepared:
 			if entry.DestinationPath == nil || entry.PreparedTemplateContent == nil {
 				continue
 			}
 			if entry.DestinationContent == nil {
-				result.ResultFiles[*entry.DestinationPath] = *entry.PreparedTemplateContent
-				if entry.DestinationExists {
-					result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
-				} else {
-					result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
-				}
+				recordTemplateApplyOutput(&result, entry, *entry.PreparedTemplateContent)
 				continue
 			}
 
@@ -1317,12 +1312,7 @@ func ApplyTemplateExecution(
 				continue
 			}
 
-			result.ResultFiles[*entry.DestinationPath] = *mergeResult.Output
-			if entry.DestinationExists {
-				result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
-			} else {
-				result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
-			}
+			recordTemplateApplyOutput(&result, entry, *mergeResult.Output)
 		}
 	}
 
@@ -1413,6 +1403,137 @@ func RunTemplateTreeExecution(
 	}
 }
 
+func ReadRelativeFileTree(root string) (map[string]string, error) {
+	files := map[string]string{}
+	info, err := os.Stat(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return files, nil
+		}
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, &os.PathError{Op: "read", Path: root, Err: os.ErrInvalid}
+	}
+
+	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		relativePath, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		source, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(relativePath)] = string(source)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
+func WriteRelativeFileTree(root string, files map[string]string) error {
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return err
+	}
+
+	paths := mapsKeys(files)
+	slices.Sort(paths)
+	for _, relativePath := range paths {
+		fullPath := filepath.Join(root, filepath.FromSlash(relativePath))
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(fullPath, []byte(files[relativePath]), 0o644); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func RunTemplateTreeExecutionFromDirectories(
+	templateRoot string,
+	destinationRoot string,
+	context *TemplateDestinationContext,
+	defaultStrategy TemplateStrategy,
+	overrides []TemplateStrategyOverride,
+	replacements map[string]string,
+	mergePreparedContent func(TemplateExecutionPlanEntry) MergeResult[string],
+	config *TemplateTokenConfig,
+) (TemplateTreeRunResult, error) {
+	templateContents, err := ReadRelativeFileTree(templateRoot)
+	if err != nil {
+		return TemplateTreeRunResult{}, err
+	}
+	destinationContents, err := ReadRelativeFileTree(destinationRoot)
+	if err != nil {
+		return TemplateTreeRunResult{}, err
+	}
+	templateSourcePaths := mapsKeys(templateContents)
+	slices.Sort(templateSourcePaths)
+
+	return RunTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		destinationContents,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		mergePreparedContent,
+		config,
+	), nil
+}
+
+func ApplyTemplateTreeExecutionToDirectory(
+	templateRoot string,
+	destinationRoot string,
+	context *TemplateDestinationContext,
+	defaultStrategy TemplateStrategy,
+	overrides []TemplateStrategyOverride,
+	replacements map[string]string,
+	mergePreparedContent func(TemplateExecutionPlanEntry) MergeResult[string],
+	config *TemplateTokenConfig,
+) (TemplateTreeRunResult, error) {
+	runResult, err := RunTemplateTreeExecutionFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		mergePreparedContent,
+		config,
+	)
+	if err != nil {
+		return TemplateTreeRunResult{}, err
+	}
+
+	filesToWrite := map[string]string{}
+	for _, path := range runResult.ApplyResult.CreatedPaths {
+		filesToWrite[path] = runResult.ApplyResult.ResultFiles[path]
+	}
+	for _, path := range runResult.ApplyResult.UpdatedPaths {
+		filesToWrite[path] = runResult.ApplyResult.ResultFiles[path]
+	}
+	if err := WriteRelativeFileTree(destinationRoot, filesToWrite); err != nil {
+		return TemplateTreeRunResult{}, err
+	}
+
+	return runResult, nil
+}
+
 func ReportTemplateTreeRun(result TemplateTreeRunResult) TemplateTreeRunReport {
 	created := make(map[string]struct{}, len(result.ApplyResult.CreatedPaths))
 	for _, path := range result.ApplyResult.CreatedPaths {
@@ -1487,6 +1608,24 @@ func pathBase(path string) string {
 	}
 
 	return path[idx+1:]
+}
+
+func recordTemplateApplyOutput(result *TemplateApplyResult, entry TemplateExecutionPlanEntry, output string) {
+	if entry.DestinationPath == nil {
+		return
+	}
+
+	result.ResultFiles[*entry.DestinationPath] = output
+	if entry.DestinationExists && entry.DestinationContent != nil && *entry.DestinationContent == output {
+		result.KeptPaths = append(result.KeptPaths, *entry.DestinationPath)
+		return
+	}
+	if entry.DestinationExists {
+		result.UpdatedPaths = append(result.UpdatedPaths, *entry.DestinationPath)
+		return
+	}
+
+	result.CreatedPaths = append(result.CreatedPaths, *entry.DestinationPath)
 }
 
 func containsKey[V any](input map[string]V, key string) bool {
