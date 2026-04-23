@@ -351,6 +351,29 @@ type TemplateTreeRunReport struct {
 	Summary TemplateTreeRunReportSummary `json:"summary"`
 }
 
+type TemplateDirectoryApplyReportEntry struct {
+	TemplateSourcePath     string                  `json:"template_source_path"`
+	LogicalDestinationPath string                  `json:"logical_destination_path"`
+	DestinationPath        *string                 `json:"destination_path"`
+	ExecutionAction        TemplateExecutionAction `json:"execution_action"`
+	Status                 TemplateTreeRunStatus   `json:"status"`
+	Written                bool                    `json:"written"`
+}
+
+type TemplateDirectoryApplyReportSummary struct {
+	Created int `json:"created"`
+	Updated int `json:"updated"`
+	Kept    int `json:"kept"`
+	Blocked int `json:"blocked"`
+	Omitted int `json:"omitted"`
+	Written int `json:"written"`
+}
+
+type TemplateDirectoryApplyReport struct {
+	Entries []TemplateDirectoryApplyReportEntry `json:"entries"`
+	Summary TemplateDirectoryApplyReportSummary `json:"summary"`
+}
+
 type ConformanceOutcome string
 
 const (
@@ -1596,6 +1619,60 @@ func ReportTemplateTreeRun(result TemplateTreeRunResult) TemplateTreeRunReport {
 	}
 
 	return TemplateTreeRunReport{
+		Entries: entries,
+		Summary: summary,
+	}
+}
+
+func ReportTemplateDirectoryApply(result TemplateTreeRunResult) TemplateDirectoryApplyReport {
+	runReport := ReportTemplateTreeRun(result)
+	created := make(map[string]struct{}, len(result.ApplyResult.CreatedPaths))
+	for _, path := range result.ApplyResult.CreatedPaths {
+		created[path] = struct{}{}
+	}
+	updated := make(map[string]struct{}, len(result.ApplyResult.UpdatedPaths))
+	for _, path := range result.ApplyResult.UpdatedPaths {
+		updated[path] = struct{}{}
+	}
+
+	entries := make([]TemplateDirectoryApplyReportEntry, 0, len(runReport.Entries))
+	summary := TemplateDirectoryApplyReportSummary{}
+	for _, entry := range runReport.Entries {
+		written := false
+		if entry.DestinationPath != nil {
+			_, written = created[*entry.DestinationPath]
+			if !written {
+				_, written = updated[*entry.DestinationPath]
+			}
+		}
+		if written {
+			summary.Written++
+		}
+
+		switch entry.Status {
+		case TemplateTreeRunCreated:
+			summary.Created++
+		case TemplateTreeRunUpdated:
+			summary.Updated++
+		case TemplateTreeRunKept:
+			summary.Kept++
+		case TemplateTreeRunBlocked:
+			summary.Blocked++
+		case TemplateTreeRunOmitted:
+			summary.Omitted++
+		}
+
+		entries = append(entries, TemplateDirectoryApplyReportEntry{
+			TemplateSourcePath:     entry.TemplateSourcePath,
+			LogicalDestinationPath: entry.LogicalDestinationPath,
+			DestinationPath:        entry.DestinationPath,
+			ExecutionAction:        entry.ExecutionAction,
+			Status:                 entry.Status,
+			Written:                written,
+		})
+	}
+
+	return TemplateDirectoryApplyReport{
 		Entries: entries,
 		Summary: summary,
 	}

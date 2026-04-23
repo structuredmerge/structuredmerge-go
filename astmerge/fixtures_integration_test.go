@@ -16,6 +16,7 @@ import (
 // diagnosticsFixturePath(t, "mini_template_tree_multi_family_run_report")
 // diagnosticsFixturePath(t, "mini_template_tree_directory_run_report")
 // diagnosticsFixturePath(t, "mini_template_tree_directory_apply_convergence")
+// diagnosticsFixturePath(t, "mini_template_tree_directory_apply_report")
 
 func readRelativeFileTree(t *testing.T, root string) map[string]string {
 	t.Helper()

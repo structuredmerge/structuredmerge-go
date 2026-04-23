@@ -389,3 +389,59 @@ func TestMiniTemplateTreeDirectoryApplyConvergenceFixture(t *testing.T) {
 		t.Fatalf("expected second directory apply report to match fixture")
 	}
 }
+
+func TestMiniTemplateTreeDirectoryApplyReportFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_directory_apply_report"))
+	fixtureDir := filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_directory_apply_report"))
+	context := decodeFixtureValue[astmerge.TemplateDestinationContext](t, fixture["context"])
+	overrides := decodeFixtureValue[[]astmerge.TemplateStrategyOverride](t, fixture["overrides"])
+	replacements := decodeFixtureValue[map[string]string](t, fixture["replacements"])
+	tempRoot := repoTempDir(t)
+	destinationRoot := filepath.Join(tempRoot, "destination")
+
+	initialDestination, err := astmerge.ReadRelativeFileTree(filepath.Join(fixtureDir, "destination"))
+	if err != nil {
+		t.Fatalf("read initial destination tree: %v", err)
+	}
+	if err := astmerge.WriteRelativeFileTree(destinationRoot, initialDestination); err != nil {
+		t.Fatalf("seed destination tree: %v", err)
+	}
+
+	firstRun, err := astmerge.ApplyTemplateTreeExecutionToDirectory(
+		filepath.Join(fixtureDir, "template"),
+		destinationRoot,
+		&context,
+		astmerge.TemplateStrategy(fixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		multiFamilyMergeCallback,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("apply template tree to directory: %v", err)
+	}
+	firstActual := astmerge.ReportTemplateDirectoryApply(firstRun)
+	firstExpected := decodeFixtureValue[astmerge.TemplateDirectoryApplyReport](t, fixture["expected_first_report"])
+	if !reflect.DeepEqual(firstActual, firstExpected) {
+		t.Fatalf("expected first directory apply report to match fixture")
+	}
+
+	secondRun, err := astmerge.ApplyTemplateTreeExecutionToDirectory(
+		filepath.Join(fixtureDir, "template"),
+		destinationRoot,
+		&context,
+		astmerge.TemplateStrategy(fixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		multiFamilyMergeCallback,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("reapply template tree to directory: %v", err)
+	}
+	secondActual := astmerge.ReportTemplateDirectoryApply(secondRun)
+	secondExpected := decodeFixtureValue[astmerge.TemplateDirectoryApplyReport](t, fixture["expected_second_report"])
+	if !reflect.DeepEqual(secondActual, secondExpected) {
+		t.Fatalf("expected second directory apply report to match fixture")
+	}
+}
