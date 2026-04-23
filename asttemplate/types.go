@@ -85,6 +85,13 @@ type SessionRequestReport struct {
 	ResolvedOptions *DirectorySessionOptions `json:"resolved_options"`
 }
 
+type SessionRunnerRequest struct {
+	RequestKind string                   `json:"request_kind"`
+	ProfileName string                   `json:"profile_name,omitempty"`
+	Options     *DirectorySessionOptions `json:"options,omitempty"`
+	Overrides   *DirectorySessionOptions `json:"overrides,omitempty"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1038,6 +1045,26 @@ func RunTemplateDirectorySessionRequest(request SessionRequestReport) (SessionOu
 		}), nil
 	}
 	return RunTemplateDirectorySessionWithOptions(*request.ResolvedOptions)
+}
+
+func RunTemplateDirectorySessionRunnerRequest(
+	request SessionRunnerRequest,
+	profiles map[string]DirectorySessionProfile,
+) (SessionOutcomeReport, error) {
+	if request.RequestKind == "profile" {
+		overrides := DirectorySessionOptions{}
+		if request.Overrides != nil {
+			overrides = *request.Overrides
+		}
+		return RunTemplateDirectorySessionRequest(
+			ReportTemplateDirectorySessionProfileRequest(profiles, request.ProfileName, overrides),
+		)
+	}
+	options := DirectorySessionOptions{}
+	if request.Options != nil {
+		options = *request.Options
+	}
+	return RunTemplateDirectorySessionRequest(ReportTemplateDirectorySessionOptionsRequest(options))
 }
 
 func ResolveTemplateDirectorySessionOptions(

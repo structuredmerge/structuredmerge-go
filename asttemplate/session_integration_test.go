@@ -712,6 +712,53 @@ func TestTemplateDirectorySessionRequestOutcomeReportFixture(t *testing.T) {
 	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
 }
 
+func TestTemplateDirectorySessionRequestRunnerReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-369-template-directory-session-request-runner-report", "template-directory-session-request-runner-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	optionsReady := fixture["options_ready"].(map[string]any)
+	optionsReadyOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerRequest(
+		decodeSessionRunnerRequestFromFixture(t, optionsReady["request"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("options ready runner failed: %v", err)
+	}
+	assertJSONEqual(t, optionsReady["expected"], optionsReadyOutcome)
+
+	optionsBlocked := fixture["options_blocked"].(map[string]any)
+	optionsBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerRequest(
+		decodeSessionRunnerRequestFromFixture(t, optionsBlocked["request"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("options blocked runner failed: %v", err)
+	}
+	assertJSONEqual(t, optionsBlocked["expected"], optionsBlockedOutcome)
+
+	profileReady := fixture["profile_ready"].(map[string]any)
+	profileReadyOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerRequest(
+		decodeSessionRunnerRequestFromFixture(t, profileReady["request"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("profile ready runner failed: %v", err)
+	}
+	assertJSONEqual(t, profileReady["expected"], profileReadyOutcome)
+
+	profileBlocked := fixture["profile_blocked"].(map[string]any)
+	profileBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerRequest(
+		decodeSessionRunnerRequestFromFixture(t, profileBlocked["request"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("profile blocked runner failed: %v", err)
+	}
+	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -883,6 +930,36 @@ func decodeSessionRequestReportFromFixture(t *testing.T, raw any, fixtureRoot st
 		report.ResolvedOptions.DestinationRoot = filepath.Join(fixtureRoot, report.ResolvedOptions.DestinationRoot)
 	}
 	return report
+}
+
+func decodeSessionRunnerRequestFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionRunnerRequest {
+	t.Helper()
+	section := raw.(map[string]any)
+	request := asttemplate.SessionRunnerRequest{
+		RequestKind: stringOrZero(section["request_kind"]),
+		ProfileName: stringOrZero(section["profile_name"]),
+	}
+	if rawOptions, ok := section["options"]; ok && rawOptions != nil {
+		options := decodeSessionOptionsFromFixture(t, rawOptions)
+		if options.TemplateRoot != "" {
+			options.TemplateRoot = filepath.Join(fixtureRoot, options.TemplateRoot)
+		}
+		if options.DestinationRoot != "" {
+			options.DestinationRoot = filepath.Join(fixtureRoot, options.DestinationRoot)
+		}
+		request.Options = &options
+	}
+	if rawOverrides, ok := section["overrides"]; ok && rawOverrides != nil {
+		overrides := decodeSessionOptionsFromFixture(t, rawOverrides)
+		if overrides.TemplateRoot != "" {
+			overrides.TemplateRoot = filepath.Join(fixtureRoot, overrides.TemplateRoot)
+		}
+		if overrides.DestinationRoot != "" {
+			overrides.DestinationRoot = filepath.Join(fixtureRoot, overrides.DestinationRoot)
+		}
+		request.Overrides = &overrides
+	}
+	return request
 }
 
 func decodeSessionDiagnostics(t *testing.T, raw any) []asttemplate.SessionDiagnostic {
