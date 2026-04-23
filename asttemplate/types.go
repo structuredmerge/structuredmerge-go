@@ -1017,6 +1017,29 @@ func reportTemplateDirectorySessionConfigurationOutcome(
 	)
 }
 
+func RunTemplateDirectorySessionRequest(request SessionRequestReport) (SessionOutcomeReport, error) {
+	if !request.Ready {
+		return reportTemplateDirectorySessionConfigurationOutcome(request.Mode, SessionDiagnosticsReport{
+			Mode:        request.Mode,
+			Ready:       request.Ready,
+			Diagnostics: request.Diagnostics,
+		}), nil
+	}
+	if request.ResolvedOptions == nil {
+		return reportTemplateDirectorySessionConfigurationOutcome(request.Mode, SessionDiagnosticsReport{
+			Mode:  request.Mode,
+			Ready: false,
+			Diagnostics: []SessionDiagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.CategoryConfigurationError,
+				Reason:   "missing_resolved_options",
+				Message:  "ready template session request is missing resolved_options",
+			}},
+		}), nil
+	}
+	return RunTemplateDirectorySessionWithOptions(*request.ResolvedOptions)
+}
+
 func ResolveTemplateDirectorySessionOptions(
 	profiles map[string]DirectorySessionProfile,
 	profileName string,

@@ -670,6 +670,48 @@ func TestTemplateDirectorySessionRequestReportFixture(t *testing.T) {
 	))
 }
 
+func TestTemplateDirectorySessionRequestOutcomeReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-368-template-directory-session-request-outcome-report", "template-directory-session-request-outcome-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	optionsReady := fixture["options_ready"].(map[string]any)
+	optionsReadyOutcome, err := asttemplate.RunTemplateDirectorySessionRequest(
+		decodeSessionRequestReportFromFixture(t, optionsReady["request"], fixtureRoot),
+	)
+	if err != nil {
+		t.Fatalf("options ready outcome failed: %v", err)
+	}
+	assertJSONEqual(t, optionsReady["expected"], optionsReadyOutcome)
+
+	optionsBlocked := fixture["options_blocked"].(map[string]any)
+	optionsBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionRequest(
+		decodeSessionRequestReportFromFixture(t, optionsBlocked["request"], fixtureRoot),
+	)
+	if err != nil {
+		t.Fatalf("options blocked outcome failed: %v", err)
+	}
+	assertJSONEqual(t, optionsBlocked["expected"], optionsBlockedOutcome)
+
+	profileReady := fixture["profile_ready"].(map[string]any)
+	profileReadyOutcome, err := asttemplate.RunTemplateDirectorySessionRequest(
+		decodeSessionRequestReportFromFixture(t, profileReady["request"], fixtureRoot),
+	)
+	if err != nil {
+		t.Fatalf("profile ready outcome failed: %v", err)
+	}
+	assertJSONEqual(t, profileReady["expected"], profileReadyOutcome)
+
+	profileBlocked := fixture["profile_blocked"].(map[string]any)
+	profileBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionRequest(
+		decodeSessionRequestReportFromFixture(t, profileBlocked["request"], fixtureRoot),
+	)
+	if err != nil {
+		t.Fatalf("profile blocked outcome failed: %v", err)
+	}
+	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -813,6 +855,52 @@ func decodeSessionProfiles(t *testing.T, raw any) map[string]asttemplate.Directo
 		}
 	}
 	return profiles
+}
+
+func decodeSessionRequestReport(t *testing.T, raw any) asttemplate.SessionRequestReport {
+	t.Helper()
+	section := raw.(map[string]any)
+	var resolved *asttemplate.DirectorySessionOptions
+	if rawResolved, ok := section["resolved_options"]; ok && rawResolved != nil {
+		options := decodeSessionOptionsFromFixture(t, rawResolved)
+		resolved = &options
+	}
+	return asttemplate.SessionRequestReport{
+		RequestKind:     section["request_kind"].(string),
+		ProfileName:     stringOrZero(section["profile_name"]),
+		Mode:            asttemplate.DirectorySessionMode(section["mode"].(string)),
+		Ready:           section["ready"].(bool),
+		Diagnostics:     decodeSessionDiagnostics(t, section["diagnostics"]),
+		ResolvedOptions: resolved,
+	}
+}
+
+func decodeSessionRequestReportFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionRequestReport {
+	t.Helper()
+	report := decodeSessionRequestReport(t, raw)
+	if report.ResolvedOptions != nil {
+		report.ResolvedOptions.TemplateRoot = filepath.Join(fixtureRoot, report.ResolvedOptions.TemplateRoot)
+		report.ResolvedOptions.DestinationRoot = filepath.Join(fixtureRoot, report.ResolvedOptions.DestinationRoot)
+	}
+	return report
+}
+
+func decodeSessionDiagnostics(t *testing.T, raw any) []asttemplate.SessionDiagnostic {
+	t.Helper()
+	if raw == nil {
+		return nil
+	}
+	data, _ := json.Marshal(raw)
+	var diagnostics []asttemplate.SessionDiagnostic
+	if err := json.Unmarshal(data, &diagnostics); err != nil {
+		t.Fatalf("decode session diagnostics: %v", err)
+	}
+	return diagnostics
+}
+
+func stringOrZero(value any) string {
+	text, _ := value.(string)
+	return text
 }
 
 func assertJSONEqual(t *testing.T, expected any, actual any) {
