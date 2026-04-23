@@ -4,6 +4,9 @@ import (
 	"slices"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/markdownmerge"
+	"github.com/structuredmerge/structuredmerge-go/rubymerge"
+	"github.com/structuredmerge/structuredmerge-go/tomlmerge"
 )
 
 type DirectorySessionMode string
@@ -177,4 +180,82 @@ func ApplyTemplateDirectorySessionWithRegistryToDirectory(
 		return DirectoryRegistrySessionReport{}, err
 	}
 	return ReportTemplateDirectoryRegistrySession(DirectorySessionModeApply, result.ExecutionPlan, &result, registry), nil
+}
+
+func DefaultFamilyMergeAdapterRegistry(allowedFamilies ...string) FamilyMergeAdapterRegistry {
+	allowed := map[string]struct{}{}
+	for _, family := range allowedFamilies {
+		allowed[family] = struct{}{}
+	}
+	include := func(family string) bool {
+		if len(allowed) == 0 {
+			return true
+		}
+		_, ok := allowed[family]
+		return ok
+	}
+
+	registry := FamilyMergeAdapterRegistry{}
+	if include("markdown") {
+		registry["markdown"] = func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+			template := ""
+			if entry.PreparedTemplateContent != nil {
+				template = *entry.PreparedTemplateContent
+			}
+			destination := ""
+			if entry.DestinationContent != nil {
+				destination = *entry.DestinationContent
+			}
+			return markdownmerge.MergeMarkdown(template, destination, "markdown")
+		}
+	}
+	if include("toml") {
+		registry["toml"] = func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+			template := ""
+			if entry.PreparedTemplateContent != nil {
+				template = *entry.PreparedTemplateContent
+			}
+			destination := ""
+			if entry.DestinationContent != nil {
+				destination = *entry.DestinationContent
+			}
+			return tomlmerge.MergeTOML(template, destination, "toml")
+		}
+	}
+	if include("ruby") {
+		registry["ruby"] = func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+			template := ""
+			if entry.PreparedTemplateContent != nil {
+				template = *entry.PreparedTemplateContent
+			}
+			destination := ""
+			if entry.DestinationContent != nil {
+				destination = *entry.DestinationContent
+			}
+			return rubymerge.MergeRuby(template, destination, "ruby")
+		}
+	}
+	return registry
+}
+
+func ApplyTemplateDirectorySessionWithDefaultRegistryToDirectory(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (DirectoryRegistrySessionReport, error) {
+	return ApplyTemplateDirectorySessionWithRegistryToDirectory(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		DefaultFamilyMergeAdapterRegistry(allowedFamilies...),
+		config,
+	)
 }
