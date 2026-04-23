@@ -153,6 +153,67 @@ func TestDefaultFamilyMergeAdapterRegistryFamilies(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectoryAdapterCapabilityReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-356-template-directory-adapter-capability-report", "template-directory-adapter-capability-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	fullRegistry := asttemplate.FamilyMergeAdapterRegistry{
+		"markdown": markdownAdapter,
+		"ruby":     rubyAdapter,
+		"toml":     tomlAdapter,
+	}
+	partialRegistry := asttemplate.FamilyMergeAdapterRegistry{
+		"markdown": markdownAdapter,
+		"toml":     tomlAdapter,
+	}
+
+	actual, err := asttemplate.ReportAdapterCapabilitiesFromDirectories(
+		filepath.Join(fixtureRoot, "apply-run", "template"),
+		filepath.Join(fixtureRoot, "apply-run", "destination"),
+		decodeContext(t, fixture["full_registry"].(map[string]any)["context"]),
+		decodeStrategy(t, fixture["full_registry"].(map[string]any)["default_strategy"]),
+		decodeOverrides(t, fixture["full_registry"].(map[string]any)["overrides"]),
+		decodeReplacements(t, fixture["full_registry"].(map[string]any)["replacements"]),
+		fullRegistry,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("full registry capability report failed: %v", err)
+	}
+	assertJSONEqual(t, fixture["full_registry"].(map[string]any)["expected"], actual)
+
+	actual, err = asttemplate.ReportAdapterCapabilitiesFromDirectories(
+		filepath.Join(fixtureRoot, "apply-run", "template"),
+		filepath.Join(fixtureRoot, "apply-run", "destination"),
+		decodeContext(t, fixture["partial_registry"].(map[string]any)["context"]),
+		decodeStrategy(t, fixture["partial_registry"].(map[string]any)["default_strategy"]),
+		decodeOverrides(t, fixture["partial_registry"].(map[string]any)["overrides"]),
+		decodeReplacements(t, fixture["partial_registry"].(map[string]any)["replacements"]),
+		partialRegistry,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("partial registry capability report failed: %v", err)
+	}
+	assertJSONEqual(t, fixture["partial_registry"].(map[string]any)["expected"], actual)
+
+	actual, err = asttemplate.ReportDefaultAdapterCapabilitiesFromDirectories(
+		filepath.Join(fixtureRoot, "apply-run", "template"),
+		filepath.Join(fixtureRoot, "apply-run", "destination"),
+		decodeContext(t, fixture["filtered_discovery"].(map[string]any)["context"]),
+		decodeStrategy(t, fixture["filtered_discovery"].(map[string]any)["default_strategy"]),
+		decodeOverrides(t, fixture["filtered_discovery"].(map[string]any)["overrides"]),
+		decodeReplacements(t, fixture["filtered_discovery"].(map[string]any)["replacements"]),
+		decodeOptionalFamilies(t, fixture["filtered_discovery"].(map[string]any)["allowed_families"]),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("filtered discovery capability report failed: %v", err)
+	}
+	assertJSONEqual(t, fixture["filtered_discovery"].(map[string]any)["expected"], actual)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))

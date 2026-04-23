@@ -33,6 +33,13 @@ type DirectoryRegistrySessionReport struct {
 	RunnerReport    astmerge.TemplateDirectoryRunnerReport `json:"runner_report"`
 }
 
+type AdapterCapabilityReport struct {
+	RequiredFamilies []string `json:"required_families"`
+	AdapterFamilies  []string `json:"adapter_families"`
+	MissingFamilies  []string `json:"missing_families"`
+	Ready            bool     `json:"ready"`
+}
+
 func ReportTemplateDirectorySession(mode DirectorySessionMode, entries []astmerge.TemplateExecutionPlanEntry, result *astmerge.TemplateTreeRunResult) DirectorySessionReport {
 	return DirectorySessionReport{
 		Mode:         mode,
@@ -249,6 +256,90 @@ func ApplyTemplateDirectorySessionWithDefaultRegistryToDirectory(
 	config *astmerge.TemplateTokenConfig,
 ) (DirectoryRegistrySessionReport, error) {
 	return ApplyTemplateDirectorySessionWithRegistryToDirectory(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		DefaultFamilyMergeAdapterRegistry(allowedFamilies...),
+		config,
+	)
+}
+
+func RequiredFamilies(entries []astmerge.TemplateExecutionPlanEntry) []string {
+	families := map[string]struct{}{}
+	for _, entry := range entries {
+		if entry.ExecutionAction != astmerge.TemplateExecutionMergePrepared {
+			continue
+		}
+		families[entry.Classification.Family] = struct{}{}
+	}
+	required := make([]string, 0, len(families))
+	for family := range families {
+		required = append(required, family)
+	}
+	slices.Sort(required)
+	return required
+}
+
+func ReportAdapterCapabilities(entries []astmerge.TemplateExecutionPlanEntry, registry FamilyMergeAdapterRegistry) AdapterCapabilityReport {
+	required := RequiredFamilies(entries)
+	available := RegisteredAdapterFamilies(registry)
+	availableSet := map[string]struct{}{}
+	for _, family := range available {
+		availableSet[family] = struct{}{}
+	}
+	missing := []string{}
+	for _, family := range required {
+		if _, ok := availableSet[family]; !ok {
+			missing = append(missing, family)
+		}
+	}
+	return AdapterCapabilityReport{
+		RequiredFamilies: required,
+		AdapterFamilies:  available,
+		MissingFamilies:  missing,
+		Ready:            len(missing) == 0,
+	}
+}
+
+func ReportAdapterCapabilitiesFromDirectories(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	registry FamilyMergeAdapterRegistry,
+	config *astmerge.TemplateTokenConfig,
+) (AdapterCapabilityReport, error) {
+	plan, err := astmerge.PlanTemplateTreeExecutionFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		config,
+	)
+	if err != nil {
+		return AdapterCapabilityReport{}, err
+	}
+	return ReportAdapterCapabilities(plan, registry), nil
+}
+
+func ReportDefaultAdapterCapabilitiesFromDirectories(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (AdapterCapabilityReport, error) {
+	return ReportAdapterCapabilitiesFromDirectories(
 		templateRoot,
 		destinationRoot,
 		context,
