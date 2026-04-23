@@ -617,6 +617,29 @@ func TestTemplateDirectorySessionProfileConfigurationOutcomeReportFixture(t *tes
 	assertJSONEqual(t, missingRoots["expected"], missingRootsOutcome)
 }
 
+func TestTemplateDirectorySessionOptionsConfigurationOutcomeReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-366-template-directory-session-options-configuration-outcome-report", "template-directory-session-options-configuration-outcome-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+
+	missingBothRoots := fixture["missing_both_roots"].(map[string]any)
+	missingBothRootsOutcome, err := asttemplate.RunTemplateDirectorySessionWithOptions(
+		decodeSessionOptionsFromFixture(t, missingBothRoots["options"]),
+	)
+	if err != nil {
+		t.Fatalf("missing both roots outcome failed: %v", err)
+	}
+	assertJSONEqual(t, missingBothRoots["expected"], missingBothRootsOutcome)
+
+	missingDestinationRoot := fixture["missing_destination_root"].(map[string]any)
+	missingDestinationRootOutcome, err := asttemplate.RunTemplateDirectorySessionWithOptions(
+		decodeSessionOptionsFromFixture(t, missingDestinationRoot["options"]),
+	)
+	if err != nil {
+		t.Fatalf("missing destination root outcome failed: %v", err)
+	}
+	assertJSONEqual(t, missingDestinationRoot["expected"], missingDestinationRootOutcome)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))

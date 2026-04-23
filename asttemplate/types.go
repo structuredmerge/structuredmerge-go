@@ -868,6 +868,10 @@ func RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
 }
 
 func RunTemplateDirectorySessionWithOptions(options DirectorySessionOptions) (SessionOutcomeReport, error) {
+	configuration := ReportTemplateDirectorySessionOptionsConfiguration(options)
+	if !configuration.Ready {
+		return reportTemplateDirectorySessionConfigurationOutcome(configuration.Mode, configuration), nil
+	}
 	return RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
 		options.Mode,
 		options.TemplateRoot,
