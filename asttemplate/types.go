@@ -942,6 +942,24 @@ func ReportTemplateDirectorySessionProfileConfiguration(
 	return report
 }
 
+func reportTemplateDirectorySessionConfigurationOutcome(
+	mode DirectorySessionMode,
+	diagnostics SessionDiagnosticsReport,
+) SessionOutcomeReport {
+	return ReportTemplateDirectorySessionOutcome(
+		ReportTemplateDirectorySession(mode, nil, nil),
+		SessionStatusReport{
+			Mode:              mode,
+			Ready:             false,
+			MissingFamilies:   []string{},
+			BlockedPaths:      []string{},
+			PlannedWriteCount: 0,
+			WrittenCount:      0,
+		},
+		diagnostics,
+	)
+}
+
 func ResolveTemplateDirectorySessionOptions(
 	profiles map[string]DirectorySessionProfile,
 	profileName string,
@@ -990,13 +1008,26 @@ func RunTemplateDirectorySessionWithProfile(
 	profiles map[string]DirectorySessionProfile,
 	profileName string,
 	overrides DirectorySessionOptions,
-) (SessionOutcomeReport, bool, error) {
+) (SessionOutcomeReport, error) {
+	configuration := ReportTemplateDirectorySessionProfileConfiguration(profiles, profileName, overrides)
+	if !configuration.Ready {
+		return reportTemplateDirectorySessionConfigurationOutcome(configuration.Mode, configuration), nil
+	}
 	options, ok := ResolveTemplateDirectorySessionOptions(profiles, profileName, overrides)
 	if !ok {
-		return SessionOutcomeReport{}, false, nil
+		diagnostics := SessionDiagnosticsReport{
+			Mode:  normalizeSessionMode(overrides.Mode),
+			Ready: false,
+			Diagnostics: []SessionDiagnostic{{
+				Severity: astmerge.SeverityError,
+				Category: astmerge.CategoryConfigurationError,
+				Reason:   "missing_profile",
+				Message:  "unknown template session profile: " + profileName,
+			}},
+		}
+		return reportTemplateDirectorySessionConfigurationOutcome(diagnostics.Mode, diagnostics), nil
 	}
-	outcome, err := RunTemplateDirectorySessionWithOptions(options)
-	return outcome, true, err
+	return RunTemplateDirectorySessionWithOptions(options)
 }
 
 func firstNonEmptySessionMode(values ...DirectorySessionMode) DirectorySessionMode {

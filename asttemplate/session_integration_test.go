@@ -505,7 +505,7 @@ func TestTemplateDirectorySessionProfileReportFixture(t *testing.T) {
 	profiles := decodeSessionProfiles(t, fixture["profiles"])
 
 	planRun := fixture["plan_run"].(map[string]any)
-	planOutcome, ok, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+	planOutcome, err := asttemplate.RunTemplateDirectorySessionWithProfile(
 		profiles,
 		planRun["profile"].(string),
 		asttemplate.DirectorySessionOptions{
@@ -513,7 +513,7 @@ func TestTemplateDirectorySessionProfileReportFixture(t *testing.T) {
 			DestinationRoot: filepath.Join(fixtureRoot, "dry-run", "destination"),
 		},
 	)
-	if err != nil || !ok {
+	if err != nil {
 		t.Fatalf("plan profile failed: %v", err)
 	}
 	assertJSONEqual(t, planRun["expected"], planOutcome)
@@ -525,7 +525,7 @@ func TestTemplateDirectorySessionProfileReportFixture(t *testing.T) {
 	}
 
 	applyRun := fixture["apply_run"].(map[string]any)
-	applyOutcome, ok, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+	applyOutcome, err := asttemplate.RunTemplateDirectorySessionWithProfile(
 		profiles,
 		applyRun["profile"].(string),
 		asttemplate.DirectorySessionOptions{
@@ -533,19 +533,19 @@ func TestTemplateDirectorySessionProfileReportFixture(t *testing.T) {
 			DestinationRoot: tempRoot,
 		},
 	)
-	if err != nil || !ok {
+	if err != nil {
 		t.Fatalf("apply profile failed: %v", err)
 	}
 	assertJSONEqual(t, applyRun["expected"], applyOutcome)
 
 	reapplyRun := fixture["reapply_run"].(map[string]any)
 	reapplyOverrides := decodeSessionOptions(t, reapplyRun["overrides"], filepath.Join(fixtureRoot, "apply-run", "template"), tempRoot)
-	reapplyOutcome, ok, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+	reapplyOutcome, err := asttemplate.RunTemplateDirectorySessionWithProfile(
 		profiles,
 		reapplyRun["profile"].(string),
 		reapplyOverrides,
 	)
-	if err != nil || !ok {
+	if err != nil {
 		t.Fatalf("reapply profile failed: %v", err)
 	}
 	assertJSONEqual(t, reapplyRun["expected"], reapplyOutcome)
@@ -587,6 +587,34 @@ func TestTemplateDirectorySessionConfigurationReportFixture(t *testing.T) {
 		profileMissingRoots["profile"].(string),
 		decodeSessionOptionsFromFixture(t, profileMissingRoots["overrides"]),
 	))
+}
+
+func TestTemplateDirectorySessionProfileConfigurationOutcomeReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-365-template-directory-session-profile-configuration-outcome-report", "template-directory-session-profile-configuration-outcome-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	missingProfile := fixture["missing_profile"].(map[string]any)
+	missingProfileOutcome, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+		profiles,
+		missingProfile["profile"].(string),
+		decodeSessionOptionsFromFixture(t, missingProfile["overrides"]),
+	)
+	if err != nil {
+		t.Fatalf("missing profile outcome failed: %v", err)
+	}
+	assertJSONEqual(t, missingProfile["expected"], missingProfileOutcome)
+
+	missingRoots := fixture["missing_roots"].(map[string]any)
+	missingRootsOutcome, err := asttemplate.RunTemplateDirectorySessionWithProfile(
+		profiles,
+		missingRoots["profile"].(string),
+		decodeSessionOptionsFromFixture(t, missingRoots["overrides"]),
+	)
+	if err != nil {
+		t.Fatalf("missing roots outcome failed: %v", err)
+	}
+	assertJSONEqual(t, missingRoots["expected"], missingRootsOutcome)
 }
 
 func repoRoot(t *testing.T) string {
