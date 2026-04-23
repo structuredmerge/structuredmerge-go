@@ -461,6 +461,43 @@ func TestTemplateDirectorySessionRunnerReportFixture(t *testing.T) {
 	_ = os.RemoveAll(tempRoot)
 }
 
+func TestTemplateDirectorySessionOptionsReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-362-template-directory-session-options-report", "template-directory-session-options-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	planRun := fixture["plan_run"].(map[string]any)
+	planOptions := decodeSessionOptions(t, planRun["options"], filepath.Join(fixtureRoot, "dry-run", "template"), filepath.Join(fixtureRoot, "dry-run", "destination"))
+	planOutcome, err := asttemplate.RunTemplateDirectorySessionWithOptions(planOptions)
+	if err != nil {
+		t.Fatalf("plan options failed: %v", err)
+	}
+	assertJSONEqual(t, planRun["expected"], planOutcome)
+
+	tempRoot := filepath.Join(repoRoot(t), "go", "asttemplate", "tmp", t.Name(), "options")
+	_ = os.RemoveAll(tempRoot)
+	if err := copyTree(filepath.Join(fixtureRoot, "apply-run", "destination"), tempRoot); err != nil {
+		t.Fatalf("copy destination: %v", err)
+	}
+
+	applyRun := fixture["apply_run"].(map[string]any)
+	applyOptions := decodeSessionOptions(t, applyRun["options"], filepath.Join(fixtureRoot, "apply-run", "template"), tempRoot)
+	applyOutcome, err := asttemplate.RunTemplateDirectorySessionWithOptions(applyOptions)
+	if err != nil {
+		t.Fatalf("apply options failed: %v", err)
+	}
+	assertJSONEqual(t, applyRun["expected"], applyOutcome)
+
+	reapplyRun := fixture["reapply_run"].(map[string]any)
+	reapplyOptions := decodeSessionOptions(t, reapplyRun["options"], filepath.Join(fixtureRoot, "apply-run", "template"), tempRoot)
+	reapplyOutcome, err := asttemplate.RunTemplateDirectorySessionWithOptions(reapplyOptions)
+	if err != nil {
+		t.Fatalf("reapply options failed: %v", err)
+	}
+	assertJSONEqual(t, reapplyRun["expected"], reapplyOutcome)
+	_ = os.RemoveAll(tempRoot)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -534,6 +571,21 @@ func decodeOptionalFamilies(t *testing.T, raw any) []string {
 		t.Fatalf("decode allowed families: %v", err)
 	}
 	return families
+}
+
+func decodeSessionOptions(t *testing.T, raw any, templateRoot string, destinationRoot string) asttemplate.DirectorySessionOptions {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.DirectorySessionOptions{
+		Mode:            asttemplate.DirectorySessionMode(section["mode"].(string)),
+		TemplateRoot:    templateRoot,
+		DestinationRoot: destinationRoot,
+		Context:         decodeContext(t, section["context"]),
+		DefaultStrategy: decodeStrategy(t, section["default_strategy"]),
+		Overrides:       decodeOverrides(t, section["overrides"]),
+		Replacements:    decodeReplacements(t, section["replacements"]),
+		AllowedFamilies: decodeOptionalFamilies(t, section["allowed_families"]),
+	}
 }
 
 func assertJSONEqual(t *testing.T, expected any, actual any) {

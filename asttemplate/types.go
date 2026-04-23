@@ -76,6 +76,18 @@ type SessionOutcomeReport struct {
 	Diagnostics   SessionDiagnosticsReport `json:"diagnostics"`
 }
 
+type DirectorySessionOptions struct {
+	Mode            DirectorySessionMode                 `json:"mode"`
+	TemplateRoot    string                               `json:"template_root"`
+	DestinationRoot string                               `json:"destination_root"`
+	Context         *astmerge.TemplateDestinationContext `json:"context"`
+	DefaultStrategy astmerge.TemplateStrategy            `json:"default_strategy"`
+	Overrides       []astmerge.TemplateStrategyOverride  `json:"overrides"`
+	Replacements    map[string]string                    `json:"replacements"`
+	AllowedFamilies []string                             `json:"allowed_families"`
+	Config          *astmerge.TemplateTokenConfig        `json:"config,omitempty"`
+}
+
 func ReportTemplateDirectorySession(mode DirectorySessionMode, entries []astmerge.TemplateExecutionPlanEntry, result *astmerge.TemplateTreeRunResult) DirectorySessionReport {
 	return DirectorySessionReport{
 		Mode:         mode,
@@ -843,4 +855,18 @@ func RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
 	default:
 		return SessionOutcomeReport{}, nil
 	}
+}
+
+func RunTemplateDirectorySessionWithOptions(options DirectorySessionOptions) (SessionOutcomeReport, error) {
+	return RunTemplateDirectorySessionWithDefaultRegistryToDirectory(
+		options.Mode,
+		options.TemplateRoot,
+		options.DestinationRoot,
+		options.Context,
+		options.DefaultStrategy,
+		options.Overrides,
+		options.Replacements,
+		options.AllowedFamilies,
+		options.Config,
+	)
 }
