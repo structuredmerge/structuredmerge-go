@@ -74,6 +74,47 @@ func TestTemplateDirectorySessionReportFixture(t *testing.T) {
 	assertJSONEqual(t, reapplyRun["expected"], reapplyReport)
 }
 
+func TestTemplateDirectoryAdapterRegistryReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-354-template-directory-adapter-registry-report", "template-directory-adapter-registry-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for key, registry := range map[string]asttemplate.FamilyMergeAdapterRegistry{
+		"full_registry": {
+			"markdown": markdownAdapter,
+			"ruby":     rubyAdapter,
+			"toml":     tomlAdapter,
+		},
+		"partial_registry": {
+			"markdown": markdownAdapter,
+			"toml":     tomlAdapter,
+		},
+	} {
+		section := fixture[key].(map[string]any)
+		tempRoot := filepath.Join(repoRoot(t), "go", "asttemplate", "tmp", t.Name(), key)
+		_ = os.RemoveAll(tempRoot)
+		if err := copyTree(filepath.Join(fixtureRoot, "apply-run", "destination"), tempRoot); err != nil {
+			t.Fatalf("copy destination: %v", err)
+		}
+
+		actual, err := asttemplate.ApplyTemplateDirectorySessionWithRegistryToDirectory(
+			filepath.Join(fixtureRoot, "apply-run", "template"),
+			tempRoot,
+			decodeContext(t, section["context"]),
+			decodeStrategy(t, section["default_strategy"]),
+			decodeOverrides(t, section["overrides"]),
+			decodeReplacements(t, section["replacements"]),
+			registry,
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("%s registry session failed: %v", key, err)
+		}
+		assertJSONEqual(t, section["expected"], actual)
+		_ = os.RemoveAll(tempRoot)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -158,6 +199,14 @@ func copyTree(src string, dst string) error {
 }
 
 func multiFamilyMergeCallback(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+	return asttemplate.MergePreparedContentFromRegistry(asttemplate.FamilyMergeAdapterRegistry{
+		"markdown": markdownAdapter,
+		"ruby":     rubyAdapter,
+		"toml":     tomlAdapter,
+	}, entry)
+}
+
+func markdownAdapter(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
 	destination := ""
 	if entry.DestinationContent != nil {
 		destination = *entry.DestinationContent
@@ -166,21 +215,29 @@ func multiFamilyMergeCallback(entry astmerge.TemplateExecutionPlanEntry) astmerg
 	if entry.PreparedTemplateContent != nil {
 		template = *entry.PreparedTemplateContent
 	}
-	switch entry.Classification.Family {
-	case "markdown":
-		return markdownmerge.MergeMarkdown(template, destination, "markdown")
-	case "toml":
-		return tomlmerge.MergeTOML(template, destination, "toml")
-	case "ruby":
-		return rubymerge.MergeRuby(template, destination, "ruby")
-	default:
-		return astmerge.MergeResult[string]{
-			OK: false,
-			Diagnostics: []astmerge.Diagnostic{{
-				Severity: astmerge.SeverityError,
-				Category: astmerge.CategoryConfigurationError,
-				Message:  "missing family merge adapter for " + entry.Classification.Family,
-			}},
-		}
+	return markdownmerge.MergeMarkdown(template, destination, "markdown")
+}
+
+func tomlAdapter(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+	destination := ""
+	if entry.DestinationContent != nil {
+		destination = *entry.DestinationContent
 	}
+	template := ""
+	if entry.PreparedTemplateContent != nil {
+		template = *entry.PreparedTemplateContent
+	}
+	return tomlmerge.MergeTOML(template, destination, "toml")
+}
+
+func rubyAdapter(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+	destination := ""
+	if entry.DestinationContent != nil {
+		destination = *entry.DestinationContent
+	}
+	template := ""
+	if entry.PreparedTemplateContent != nil {
+		template = *entry.PreparedTemplateContent
+	}
+	return rubymerge.MergeRuby(template, destination, "ruby")
 }
