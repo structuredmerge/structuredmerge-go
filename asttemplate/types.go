@@ -70,6 +70,12 @@ type SessionDiagnosticsReport struct {
 	Diagnostics []SessionDiagnostic  `json:"diagnostics"`
 }
 
+type SessionOutcomeReport struct {
+	SessionReport any                      `json:"session_report"`
+	Status        SessionStatusReport      `json:"status"`
+	Diagnostics   SessionDiagnosticsReport `json:"diagnostics"`
+}
+
 func ReportTemplateDirectorySession(mode DirectorySessionMode, entries []astmerge.TemplateExecutionPlanEntry, result *astmerge.TemplateTreeRunResult) DirectorySessionReport {
 	return DirectorySessionReport{
 		Mode:         mode,
@@ -646,4 +652,108 @@ func ApplyTemplateDirectorySessionDiagnosticsWithDefaultRegistryToDirectory(
 	}
 	capabilities := ReportAdapterCapabilities(result.ExecutionPlan, registry)
 	return ReportTemplateDirectorySessionDiagnostics(DirectorySessionModeApply, result.ExecutionPlan, &result, capabilities), nil
+}
+
+func ReportTemplateDirectorySessionOutcome(
+	sessionReport any,
+	status SessionStatusReport,
+	diagnostics SessionDiagnosticsReport,
+) SessionOutcomeReport {
+	return SessionOutcomeReport{
+		SessionReport: sessionReport,
+		Status:        status,
+		Diagnostics:   diagnostics,
+	}
+}
+
+func PlanTemplateDirectorySessionOutcomeFromDirectories(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionOutcomeReport, error) {
+	sessionReport, err := PlanTemplateDirectorySessionFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		config,
+	)
+	if err != nil {
+		return SessionOutcomeReport{}, err
+	}
+	envelope, err := PlanTemplateDirectorySessionEnvelopeFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		allowedFamilies,
+		config,
+	)
+	if err != nil {
+		return SessionOutcomeReport{}, err
+	}
+	diagnostics, err := PlanTemplateDirectorySessionDiagnosticsFromDirectories(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		allowedFamilies,
+		config,
+	)
+	if err != nil {
+		return SessionOutcomeReport{}, err
+	}
+	return ReportTemplateDirectorySessionOutcome(
+		sessionReport,
+		ReportTemplateDirectorySessionStatus(envelope),
+		diagnostics,
+	), nil
+}
+
+func ApplyTemplateDirectorySessionOutcomeWithDefaultRegistryToDirectory(
+	templateRoot string,
+	destinationRoot string,
+	context *astmerge.TemplateDestinationContext,
+	defaultStrategy astmerge.TemplateStrategy,
+	overrides []astmerge.TemplateStrategyOverride,
+	replacements map[string]string,
+	allowedFamilies []string,
+	config *astmerge.TemplateTokenConfig,
+) (SessionOutcomeReport, error) {
+	registry := DefaultFamilyMergeAdapterRegistry(allowedFamilies...)
+	result, err := astmerge.ApplyTemplateTreeExecutionToDirectory(
+		templateRoot,
+		destinationRoot,
+		context,
+		defaultStrategy,
+		overrides,
+		replacements,
+		func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+			return MergePreparedContentFromRegistry(registry, entry)
+		},
+		config,
+	)
+	if err != nil {
+		return SessionOutcomeReport{}, err
+	}
+	sessionReport := ReportTemplateDirectoryRegistrySession(DirectorySessionModeApply, result.ExecutionPlan, &result, registry)
+	capabilities := ReportAdapterCapabilities(result.ExecutionPlan, registry)
+	status := ReportTemplateDirectorySessionStatus(ReportTemplateDirectorySessionEnvelope(sessionReport, capabilities))
+	diagnostics := ReportTemplateDirectorySessionDiagnostics(DirectorySessionModeApply, result.ExecutionPlan, &result, capabilities)
+	return ReportTemplateDirectorySessionOutcome(
+		sessionReport,
+		status,
+		diagnostics,
+	), nil
 }

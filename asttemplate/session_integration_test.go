@@ -352,6 +352,52 @@ func TestTemplateDirectorySessionDiagnosticsReportFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionOutcomeReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-360-template-directory-session-outcome-report", "template-directory-session-outcome-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	dryRun := fixture["dry_run"].(map[string]any)
+	dryOutcome, err := asttemplate.PlanTemplateDirectorySessionOutcomeFromDirectories(
+		filepath.Join(fixtureRoot, "dry-run", "template"),
+		filepath.Join(fixtureRoot, "dry-run", "destination"),
+		decodeContext(t, dryRun["context"]),
+		decodeStrategy(t, dryRun["default_strategy"]),
+		decodeOverrides(t, dryRun["overrides"]),
+		decodeReplacements(t, dryRun["replacements"]),
+		decodeOptionalFamilies(t, dryRun["allowed_families"]),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("dry-run outcome failed: %v", err)
+	}
+	assertJSONEqual(t, dryRun["expected"], dryOutcome)
+
+	for _, key := range []string{"apply_run", "filtered_discovery"} {
+		section := fixture[key].(map[string]any)
+		tempRoot := filepath.Join(repoRoot(t), "go", "asttemplate", "tmp", t.Name(), key)
+		_ = os.RemoveAll(tempRoot)
+		if err := copyTree(filepath.Join(fixtureRoot, "apply-run", "destination"), tempRoot); err != nil {
+			t.Fatalf("copy destination: %v", err)
+		}
+		actual, err := asttemplate.ApplyTemplateDirectorySessionOutcomeWithDefaultRegistryToDirectory(
+			filepath.Join(fixtureRoot, "apply-run", "template"),
+			tempRoot,
+			decodeContext(t, section["context"]),
+			decodeStrategy(t, section["default_strategy"]),
+			decodeOverrides(t, section["overrides"]),
+			decodeReplacements(t, section["replacements"]),
+			decodeOptionalFamilies(t, section["allowed_families"]),
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("%s outcome failed: %v", key, err)
+		}
+		assertJSONEqual(t, section["expected"], actual)
+		_ = os.RemoveAll(tempRoot)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
