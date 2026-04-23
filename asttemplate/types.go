@@ -156,6 +156,21 @@ type SessionCommand struct {
 	Request   *SessionRunnerRequest `json:"request,omitempty"`
 }
 
+type SessionCommandPayload struct {
+	Operation          string                               `json:"operation"`
+	RequestKind        string                               `json:"request_kind,omitempty"`
+	DefaultProfileName string                               `json:"default_profile_name,omitempty"`
+	ProfileName        string                               `json:"profile_name,omitempty"`
+	Mode               DirectorySessionMode                 `json:"mode"`
+	TemplateRoot       string                               `json:"template_root"`
+	DestinationRoot    string                               `json:"destination_root"`
+	Context            *astmerge.TemplateDestinationContext `json:"context"`
+	DefaultStrategy    astmerge.TemplateStrategy            `json:"default_strategy"`
+	Overrides          []astmerge.TemplateStrategyOverride  `json:"overrides"`
+	Replacements       map[string]string                    `json:"replacements"`
+	AllowedFamilies    []string                             `json:"allowed_families"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1393,6 +1408,28 @@ func RunTemplateDirectorySessionCommand(
 	return RunTemplateDirectorySessionDispatch(command.Operation, SessionEntrypoint{
 		Payload: command.Payload,
 		Request: command.Request,
+	}, profiles)
+}
+
+func RunTemplateDirectorySessionCommandPayload(
+	payload SessionCommandPayload,
+	profiles map[string]DirectorySessionProfile,
+) (SessionDispatchReport, error) {
+	return RunTemplateDirectorySessionCommand(SessionCommand{
+		Operation: payload.Operation,
+		Payload: &SessionRunnerPayload{
+			RequestKind:        payload.RequestKind,
+			DefaultProfileName: payload.DefaultProfileName,
+			ProfileName:        payload.ProfileName,
+			Mode:               payload.Mode,
+			TemplateRoot:       payload.TemplateRoot,
+			DestinationRoot:    payload.DestinationRoot,
+			Context:            payload.Context,
+			DefaultStrategy:    payload.DefaultStrategy,
+			Overrides:          payload.Overrides,
+			Replacements:       payload.Replacements,
+			AllowedFamilies:    payload.AllowedFamilies,
+		},
 	}, profiles)
 }
 

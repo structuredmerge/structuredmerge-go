@@ -1077,6 +1077,23 @@ func TestTemplateDirectorySessionCommandReportFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionCommandPayloadReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-379-template-directory-session-command-payload-report", "template-directory-session-command-payload-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	for _, key := range []string{"inspect_ready", "run_profile_ready", "run_profile_blocked"} {
+		section := fixture[key].(map[string]any)
+		command := decodeSessionCommandPayloadFromFixture(t, section["input"], fixtureRoot)
+		actual, err := asttemplate.RunTemplateDirectorySessionCommandPayload(command, profiles)
+		if err != nil {
+			t.Fatalf("%s command payload failed: %v", key, err)
+		}
+		assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(section["expected"], fixtureRoot), actual)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1383,6 +1400,32 @@ func decodeSessionCommandFromFixture(t *testing.T, raw any, fixtureRoot string) 
 		command.Request = &resolved
 	}
 	return command
+}
+
+func decodeSessionCommandPayloadFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionCommandPayload {
+	t.Helper()
+	section := raw.(map[string]any)
+	payload := asttemplate.SessionCommandPayload{
+		Operation:          stringOrZero(section["operation"]),
+		RequestKind:        stringOrZero(section["request_kind"]),
+		DefaultProfileName: stringOrZero(section["default_profile_name"]),
+		ProfileName:        stringOrZero(section["profile_name"]),
+		Mode:               asttemplate.DirectorySessionMode(stringOrZero(section["mode"])),
+		TemplateRoot:       stringOrZero(section["template_root"]),
+		DestinationRoot:    stringOrZero(section["destination_root"]),
+		Context:            decodeOptionalContext(t, section["context"]),
+		DefaultStrategy:    decodeOptionalStrategy(t, section["default_strategy"]),
+		Overrides:          decodeOptionalOverrides(t, section["overrides"]),
+		Replacements:       decodeOptionalReplacements(t, section["replacements"]),
+		AllowedFamilies:    decodeOptionalFamilies(t, section["allowed_families"]),
+	}
+	if payload.TemplateRoot != "" {
+		payload.TemplateRoot = filepath.Join(fixtureRoot, payload.TemplateRoot)
+	}
+	if payload.DestinationRoot != "" {
+		payload.DestinationRoot = filepath.Join(fixtureRoot, payload.DestinationRoot)
+	}
+	return payload
 }
 
 func cloneFixturePathMap(raw any, fixtureRoot string) map[string]any {
