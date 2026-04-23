@@ -1,6 +1,7 @@
 package asttemplate
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 
@@ -1081,7 +1082,7 @@ func RunTemplateDirectorySessionRunnerRequest(
 	if request.RequestKind == "profile" {
 		overrides := DirectorySessionOptions{}
 		if request.Overrides != nil {
-			overrides = decodeSessionRunnerOptions(request.Overrides)
+			overrides = decodeSessionRunnerOptions(request.Overrides, true)
 		}
 		return RunTemplateDirectorySessionRequest(
 			ReportTemplateDirectorySessionProfileRequest(profiles, request.ProfileName, overrides),
@@ -1089,7 +1090,7 @@ func RunTemplateDirectorySessionRunnerRequest(
 	}
 	options := DirectorySessionOptions{}
 	if request.Options != nil {
-		options = decodeSessionRunnerOptions(request.Options)
+		options = decodeSessionRunnerOptions(request.Options, false)
 	}
 	return RunTemplateDirectorySessionRequest(ReportTemplateDirectorySessionOptionsRequest(options))
 }
@@ -1151,6 +1152,18 @@ func ReportTemplateDirectorySessionRunnerPayload(payload SessionRunnerPayload) S
 	}
 }
 
+func RunTemplateDirectorySessionRunnerPayload(
+	payload SessionRunnerPayload,
+	profiles map[string]DirectorySessionProfile,
+) (SessionOutcomeReport, error) {
+	return RunTemplateDirectorySessionRunnerRequest(
+		ReportTemplateDirectorySessionRunnerInput(
+			ReportTemplateDirectorySessionRunnerPayload(payload),
+		),
+		profiles,
+	)
+}
+
 func reportSessionRunnerInputOptions(input SessionRunnerInput) map[string]any {
 	return map[string]any{
 		"mode":             input.Mode,
@@ -1173,7 +1186,7 @@ func reportSessionRunnerInputOverrides(input SessionRunnerInput) map[string]any 
 	if input.Context != nil && input.Context.ProjectName != "" {
 		overrides["context"] = input.Context
 	}
-	if input.DefaultStrategy != "" {
+	if input.DefaultStrategy != "" && input.DefaultStrategy != astmerge.TemplateStrategyMerge {
 		overrides["default_strategy"] = input.DefaultStrategy
 	}
 	if len(input.Overrides) > 0 {
@@ -1188,103 +1201,31 @@ func reportSessionRunnerInputOverrides(input SessionRunnerInput) map[string]any 
 	return overrides
 }
 
-func decodeSessionRunnerOptions(raw map[string]any) DirectorySessionOptions {
-	options := DirectorySessionOptions{
-		DefaultStrategy: astmerge.TemplateStrategyMerge,
+func decodeSessionRunnerOptions(raw map[string]any, sparse bool) DirectorySessionOptions {
+	options := DirectorySessionOptions{}
+	if !sparse {
+		options.DefaultStrategy = astmerge.TemplateStrategyMerge
 	}
-	if mode, ok := raw["mode"].(string); ok && mode != "" {
-		options.Mode = DirectorySessionMode(mode)
+	if raw == nil {
+		return options
 	}
-	if templateRoot, ok := raw["template_root"].(string); ok {
-		options.TemplateRoot = templateRoot
+	payload, err := json.Marshal(raw)
+	if err == nil {
+		_ = json.Unmarshal(payload, &options)
 	}
-	if destinationRoot, ok := raw["destination_root"].(string); ok {
-		options.DestinationRoot = destinationRoot
+	if !sparse && options.Context == nil {
+		options.Context = &astmerge.TemplateDestinationContext{}
 	}
-	if context, ok := raw["context"]; ok && context != nil {
-		options.Context = decodeTemplateDestinationContextMap(context)
+	if !sparse && options.Overrides == nil {
+		options.Overrides = []astmerge.TemplateStrategyOverride{}
 	}
-	if strategy, ok := raw["default_strategy"].(string); ok && strategy != "" {
-		options.DefaultStrategy = astmerge.TemplateStrategy(strategy)
+	if !sparse && options.Replacements == nil {
+		options.Replacements = map[string]string{}
 	}
-	if overrides, ok := raw["overrides"]; ok && overrides != nil {
-		options.Overrides = decodeTemplateStrategyOverrides(overrides)
-	}
-	if replacements, ok := raw["replacements"]; ok && replacements != nil {
-		options.Replacements = decodeStringMap(replacements)
-	}
-	if allowedFamilies, ok := raw["allowed_families"]; ok {
-		options.AllowedFamilies = decodeStringSlice(allowedFamilies)
+	if !sparse && options.DefaultStrategy == "" {
+		options.DefaultStrategy = astmerge.TemplateStrategyMerge
 	}
 	return options
-}
-
-func decodeTemplateDestinationContextMap(raw any) *astmerge.TemplateDestinationContext {
-	section, ok := raw.(map[string]any)
-	if !ok {
-		return nil
-	}
-	context := &astmerge.TemplateDestinationContext{}
-	if projectName, ok := section["project_name"].(string); ok && projectName != "" {
-		context.ProjectName = projectName
-	}
-	if context.ProjectName == "" {
-		return &astmerge.TemplateDestinationContext{}
-	}
-	return context
-}
-
-func decodeTemplateStrategyOverrides(raw any) []astmerge.TemplateStrategyOverride {
-	items, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-	overrides := make([]astmerge.TemplateStrategyOverride, 0, len(items))
-	for _, item := range items {
-		section, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		overrides = append(overrides, astmerge.TemplateStrategyOverride{
-			Path:     stringOrAny(section["path"]),
-			Strategy: astmerge.TemplateStrategy(stringOrAny(section["strategy"])),
-		})
-	}
-	return overrides
-}
-
-func decodeStringMap(raw any) map[string]string {
-	section, ok := raw.(map[string]any)
-	if !ok {
-		return nil
-	}
-	values := make(map[string]string, len(section))
-	for key, value := range section {
-		values[key] = stringOrAny(value)
-	}
-	return values
-}
-
-func decodeStringSlice(raw any) []string {
-	if raw == nil {
-		return nil
-	}
-	items, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-	values := make([]string, 0, len(items))
-	for _, item := range items {
-		values = append(values, stringOrAny(item))
-	}
-	return values
-}
-
-func stringOrAny(raw any) string {
-	if value, ok := raw.(string); ok {
-		return value
-	}
-	return ""
 }
 
 func defaultTemplateStrategy(strategy astmerge.TemplateStrategy) astmerge.TemplateStrategy {

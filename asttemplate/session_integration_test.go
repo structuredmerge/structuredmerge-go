@@ -809,6 +809,53 @@ func TestTemplateDirectorySessionRunnerPayloadReportFixture(t *testing.T) {
 	))
 }
 
+func TestTemplateDirectorySessionRunnerPayloadOutcomeReportFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-372-template-directory-session-runner-payload-outcome-report", "template-directory-session-runner-payload-outcome-report.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	optionsReady := fixture["options_ready"].(map[string]any)
+	optionsReadyOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayloadFromFixture(t, optionsReady["payload"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("options ready payload runner failed: %v", err)
+	}
+	assertJSONEqual(t, optionsReady["expected"], optionsReadyOutcome)
+
+	optionsBlocked := fixture["options_blocked"].(map[string]any)
+	optionsBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayloadFromFixture(t, optionsBlocked["payload"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("options blocked payload runner failed: %v", err)
+	}
+	assertJSONEqual(t, optionsBlocked["expected"], optionsBlockedOutcome)
+
+	profileReady := fixture["profile_ready"].(map[string]any)
+	profileReadyOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayloadFromFixture(t, profileReady["payload"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("profile ready payload runner failed: %v", err)
+	}
+	assertJSONEqual(t, profileReady["expected"], profileReadyOutcome)
+
+	profileBlocked := fixture["profile_blocked"].(map[string]any)
+	profileBlockedOutcome, err := asttemplate.RunTemplateDirectorySessionRunnerPayload(
+		decodeSessionRunnerPayloadFromFixture(t, profileBlocked["payload"], fixtureRoot),
+		profiles,
+	)
+	if err != nil {
+		t.Fatalf("profile blocked payload runner failed: %v", err)
+	}
+	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1031,6 +1078,18 @@ func decodeSessionRunnerPayload(t *testing.T, raw any) asttemplate.SessionRunner
 		Replacements:       decodeOptionalReplacements(t, section["replacements"]),
 		AllowedFamilies:    decodeOptionalFamilies(t, section["allowed_families"]),
 	}
+}
+
+func decodeSessionRunnerPayloadFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionRunnerPayload {
+	t.Helper()
+	payload := decodeSessionRunnerPayload(t, raw)
+	if payload.TemplateRoot != "" {
+		payload.TemplateRoot = filepath.Join(fixtureRoot, payload.TemplateRoot)
+	}
+	if payload.DestinationRoot != "" {
+		payload.DestinationRoot = filepath.Join(fixtureRoot, payload.DestinationRoot)
+	}
+	return payload
 }
 
 func cloneFixturePathMap(raw any, fixtureRoot string) map[string]any {
