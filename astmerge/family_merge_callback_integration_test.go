@@ -217,3 +217,63 @@ func TestMiniTemplateTreeMultiFamilyMergeCallbackFixture(t *testing.T) {
 		t.Fatalf("expected mini template tree multi-family merge callback to match fixture")
 	}
 }
+
+func TestMiniTemplateTreeMultiFamilyRunReportFixture(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_multi_family_merge_callback"))
+	reportFixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "mini_template_tree_multi_family_run_report"))
+	fixtureDir := filepath.Dir(diagnosticsFixturePath(t, "mini_template_tree_multi_family_merge_callback"))
+	templateContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "template"))
+	destinationContents := readRelativeFileTree(t, filepath.Join(fixtureDir, "destination"))
+	templateSourcePaths := mapsKeys(templateContents)
+	slices.Sort(templateSourcePaths)
+	context := decodeFixtureValue[astmerge.TemplateDestinationContext](t, fixture["context"])
+	overrides := decodeFixtureValue[[]astmerge.TemplateStrategyOverride](t, fixture["overrides"])
+	replacements := decodeFixtureValue[map[string]string](t, fixture["replacements"])
+
+	runResult := astmerge.RunTemplateTreeExecution(
+		templateSourcePaths,
+		templateContents,
+		destinationContents,
+		&context,
+		astmerge.TemplateStrategy(fixture["default_strategy"].(string)),
+		overrides,
+		replacements,
+		func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
+			switch entry.Classification.Family {
+			case "markdown":
+				return markdownmerge.MergeMarkdown(
+					*entry.PreparedTemplateContent,
+					*entry.DestinationContent,
+					markdownmerge.DialectMarkdown,
+				)
+			case "toml":
+				return tomlmerge.MergeTOML(
+					*entry.PreparedTemplateContent,
+					*entry.DestinationContent,
+					tomlmerge.DialectTOML,
+				)
+			case "ruby":
+				return rubymerge.MergeRuby(
+					*entry.PreparedTemplateContent,
+					*entry.DestinationContent,
+					rubymerge.DialectRuby,
+				)
+			default:
+				return astmerge.MergeResult[string]{
+					OK: false,
+					Diagnostics: []astmerge.Diagnostic{{
+						Severity: astmerge.SeverityError,
+						Category: astmerge.CategoryConfigurationError,
+						Message:  "missing family merge adapter for " + entry.Classification.Family,
+					}},
+				}
+			}
+		},
+		nil,
+	)
+	actual := astmerge.ReportTemplateTreeRun(runResult)
+	expected := decodeFixtureValue[astmerge.TemplateTreeRunReport](t, reportFixture["expected"])
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected mini template tree multi-family run report to match fixture")
+	}
+}

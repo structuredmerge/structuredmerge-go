@@ -13,6 +13,7 @@ import (
 // parity anchors:
 // diagnosticsFixturePath(t, "mini_template_tree_family_merge_callback")
 // diagnosticsFixturePath(t, "mini_template_tree_multi_family_merge_callback")
+// diagnosticsFixturePath(t, "mini_template_tree_multi_family_run_report")
 
 func readRelativeFileTree(t *testing.T, root string) map[string]string {
 	t.Helper()
