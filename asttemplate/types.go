@@ -2,6 +2,7 @@ package asttemplate
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -1389,15 +1390,7 @@ func RunTemplateDirectorySessionDispatch(
 			Outcome:    &outcome,
 		}, nil
 	default:
-		outcome, err := RunTemplateDirectorySessionEntrypoint(entrypoint, profiles)
-		if err != nil {
-			return SessionDispatchReport{}, err
-		}
-		return SessionDispatchReport{
-			Operation:  operation,
-			Inspection: nil,
-			Outcome:    &outcome,
-		}, nil
+		return SessionDispatchReport{}, fmt.Errorf("unsupported template directory session operation: %s", operation)
 	}
 }
 

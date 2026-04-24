@@ -1094,6 +1094,29 @@ func TestTemplateDirectorySessionCommandPayloadReportFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionDispatchRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-380-template-directory-session-dispatch-rejection", "template-directory-session-dispatch-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	cases := fixture["cases"].([]any)
+
+	for _, rawCase := range cases {
+		testCase := rawCase.(map[string]any)
+		input := decodeSessionDispatchInputFromFixture(t, testCase["input"], fixtureRoot)
+		_, err := asttemplate.RunTemplateDirectorySessionDispatch(
+			input["operation"].(string),
+			input["entrypoint"].(asttemplate.SessionEntrypoint),
+			nil,
+		)
+		if err == nil {
+			t.Fatalf("%s dispatch rejection expected error", testCase["label"])
+		}
+		if err.Error() != testCase["expected_error"].(string) {
+			t.Fatalf("%s dispatch rejection error mismatch: got %q want %q", testCase["label"], err.Error(), testCase["expected_error"])
+		}
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
