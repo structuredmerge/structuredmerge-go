@@ -172,6 +172,23 @@ type SessionCommandPayload struct {
 	AllowedFamilies    []string                             `json:"allowed_families"`
 }
 
+type SessionInvocation struct {
+	Operation          string                               `json:"operation"`
+	Payload            *SessionRunnerPayload                `json:"payload,omitempty"`
+	Request            *SessionRunnerRequest                `json:"request,omitempty"`
+	RequestKind        string                               `json:"request_kind,omitempty"`
+	DefaultProfileName string                               `json:"default_profile_name,omitempty"`
+	ProfileName        string                               `json:"profile_name,omitempty"`
+	Mode               DirectorySessionMode                 `json:"mode,omitempty"`
+	TemplateRoot       string                               `json:"template_root,omitempty"`
+	DestinationRoot    string                               `json:"destination_root,omitempty"`
+	Context            *astmerge.TemplateDestinationContext `json:"context,omitempty"`
+	DefaultStrategy    astmerge.TemplateStrategy            `json:"default_strategy,omitempty"`
+	Overrides          []astmerge.TemplateStrategyOverride  `json:"overrides,omitempty"`
+	Replacements       map[string]string                    `json:"replacements,omitempty"`
+	AllowedFamilies    []string                             `json:"allowed_families"`
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
@@ -1423,6 +1440,34 @@ func RunTemplateDirectorySessionCommandPayload(
 			Replacements:       payload.Replacements,
 			AllowedFamilies:    payload.AllowedFamilies,
 		},
+	}, profiles)
+}
+
+func RunTemplateDirectorySession(
+	invocation SessionInvocation,
+	profiles map[string]DirectorySessionProfile,
+) (SessionDispatchReport, error) {
+	if invocation.Payload != nil || invocation.Request != nil {
+		return RunTemplateDirectorySessionCommand(SessionCommand{
+			Operation: invocation.Operation,
+			Payload:   invocation.Payload,
+			Request:   invocation.Request,
+		}, profiles)
+	}
+
+	return RunTemplateDirectorySessionCommandPayload(SessionCommandPayload{
+		Operation:          invocation.Operation,
+		RequestKind:        invocation.RequestKind,
+		DefaultProfileName: invocation.DefaultProfileName,
+		ProfileName:        invocation.ProfileName,
+		Mode:               invocation.Mode,
+		TemplateRoot:       invocation.TemplateRoot,
+		DestinationRoot:    invocation.DestinationRoot,
+		Context:            invocation.Context,
+		DefaultStrategy:    invocation.DefaultStrategy,
+		Overrides:          invocation.Overrides,
+		Replacements:       invocation.Replacements,
+		AllowedFamilies:    invocation.AllowedFamilies,
 	}, profiles)
 }
 
