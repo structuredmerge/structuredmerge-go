@@ -221,6 +221,55 @@ type SessionCommandPayload struct {
 	AllowedFamilies    []string                             `json:"allowed_families"`
 }
 
+const SessionCommandPayloadTransportVersion = 1
+
+type SessionCommandPayloadTransportImportErrorCategory string
+
+const (
+	SessionCommandPayloadTransportKindMismatch       SessionCommandPayloadTransportImportErrorCategory = "kind_mismatch"
+	SessionCommandPayloadTransportUnsupportedVersion SessionCommandPayloadTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionCommandPayloadTransportImportError struct {
+	Category SessionCommandPayloadTransportImportErrorCategory `json:"category"`
+	Message  string                                            `json:"message"`
+}
+
+type SessionCommandPayloadEnvelope struct {
+	Kind    string                `json:"kind"`
+	Version int                   `json:"version"`
+	Payload SessionCommandPayload `json:"payload"`
+}
+
+func SessionCommandPayloadEnvelopeFor(payload SessionCommandPayload) SessionCommandPayloadEnvelope {
+	return SessionCommandPayloadEnvelope{
+		Kind:    "template_directory_session_command_payload",
+		Version: SessionCommandPayloadTransportVersion,
+		Payload: payload,
+	}
+}
+
+func ImportSessionCommandPayloadEnvelope(
+	envelope SessionCommandPayloadEnvelope,
+) (*SessionCommandPayload, *SessionCommandPayloadTransportImportError) {
+	if envelope.Kind != "template_directory_session_command_payload" {
+		return nil, &SessionCommandPayloadTransportImportError{
+			Category: SessionCommandPayloadTransportKindMismatch,
+			Message:  "expected template_directory_session_command_payload envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionCommandPayloadTransportVersion {
+		return nil, &SessionCommandPayloadTransportImportError{
+			Category: SessionCommandPayloadTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_command_payload envelope version %d.", envelope.Version),
+		}
+	}
+
+	payload := envelope.Payload
+	return &payload, nil
+}
+
 type SessionInvocation struct {
 	Operation          string                               `json:"operation"`
 	Payload            *SessionRunnerPayload                `json:"payload,omitempty"`

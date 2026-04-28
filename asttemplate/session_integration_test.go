@@ -1206,6 +1206,33 @@ func TestTemplateDirectorySessionCommandTransportRejectionFixture(t *testing.T) 
 	}
 }
 
+func TestTemplateDirectorySessionCommandPayloadTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-392-template-directory-session-command-payload-transport-envelope", "template-directory-session-command-payload-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		payload := decodeSessionCommandPayloadFromFixture(t, testCase["input"], fixtureRoot)
+		expected := decodeSessionCommandPayloadEnvelopeFromFixture(t, testCase["expected_envelope"], fixtureRoot)
+
+		envelope := asttemplate.SessionCommandPayloadEnvelopeFor(payload)
+		if !reflect.DeepEqual(envelope, expected) {
+			t.Fatalf("%s command payload envelope mismatch: got %+v want %+v", testCase["label"], envelope, expected)
+		}
+
+		imported, importErr := asttemplate.ImportSessionCommandPayloadEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s command payload envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s command payload envelope import returned nil payload", testCase["label"])
+		}
+
+		assertJSONEqual(t, payload, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionCommandEnvelopeApplicationFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-391-template-directory-session-command-envelope-application", "template-directory-session-command-envelope-application.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1733,6 +1760,16 @@ func decodeSessionCommandPayloadFromFixture(t *testing.T, raw any, fixtureRoot s
 		payload.DestinationRoot = filepath.Join(fixtureRoot, payload.DestinationRoot)
 	}
 	return payload
+}
+
+func decodeSessionCommandPayloadEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionCommandPayloadEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionCommandPayloadEnvelope{
+		Kind:    stringOrZero(section["kind"]),
+		Version: int(section["version"].(float64)),
+		Payload: decodeSessionCommandPayloadFromFixture(t, section["payload"], fixtureRoot),
+	}
 }
 
 func decodeSessionInvocationFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionInvocation {
