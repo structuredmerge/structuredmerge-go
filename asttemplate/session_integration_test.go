@@ -40,7 +40,11 @@ func TestTemplateDirectorySessionReportFixture(t *testing.T) {
 	if err := copyTree(filepath.Join(fixtureRoot, "apply-run", "destination"), tempRoot); err != nil {
 		t.Fatalf("copy destination: %v", err)
 	}
-	defer os.RemoveAll(tempRoot)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempRoot); err != nil {
+			t.Fatalf("remove temp root: %v", err)
+		}
+	})
 
 	applyReport, err := asttemplate.ApplyTemplateDirectorySessionToDirectory(
 		filepath.Join(fixtureRoot, "apply-run", "template"),
@@ -1169,6 +1173,25 @@ func TestTemplateDirectorySessionInvocationReportFixture(t *testing.T) {
 			t.Fatalf("%s invocation failed: %v", key, err)
 		}
 		assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(section["expected"], fixtureRoot), actual)
+	}
+}
+
+func TestTemplateDirectorySessionInvocationRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-384-template-directory-session-invocation-rejection", "template-directory-session-invocation-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	cases := fixture["cases"].([]any)
+
+	for _, rawCase := range cases {
+		testCase := rawCase.(map[string]any)
+		invocation := decodeSessionInvocationFromFixture(t, testCase["input"], fixtureRoot)
+		_, err := asttemplate.RunTemplateDirectorySession(invocation, nil)
+		if err == nil {
+			t.Fatalf("%s invocation rejection expected error", testCase["label"])
+		}
+		if err.Error() != testCase["expected_error"].(string) {
+			t.Fatalf("%s invocation rejection error mismatch: got %q want %q", testCase["label"], err.Error(), testCase["expected_error"])
+		}
 	}
 }
 
