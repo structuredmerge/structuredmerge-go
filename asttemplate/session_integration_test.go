@@ -1219,6 +1219,34 @@ func TestTemplateDirectorySessionInvocationJSONRoundtripFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionInvocationTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-386-template-directory-session-invocation-transport-envelope", "template-directory-session-invocation-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	cases := fixture["cases"].([]any)
+
+	for _, rawCase := range cases {
+		testCase := rawCase.(map[string]any)
+		invocation := decodeSessionInvocationFromFixture(t, testCase["input"], fixtureRoot)
+		expected := decodeSessionInvocationEnvelopeFromFixture(t, testCase["expected_envelope"], fixtureRoot)
+
+		envelope := asttemplate.SessionInvocationEnvelopeFor(invocation)
+		if !reflect.DeepEqual(envelope, expected) {
+			t.Fatalf("%s invocation envelope mismatch: got %+v want %+v", testCase["label"], envelope, expected)
+		}
+
+		imported, importErr := asttemplate.ImportSessionInvocationEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s invocation envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s invocation envelope import returned nil invocation", testCase["label"])
+		}
+
+		assertJSONEqual(t, invocation, *imported)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -1585,6 +1613,16 @@ func decodeSessionInvocationFromFixture(t *testing.T, raw any, fixtureRoot strin
 		invocation.DestinationRoot = filepath.Join(fixtureRoot, invocation.DestinationRoot)
 	}
 	return invocation
+}
+
+func decodeSessionInvocationEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionInvocationEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionInvocationEnvelope{
+		Kind:       stringOrZero(section["kind"]),
+		Version:    int(section["version"].(float64)),
+		Invocation: decodeSessionInvocationFromFixture(t, section["invocation"], fixtureRoot),
+	}
 }
 
 func cloneFixturePathMap(raw any, fixtureRoot string) map[string]any {

@@ -189,6 +189,55 @@ type SessionInvocation struct {
 	AllowedFamilies    []string                             `json:"allowed_families"`
 }
 
+const SessionInvocationTransportVersion = 1
+
+type SessionInvocationTransportImportErrorCategory string
+
+const (
+	SessionInvocationTransportKindMismatch       SessionInvocationTransportImportErrorCategory = "kind_mismatch"
+	SessionInvocationTransportUnsupportedVersion SessionInvocationTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionInvocationTransportImportError struct {
+	Category SessionInvocationTransportImportErrorCategory `json:"category"`
+	Message  string                                        `json:"message"`
+}
+
+type SessionInvocationEnvelope struct {
+	Kind       string            `json:"kind"`
+	Version    int               `json:"version"`
+	Invocation SessionInvocation `json:"invocation"`
+}
+
+func SessionInvocationEnvelopeFor(invocation SessionInvocation) SessionInvocationEnvelope {
+	return SessionInvocationEnvelope{
+		Kind:       "template_directory_session_invocation",
+		Version:    SessionInvocationTransportVersion,
+		Invocation: invocation,
+	}
+}
+
+func ImportSessionInvocationEnvelope(
+	envelope SessionInvocationEnvelope,
+) (*SessionInvocation, *SessionInvocationTransportImportError) {
+	if envelope.Kind != "template_directory_session_invocation" {
+		return nil, &SessionInvocationTransportImportError{
+			Category: SessionInvocationTransportKindMismatch,
+			Message:  "expected template_directory_session_invocation envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionInvocationTransportVersion {
+		return nil, &SessionInvocationTransportImportError{
+			Category: SessionInvocationTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_invocation envelope version %d.", envelope.Version),
+		}
+	}
+
+	invocation := envelope.Invocation
+	return &invocation, nil
+}
+
 type DirectorySessionOptions struct {
 	Mode            DirectorySessionMode                 `json:"mode"`
 	TemplateRoot    string                               `json:"template_root"`
