@@ -427,6 +427,58 @@ func TestTemplateDirectorySessionOutcomeTransportEnvelopeFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionOutcomeTransportRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-408-template-directory-session-outcome-transport-rejection", "template-directory-session-outcome-envelope-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionOutcomeEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionOutcomeTransportImportErrorFromFixture(testCase["expected_error"])
+
+		imported, importErr := asttemplate.ImportSessionOutcomeEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s outcome rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s outcome rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
+func TestTemplateDirectorySessionOutcomeEnvelopeApplicationFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-409-template-directory-session-outcome-envelope-application", "template-directory-session-outcome-envelope-application.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionOutcomeEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		imported, importErr := asttemplate.ImportSessionOutcomeEnvelope(envelope)
+		if importErr != nil {
+			t.Fatalf("%s outcome envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s outcome envelope import returned nil outcome", testCase["label"])
+		}
+		assertJSONEqual(t, testCase["expected"], *imported)
+	}
+
+	for _, rawCase := range fixture["rejections"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionOutcomeEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionOutcomeTransportImportErrorFromFixture(testCase["expected_error"])
+		imported, importErr := asttemplate.ImportSessionOutcomeEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s outcome envelope rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s outcome envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionRunnerReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-361-template-directory-session-runner-report", "template-directory-session-runner-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -2014,6 +2066,14 @@ func decodeSessionRequestTransportImportErrorFromFixture(raw any) *asttemplate.S
 	section := raw.(map[string]any)
 	return &asttemplate.SessionRequestTransportImportError{
 		Category: asttemplate.SessionRequestTransportImportErrorCategory(stringOrZero(section["category"])),
+		Message:  stringOrZero(section["message"]),
+	}
+}
+
+func decodeSessionOutcomeTransportImportErrorFromFixture(raw any) *asttemplate.SessionOutcomeTransportImportError {
+	section := raw.(map[string]any)
+	return &asttemplate.SessionOutcomeTransportImportError{
+		Category: asttemplate.SessionOutcomeTransportImportErrorCategory(stringOrZero(section["category"])),
 		Message:  stringOrZero(section["message"]),
 	}
 }
