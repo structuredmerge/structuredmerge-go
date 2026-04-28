@@ -1303,6 +1303,26 @@ func TestTemplateDirectorySessionRunnerRequestTransportEnvelopeFixture(t *testin
 	}
 }
 
+func TestTemplateDirectorySessionRunnerRequestTransportRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-399-template-directory-session-runner-request-transport-rejection", "template-directory-session-runner-request-envelope-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionRunnerRequestEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionRunnerRequestTransportImportErrorFromFixture(testCase["expected_error"])
+
+		imported, importErr := asttemplate.ImportSessionRunnerRequestEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s runner request rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s runner request rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionEntrypointTransportRejectionFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-396-template-directory-session-entrypoint-transport-rejection", "template-directory-session-entrypoint-envelope-rejection.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1387,6 +1407,40 @@ func TestTemplateDirectorySessionEntrypointEnvelopeApplicationFixture(t *testing
 		}
 		if !reflect.DeepEqual(importErr, expected) {
 			t.Fatalf("%s entrypoint envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
+func TestTemplateDirectorySessionRunnerRequestEnvelopeApplicationFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-400-template-directory-session-runner-request-envelope-application", "template-directory-session-runner-request-envelope-application.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionRunnerRequestEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		imported, importErr := asttemplate.ImportSessionRunnerRequestEnvelope(envelope)
+		if importErr != nil {
+			t.Fatalf("%s runner request envelope import failed: %+v", testCase["label"], importErr)
+		}
+		actual, err := asttemplate.RunTemplateDirectorySessionRunnerRequest(*imported, profiles)
+		if err != nil {
+			t.Fatalf("%s runner request envelope application failed: %v", testCase["label"], err)
+		}
+		assertJSONEqual(t, resolveSessionOutcomeExpectedPaths(testCase["expected"], fixtureRoot), actual)
+	}
+
+	for _, rawCase := range fixture["rejections"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionRunnerRequestEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionRunnerRequestTransportImportErrorFromFixture(testCase["expected_error"])
+		imported, importErr := asttemplate.ImportSessionRunnerRequestEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s runner request envelope rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s runner request envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
 		}
 	}
 }
@@ -1874,6 +1928,14 @@ func decodeSessionEntrypointTransportImportErrorFromFixture(raw any) *asttemplat
 	section := raw.(map[string]any)
 	return &asttemplate.SessionEntrypointTransportImportError{
 		Category: asttemplate.SessionEntrypointTransportImportErrorCategory(stringOrZero(section["category"])),
+		Message:  stringOrZero(section["message"]),
+	}
+}
+
+func decodeSessionRunnerRequestTransportImportErrorFromFixture(raw any) *asttemplate.SessionRunnerRequestTransportImportError {
+	section := raw.(map[string]any)
+	return &asttemplate.SessionRunnerRequestTransportImportError{
+		Category: asttemplate.SessionRunnerRequestTransportImportErrorCategory(stringOrZero(section["category"])),
 		Message:  stringOrZero(section["message"]),
 	}
 }
