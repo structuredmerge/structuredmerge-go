@@ -157,6 +157,55 @@ type SessionCommand struct {
 	Request   *SessionRunnerRequest `json:"request,omitempty"`
 }
 
+const SessionCommandTransportVersion = 1
+
+type SessionCommandTransportImportErrorCategory string
+
+const (
+	SessionCommandTransportKindMismatch       SessionCommandTransportImportErrorCategory = "kind_mismatch"
+	SessionCommandTransportUnsupportedVersion SessionCommandTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionCommandTransportImportError struct {
+	Category SessionCommandTransportImportErrorCategory `json:"category"`
+	Message  string                                     `json:"message"`
+}
+
+type SessionCommandEnvelope struct {
+	Kind    string         `json:"kind"`
+	Version int            `json:"version"`
+	Command SessionCommand `json:"command"`
+}
+
+func SessionCommandEnvelopeFor(command SessionCommand) SessionCommandEnvelope {
+	return SessionCommandEnvelope{
+		Kind:    "template_directory_session_command",
+		Version: SessionCommandTransportVersion,
+		Command: command,
+	}
+}
+
+func ImportSessionCommandEnvelope(
+	envelope SessionCommandEnvelope,
+) (*SessionCommand, *SessionCommandTransportImportError) {
+	if envelope.Kind != "template_directory_session_command" {
+		return nil, &SessionCommandTransportImportError{
+			Category: SessionCommandTransportKindMismatch,
+			Message:  "expected template_directory_session_command envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionCommandTransportVersion {
+		return nil, &SessionCommandTransportImportError{
+			Category: SessionCommandTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_command envelope version %d.", envelope.Version),
+		}
+	}
+
+	command := envelope.Command
+	return &command, nil
+}
+
 type SessionCommandPayload struct {
 	Operation          string                               `json:"operation"`
 	RequestKind        string                               `json:"request_kind,omitempty"`
