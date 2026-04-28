@@ -1233,6 +1233,26 @@ func TestTemplateDirectorySessionCommandPayloadTransportEnvelopeFixture(t *testi
 	}
 }
 
+func TestTemplateDirectorySessionCommandPayloadTransportRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-393-template-directory-session-command-payload-transport-rejection", "template-directory-session-command-payload-envelope-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionCommandPayloadEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionCommandPayloadTransportImportErrorFromFixture(testCase["expected_error"])
+
+		imported, importErr := asttemplate.ImportSessionCommandPayloadEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s command payload rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s command payload rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionCommandEnvelopeApplicationFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-391-template-directory-session-command-envelope-application", "template-directory-session-command-envelope-application.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1769,6 +1789,14 @@ func decodeSessionCommandPayloadEnvelopeFromFixture(t *testing.T, raw any, fixtu
 		Kind:    stringOrZero(section["kind"]),
 		Version: int(section["version"].(float64)),
 		Payload: decodeSessionCommandPayloadFromFixture(t, section["payload"], fixtureRoot),
+	}
+}
+
+func decodeSessionCommandPayloadTransportImportErrorFromFixture(raw any) *asttemplate.SessionCommandPayloadTransportImportError {
+	section := raw.(map[string]any)
+	return &asttemplate.SessionCommandPayloadTransportImportError{
+		Category: asttemplate.SessionCommandPayloadTransportImportErrorCategory(stringOrZero(section["category"])),
+		Message:  stringOrZero(section["message"]),
 	}
 }
 
