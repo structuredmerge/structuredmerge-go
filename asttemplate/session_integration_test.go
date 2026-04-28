@@ -885,6 +885,60 @@ func TestTemplateDirectorySessionRunnerPayloadTransportEnvelopeFixture(t *testin
 	}
 }
 
+func TestTemplateDirectorySessionRunnerPayloadTransportRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-402-template-directory-session-runner-payload-transport-rejection", "template-directory-session-runner-payload-envelope-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionRunnerPayloadEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionRunnerPayloadTransportImportErrorFromFixture(testCase["expected_error"])
+
+		imported, importErr := asttemplate.ImportSessionRunnerPayloadEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s runner payload rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s runner payload rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
+func TestTemplateDirectorySessionRunnerPayloadEnvelopeApplicationFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-403-template-directory-session-runner-payload-envelope-application", "template-directory-session-runner-payload-envelope-application.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionRunnerPayloadEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		imported, importErr := asttemplate.ImportSessionRunnerPayloadEnvelope(envelope)
+		if importErr != nil {
+			t.Fatalf("%s runner payload envelope import failed: %+v", testCase["label"], importErr)
+		}
+		actual, err := asttemplate.RunTemplateDirectorySessionRunnerPayload(*imported, profiles)
+		if err != nil {
+			t.Fatalf("%s runner payload envelope application failed: %v", testCase["label"], err)
+		}
+		assertJSONEqual(t, resolveSessionOutcomeExpectedPaths(testCase["expected"], fixtureRoot), actual)
+	}
+
+	for _, rawCase := range fixture["rejections"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionRunnerPayloadEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionRunnerPayloadTransportImportErrorFromFixture(testCase["expected_error"])
+		imported, importErr := asttemplate.ImportSessionRunnerPayloadEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s runner payload envelope rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s runner payload envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionEntrypointOutcomeReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-373-template-directory-session-entrypoint-outcome-report", "template-directory-session-entrypoint-outcome-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1916,6 +1970,14 @@ func decodeSessionRunnerPayloadEnvelopeFromFixture(t *testing.T, raw any, fixtur
 		Kind:    stringOrZero(section["kind"]),
 		Version: int(section["version"].(float64)),
 		Payload: decodeSessionRunnerPayloadFromFixture(t, section["payload"], fixtureRoot),
+	}
+}
+
+func decodeSessionRunnerPayloadTransportImportErrorFromFixture(raw any) *asttemplate.SessionRunnerPayloadTransportImportError {
+	section := raw.(map[string]any)
+	return &asttemplate.SessionRunnerPayloadTransportImportError{
+		Category: asttemplate.SessionRunnerPayloadTransportImportErrorCategory(stringOrZero(section["category"])),
+		Message:  stringOrZero(section["message"]),
 	}
 }
 
