@@ -121,6 +121,55 @@ type SessionDiagnosticsReport struct {
 	Diagnostics []SessionDiagnostic  `json:"diagnostics"`
 }
 
+const SessionDiagnosticsTransportVersion = 1
+
+type SessionDiagnosticsTransportImportErrorCategory string
+
+const (
+	SessionDiagnosticsTransportKindMismatch       SessionDiagnosticsTransportImportErrorCategory = "kind_mismatch"
+	SessionDiagnosticsTransportUnsupportedVersion SessionDiagnosticsTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionDiagnosticsTransportImportError struct {
+	Category SessionDiagnosticsTransportImportErrorCategory `json:"category"`
+	Message  string                                         `json:"message"`
+}
+
+type SessionDiagnosticsEnvelope struct {
+	Kind        string                   `json:"kind"`
+	Version     int                      `json:"version"`
+	Diagnostics SessionDiagnosticsReport `json:"diagnostics"`
+}
+
+func SessionDiagnosticsEnvelopeFor(diagnostics SessionDiagnosticsReport) SessionDiagnosticsEnvelope {
+	return SessionDiagnosticsEnvelope{
+		Kind:        "template_directory_session_diagnostics",
+		Version:     SessionDiagnosticsTransportVersion,
+		Diagnostics: diagnostics,
+	}
+}
+
+func ImportSessionDiagnosticsEnvelope(
+	envelope SessionDiagnosticsEnvelope,
+) (*SessionDiagnosticsReport, *SessionDiagnosticsTransportImportError) {
+	if envelope.Kind != "template_directory_session_diagnostics" {
+		return nil, &SessionDiagnosticsTransportImportError{
+			Category: SessionDiagnosticsTransportKindMismatch,
+			Message:  "expected template_directory_session_diagnostics envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionDiagnosticsTransportVersion {
+		return nil, &SessionDiagnosticsTransportImportError{
+			Category: SessionDiagnosticsTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_diagnostics envelope version %d.", envelope.Version),
+		}
+	}
+
+	diagnostics := envelope.Diagnostics
+	return &diagnostics, nil
+}
+
 type SessionOutcomeReport struct {
 	SessionReport any                      `json:"session_report"`
 	Status        SessionStatusReport      `json:"status"`

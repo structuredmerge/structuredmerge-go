@@ -430,6 +430,30 @@ func TestTemplateDirectorySessionStatusEnvelopeApplicationFixture(t *testing.T) 
 	}
 }
 
+func TestTemplateDirectorySessionDiagnosticsTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-416-template-directory-session-diagnostics-transport-envelope", "template-directory-session-diagnostics-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		diagnostics := decodeSessionDiagnosticsReportFromFixture(t, testCase["input"])
+		expected := decodeSessionDiagnosticsEnvelopeFromFixture(t, testCase["expected_envelope"])
+
+		envelope := asttemplate.SessionDiagnosticsEnvelopeFor(diagnostics)
+		assertJSONEqual(t, envelope, expected)
+
+		imported, importErr := asttemplate.ImportSessionDiagnosticsEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s diagnostics envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s diagnostics envelope import returned nil diagnostics", testCase["label"])
+		}
+
+		assertJSONEqual(t, diagnostics, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionOutcomeReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-360-template-directory-session-outcome-report", "template-directory-session-outcome-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -2237,6 +2261,26 @@ func decodeSessionStatusEnvelopeFromFixture(t *testing.T, raw any) asttemplate.S
 		Kind:    stringOrZero(section["kind"]),
 		Version: int(section["version"].(float64)),
 		Status:  decodeSessionStatusFromFixture(t, section["status"]),
+	}
+}
+
+func decodeSessionDiagnosticsReportFromFixture(t *testing.T, raw any) asttemplate.SessionDiagnosticsReport {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionDiagnosticsReport{
+		Mode:        asttemplate.DirectorySessionMode(section["mode"].(string)),
+		Ready:       section["ready"].(bool),
+		Diagnostics: decodeSessionDiagnostics(t, section["diagnostics"]),
+	}
+}
+
+func decodeSessionDiagnosticsEnvelopeFromFixture(t *testing.T, raw any) asttemplate.SessionDiagnosticsEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionDiagnosticsEnvelope{
+		Kind:        stringOrZero(section["kind"]),
+		Version:     int(section["version"].(float64)),
+		Diagnostics: decodeSessionDiagnosticsReportFromFixture(t, section["diagnostics"]),
 	}
 }
 
