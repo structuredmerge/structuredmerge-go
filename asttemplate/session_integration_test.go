@@ -356,6 +356,30 @@ func TestTemplateDirectorySessionDiagnosticsReportFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionStatusTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-413-template-directory-session-status-transport-envelope", "template-directory-session-status-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		status := decodeSessionStatusFromFixture(t, testCase["input"])
+		expected := decodeSessionStatusEnvelopeFromFixture(t, testCase["expected_envelope"])
+
+		envelope := asttemplate.SessionStatusEnvelopeFor(status)
+		assertJSONEqual(t, envelope, expected)
+
+		imported, importErr := asttemplate.ImportSessionStatusEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s status envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s status envelope import returned nil status", testCase["label"])
+		}
+
+		assertJSONEqual(t, status, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionOutcomeReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-360-template-directory-session-outcome-report", "template-directory-session-outcome-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -2143,6 +2167,29 @@ func decodeSessionInspectionReportFromFixture(t *testing.T, raw any, fixtureRoot
 	return report
 }
 
+func decodeSessionStatusFromFixture(t *testing.T, raw any) asttemplate.SessionStatusReport {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionStatusReport{
+		Mode:              asttemplate.DirectorySessionMode(section["mode"].(string)),
+		Ready:             section["ready"].(bool),
+		MissingFamilies:   decodeOptionalFamilies(t, section["missing_families"]),
+		BlockedPaths:      decodeStringSlice(section["blocked_paths"]),
+		PlannedWriteCount: int(section["planned_write_count"].(float64)),
+		WrittenCount:      int(section["written_count"].(float64)),
+	}
+}
+
+func decodeSessionStatusEnvelopeFromFixture(t *testing.T, raw any) asttemplate.SessionStatusEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionStatusEnvelope{
+		Kind:    stringOrZero(section["kind"]),
+		Version: int(section["version"].(float64)),
+		Status:  decodeSessionStatusFromFixture(t, section["status"]),
+	}
+}
+
 func decodeSessionInspectionEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionInspectionEnvelope {
 	t.Helper()
 	section := raw.(map[string]any)
@@ -2183,6 +2230,26 @@ func decodeSessionInspectionTransportImportErrorFromFixture(raw any) *asttemplat
 	section := raw.(map[string]any)
 	return &asttemplate.SessionInspectionTransportImportError{
 		Category: asttemplate.SessionInspectionTransportImportErrorCategory(stringOrZero(section["category"])),
+		Message:  stringOrZero(section["message"]),
+	}
+}
+
+func decodeStringSlice(raw any) []string {
+	if raw == nil {
+		return nil
+	}
+	sections := raw.([]any)
+	values := make([]string, 0, len(sections))
+	for _, value := range sections {
+		values = append(values, value.(string))
+	}
+	return values
+}
+
+func decodeSessionStatusTransportImportErrorFromFixture(raw any) *asttemplate.SessionStatusTransportImportError {
+	section := raw.(map[string]any)
+	return &asttemplate.SessionStatusTransportImportError{
+		Category: asttemplate.SessionStatusTransportImportErrorCategory(stringOrZero(section["category"])),
 		Message:  stringOrZero(section["message"]),
 	}
 }

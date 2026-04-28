@@ -57,6 +57,55 @@ type SessionStatusReport struct {
 	WrittenCount      int                  `json:"written_count"`
 }
 
+const SessionStatusTransportVersion = 1
+
+type SessionStatusTransportImportErrorCategory string
+
+const (
+	SessionStatusTransportKindMismatch       SessionStatusTransportImportErrorCategory = "kind_mismatch"
+	SessionStatusTransportUnsupportedVersion SessionStatusTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionStatusTransportImportError struct {
+	Category SessionStatusTransportImportErrorCategory `json:"category"`
+	Message  string                                    `json:"message"`
+}
+
+type SessionStatusEnvelope struct {
+	Kind    string              `json:"kind"`
+	Version int                 `json:"version"`
+	Status  SessionStatusReport `json:"status"`
+}
+
+func SessionStatusEnvelopeFor(status SessionStatusReport) SessionStatusEnvelope {
+	return SessionStatusEnvelope{
+		Kind:    "template_directory_session_status",
+		Version: SessionStatusTransportVersion,
+		Status:  status,
+	}
+}
+
+func ImportSessionStatusEnvelope(
+	envelope SessionStatusEnvelope,
+) (*SessionStatusReport, *SessionStatusTransportImportError) {
+	if envelope.Kind != "template_directory_session_status" {
+		return nil, &SessionStatusTransportImportError{
+			Category: SessionStatusTransportKindMismatch,
+			Message:  "expected template_directory_session_status envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionStatusTransportVersion {
+		return nil, &SessionStatusTransportImportError{
+			Category: SessionStatusTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_status envelope version %d.", envelope.Version),
+		}
+	}
+
+	status := envelope.Status
+	return &status, nil
+}
+
 type SessionDiagnostic struct {
 	Severity astmerge.DiagnosticSeverity `json:"severity"`
 	Category astmerge.DiagnosticCategory `json:"category"`
