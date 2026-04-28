@@ -94,6 +94,55 @@ type SessionRunnerRequest struct {
 	Overrides   map[string]any `json:"overrides,omitempty"`
 }
 
+const SessionRunnerRequestTransportVersion = 1
+
+type SessionRunnerRequestTransportImportErrorCategory string
+
+const (
+	SessionRunnerRequestTransportKindMismatch       SessionRunnerRequestTransportImportErrorCategory = "kind_mismatch"
+	SessionRunnerRequestTransportUnsupportedVersion SessionRunnerRequestTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionRunnerRequestTransportImportError struct {
+	Category SessionRunnerRequestTransportImportErrorCategory `json:"category"`
+	Message  string                                           `json:"message"`
+}
+
+type SessionRunnerRequestEnvelope struct {
+	Kind    string               `json:"kind"`
+	Version int                  `json:"version"`
+	Request SessionRunnerRequest `json:"request"`
+}
+
+func SessionRunnerRequestEnvelopeFor(request SessionRunnerRequest) SessionRunnerRequestEnvelope {
+	return SessionRunnerRequestEnvelope{
+		Kind:    "template_directory_session_runner_request",
+		Version: SessionRunnerRequestTransportVersion,
+		Request: request,
+	}
+}
+
+func ImportSessionRunnerRequestEnvelope(
+	envelope SessionRunnerRequestEnvelope,
+) (*SessionRunnerRequest, *SessionRunnerRequestTransportImportError) {
+	if envelope.Kind != "template_directory_session_runner_request" {
+		return nil, &SessionRunnerRequestTransportImportError{
+			Category: SessionRunnerRequestTransportKindMismatch,
+			Message:  "expected template_directory_session_runner_request envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionRunnerRequestTransportVersion {
+		return nil, &SessionRunnerRequestTransportImportError{
+			Category: SessionRunnerRequestTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_runner_request envelope version %d.", envelope.Version),
+		}
+	}
+
+	request := envelope.Request
+	return &request, nil
+}
+
 type SessionRunnerInput struct {
 	RequestKind     string                               `json:"request_kind"`
 	ProfileName     string                               `json:"profile_name,omitempty"`
