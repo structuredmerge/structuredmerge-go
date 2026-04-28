@@ -87,6 +87,55 @@ type SessionRequestReport struct {
 	ResolvedOptions *DirectorySessionOptions `json:"resolved_options"`
 }
 
+const SessionRequestTransportVersion = 1
+
+type SessionRequestTransportImportErrorCategory string
+
+const (
+	SessionRequestTransportKindMismatch       SessionRequestTransportImportErrorCategory = "kind_mismatch"
+	SessionRequestTransportUnsupportedVersion SessionRequestTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionRequestTransportImportError struct {
+	Category SessionRequestTransportImportErrorCategory `json:"category"`
+	Message  string                                     `json:"message"`
+}
+
+type SessionRequestEnvelope struct {
+	Kind    string               `json:"kind"`
+	Version int                  `json:"version"`
+	Request SessionRequestReport `json:"request"`
+}
+
+func SessionRequestEnvelopeFor(request SessionRequestReport) SessionRequestEnvelope {
+	return SessionRequestEnvelope{
+		Kind:    "template_directory_session_request",
+		Version: SessionRequestTransportVersion,
+		Request: request,
+	}
+}
+
+func ImportSessionRequestEnvelope(
+	envelope SessionRequestEnvelope,
+) (*SessionRequestReport, *SessionRequestTransportImportError) {
+	if envelope.Kind != "template_directory_session_request" {
+		return nil, &SessionRequestTransportImportError{
+			Category: SessionRequestTransportKindMismatch,
+			Message:  "expected template_directory_session_request envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionRequestTransportVersion {
+		return nil, &SessionRequestTransportImportError{
+			Category: SessionRequestTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_request envelope version %d.", envelope.Version),
+		}
+	}
+
+	request := envelope.Request
+	return &request, nil
+}
+
 type SessionRunnerRequest struct {
 	RequestKind string         `json:"request_kind"`
 	ProfileName string         `json:"profile_name,omitempty"`

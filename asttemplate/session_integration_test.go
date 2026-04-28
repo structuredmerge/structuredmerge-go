@@ -763,6 +763,31 @@ func TestTemplateDirectorySessionRequestRunnerReportFixture(t *testing.T) {
 	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
 }
 
+func TestTemplateDirectorySessionRequestTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-404-template-directory-session-request-transport-envelope", "template-directory-session-request-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		request := decodeSessionRequestReportFromFixture(t, testCase["input"], fixtureRoot)
+		expected := decodeSessionRequestEnvelopeFromFixture(t, testCase["expected_envelope"], fixtureRoot)
+
+		envelope := asttemplate.SessionRequestEnvelopeFor(request)
+		assertJSONEqual(t, envelope, expected)
+
+		imported, importErr := asttemplate.ImportSessionRequestEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s request envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s request envelope import returned nil request", testCase["label"])
+		}
+
+		assertJSONEqual(t, request, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionRunnerInputReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-370-template-directory-session-runner-input-report", "template-directory-session-runner-input-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1872,6 +1897,16 @@ func decodeSessionRequestReportFromFixture(t *testing.T, raw any, fixtureRoot st
 		report.ResolvedOptions.DestinationRoot = filepath.Join(fixtureRoot, report.ResolvedOptions.DestinationRoot)
 	}
 	return report
+}
+
+func decodeSessionRequestEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionRequestEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionRequestEnvelope{
+		Kind:    stringOrZero(section["kind"]),
+		Version: int(section["version"].(float64)),
+		Request: decodeSessionRequestReportFromFixture(t, section["request"], fixtureRoot),
+	}
 }
 
 func decodeSessionRunnerRequestFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionRunnerRequest {
