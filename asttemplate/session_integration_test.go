@@ -402,6 +402,31 @@ func TestTemplateDirectorySessionOutcomeReportFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionOutcomeTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-407-template-directory-session-outcome-transport-envelope", "template-directory-session-outcome-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		outcome := decodeSessionOutcomeFromFixture(t, testCase["input"], fixtureRoot)
+		expected := decodeSessionOutcomeEnvelopeFromFixture(t, testCase["expected_envelope"], fixtureRoot)
+
+		envelope := asttemplate.SessionOutcomeEnvelopeFor(outcome)
+		assertJSONEqual(t, envelope, expected)
+
+		imported, importErr := asttemplate.ImportSessionOutcomeEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s outcome envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s outcome envelope import returned nil outcome", testCase["label"])
+		}
+
+		assertJSONEqual(t, outcome, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionRunnerReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-361-template-directory-session-runner-report", "template-directory-session-runner-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1799,6 +1824,29 @@ func readJSONFixture(t *testing.T, path string) map[string]any {
 		t.Fatalf("decode fixture: %v", err)
 	}
 	return fixture
+}
+
+func decodeSessionOutcomeFromFixture(t *testing.T, raw any, _fixtureRoot string) asttemplate.SessionOutcomeReport {
+	t.Helper()
+	data, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("encode outcome fixture: %v", err)
+	}
+	var outcome asttemplate.SessionOutcomeReport
+	if err := json.Unmarshal(data, &outcome); err != nil {
+		t.Fatalf("decode outcome fixture: %v", err)
+	}
+	return outcome
+}
+
+func decodeSessionOutcomeEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionOutcomeEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionOutcomeEnvelope{
+		Kind:    stringOrZero(section["kind"]),
+		Version: int(section["version"].(float64)),
+		Outcome: decodeSessionOutcomeFromFixture(t, section["outcome"], fixtureRoot),
+	}
 }
 
 func decodeContext(t *testing.T, raw any) *astmerge.TemplateDestinationContext {

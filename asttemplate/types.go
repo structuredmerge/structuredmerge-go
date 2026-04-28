@@ -78,6 +78,55 @@ type SessionOutcomeReport struct {
 	Diagnostics   SessionDiagnosticsReport `json:"diagnostics"`
 }
 
+const SessionOutcomeTransportVersion = 1
+
+type SessionOutcomeTransportImportErrorCategory string
+
+const (
+	SessionOutcomeTransportKindMismatch       SessionOutcomeTransportImportErrorCategory = "kind_mismatch"
+	SessionOutcomeTransportUnsupportedVersion SessionOutcomeTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionOutcomeTransportImportError struct {
+	Category SessionOutcomeTransportImportErrorCategory `json:"category"`
+	Message  string                                     `json:"message"`
+}
+
+type SessionOutcomeEnvelope struct {
+	Kind    string               `json:"kind"`
+	Version int                  `json:"version"`
+	Outcome SessionOutcomeReport `json:"outcome"`
+}
+
+func SessionOutcomeEnvelopeFor(outcome SessionOutcomeReport) SessionOutcomeEnvelope {
+	return SessionOutcomeEnvelope{
+		Kind:    "template_directory_session_outcome",
+		Version: SessionOutcomeTransportVersion,
+		Outcome: outcome,
+	}
+}
+
+func ImportSessionOutcomeEnvelope(
+	envelope SessionOutcomeEnvelope,
+) (*SessionOutcomeReport, *SessionOutcomeTransportImportError) {
+	if envelope.Kind != "template_directory_session_outcome" {
+		return nil, &SessionOutcomeTransportImportError{
+			Category: SessionOutcomeTransportKindMismatch,
+			Message:  "expected template_directory_session_outcome envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionOutcomeTransportVersion {
+		return nil, &SessionOutcomeTransportImportError{
+			Category: SessionOutcomeTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_outcome envelope version %d.", envelope.Version),
+		}
+	}
+
+	outcome := envelope.Outcome
+	return &outcome, nil
+}
+
 type SessionRequestReport struct {
 	RequestKind     string                   `json:"request_kind"`
 	ProfileName     string                   `json:"profile_name,omitempty"`
