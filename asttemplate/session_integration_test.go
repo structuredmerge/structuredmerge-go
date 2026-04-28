@@ -1186,6 +1186,26 @@ func TestTemplateDirectorySessionCommandTransportEnvelopeFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionCommandTransportRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-390-template-directory-session-command-transport-rejection", "template-directory-session-command-envelope-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionCommandEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionCommandTransportImportErrorFromFixture(testCase["expected_error"])
+
+		imported, importErr := asttemplate.ImportSessionCommandEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s command transport rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s command transport rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionInvocationReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-383-template-directory-session-invocation-report", "template-directory-session-invocation-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1644,6 +1664,14 @@ func decodeSessionCommandEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot 
 		Kind:    stringOrZero(section["kind"]),
 		Version: int(section["version"].(float64)),
 		Command: decodeSessionCommandFromFixture(t, section["command"], fixtureRoot),
+	}
+}
+
+func decodeSessionCommandTransportImportErrorFromFixture(raw any) *asttemplate.SessionCommandTransportImportError {
+	section := raw.(map[string]any)
+	return &asttemplate.SessionCommandTransportImportError{
+		Category: asttemplate.SessionCommandTransportImportErrorCategory(stringOrZero(section["category"])),
+		Message:  stringOrZero(section["message"]),
 	}
 }
 
