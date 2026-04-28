@@ -1195,6 +1195,30 @@ func TestTemplateDirectorySessionInvocationRejectionFixture(t *testing.T) {
 	}
 }
 
+func TestTemplateDirectorySessionInvocationJSONRoundtripFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-385-template-directory-session-invocation-json-roundtrip", "template-directory-session-invocation-json-roundtrip.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	cases := fixture["cases"].([]any)
+
+	for _, rawCase := range cases {
+		testCase := rawCase.(map[string]any)
+		invocation := decodeSessionInvocationFromFixture(t, testCase["input"], fixtureRoot)
+
+		payload, err := json.Marshal(invocation)
+		if err != nil {
+			t.Fatalf("%s invocation roundtrip marshal failed: %v", testCase["label"], err)
+		}
+
+		var roundTripped asttemplate.SessionInvocation
+		if err := json.Unmarshal(payload, &roundTripped); err != nil {
+			t.Fatalf("%s invocation roundtrip unmarshal failed: %v", testCase["label"], err)
+		}
+
+		assertJSONEqual(t, invocation, roundTripped)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
