@@ -126,6 +126,55 @@ type SessionEntrypoint struct {
 	Request *SessionRunnerRequest `json:"request,omitempty"`
 }
 
+const SessionEntrypointTransportVersion = 1
+
+type SessionEntrypointTransportImportErrorCategory string
+
+const (
+	SessionEntrypointTransportKindMismatch       SessionEntrypointTransportImportErrorCategory = "kind_mismatch"
+	SessionEntrypointTransportUnsupportedVersion SessionEntrypointTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionEntrypointTransportImportError struct {
+	Category SessionEntrypointTransportImportErrorCategory `json:"category"`
+	Message  string                                        `json:"message"`
+}
+
+type SessionEntrypointEnvelope struct {
+	Kind       string            `json:"kind"`
+	Version    int               `json:"version"`
+	Entrypoint SessionEntrypoint `json:"entrypoint"`
+}
+
+func SessionEntrypointEnvelopeFor(entrypoint SessionEntrypoint) SessionEntrypointEnvelope {
+	return SessionEntrypointEnvelope{
+		Kind:       "template_directory_session_entrypoint",
+		Version:    SessionEntrypointTransportVersion,
+		Entrypoint: entrypoint,
+	}
+}
+
+func ImportSessionEntrypointEnvelope(
+	envelope SessionEntrypointEnvelope,
+) (*SessionEntrypoint, *SessionEntrypointTransportImportError) {
+	if envelope.Kind != "template_directory_session_entrypoint" {
+		return nil, &SessionEntrypointTransportImportError{
+			Category: SessionEntrypointTransportKindMismatch,
+			Message:  "expected template_directory_session_entrypoint envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionEntrypointTransportVersion {
+		return nil, &SessionEntrypointTransportImportError{
+			Category: SessionEntrypointTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_entrypoint envelope version %d.", envelope.Version),
+		}
+	}
+
+	entrypoint := envelope.Entrypoint
+	return &entrypoint, nil
+}
+
 type SessionEntrypointReport struct {
 	SourceKind    string               `json:"source_kind"`
 	RunnerRequest SessionRunnerRequest `json:"runner_request"`

@@ -1253,6 +1253,31 @@ func TestTemplateDirectorySessionCommandPayloadTransportRejectionFixture(t *test
 	}
 }
 
+func TestTemplateDirectorySessionEntrypointTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-395-template-directory-session-entrypoint-transport-envelope", "template-directory-session-entrypoint-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		entrypoint := decodeSessionEntrypointFromFixture(t, testCase["input"], fixtureRoot)
+		expected := decodeSessionEntrypointEnvelopeFromFixture(t, testCase["expected_envelope"], fixtureRoot)
+
+		envelope := asttemplate.SessionEntrypointEnvelopeFor(entrypoint)
+		assertJSONEqual(t, envelope, expected)
+
+		imported, importErr := asttemplate.ImportSessionEntrypointEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s entrypoint envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s entrypoint envelope import returned nil entrypoint", testCase["label"])
+		}
+
+		assertJSONEqual(t, entrypoint, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionCommandEnvelopeApplicationFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-391-template-directory-session-command-envelope-application", "template-directory-session-command-envelope-application.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1744,6 +1769,16 @@ func decodeSessionEntrypoint(t *testing.T, raw any) asttemplate.SessionEntrypoin
 		entrypoint.Request = &resolved
 	}
 	return entrypoint
+}
+
+func decodeSessionEntrypointEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionEntrypointEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionEntrypointEnvelope{
+		Kind:       stringOrZero(section["kind"]),
+		Version:    int(section["version"].(float64)),
+		Entrypoint: decodeSessionEntrypointFromFixture(t, section["entrypoint"], fixtureRoot),
+	}
 }
 
 func decodeSessionDispatchInputFromFixture(t *testing.T, raw any, fixtureRoot string) map[string]any {
