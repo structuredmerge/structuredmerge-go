@@ -1278,6 +1278,26 @@ func TestTemplateDirectorySessionEntrypointTransportEnvelopeFixture(t *testing.T
 	}
 }
 
+func TestTemplateDirectorySessionEntrypointTransportRejectionFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-396-template-directory-session-entrypoint-transport-rejection", "template-directory-session-entrypoint-envelope-rejection.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionEntrypointEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionEntrypointTransportImportErrorFromFixture(testCase["expected_error"])
+
+		imported, importErr := asttemplate.ImportSessionEntrypointEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s entrypoint rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s entrypoint rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionCommandEnvelopeApplicationFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-391-template-directory-session-command-envelope-application", "template-directory-session-command-envelope-application.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1308,6 +1328,40 @@ func TestTemplateDirectorySessionCommandEnvelopeApplicationFixture(t *testing.T)
 		}
 		if !reflect.DeepEqual(importErr, expected) {
 			t.Fatalf("%s command envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
+func TestTemplateDirectorySessionEntrypointEnvelopeApplicationFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-397-template-directory-session-entrypoint-envelope-application", "template-directory-session-entrypoint-envelope-application.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionEntrypointEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		imported, importErr := asttemplate.ImportSessionEntrypointEnvelope(envelope)
+		if importErr != nil {
+			t.Fatalf("%s entrypoint envelope import failed: %+v", testCase["label"], importErr)
+		}
+		actual, err := asttemplate.RunTemplateDirectorySessionEntrypoint(*imported, profiles)
+		if err != nil {
+			t.Fatalf("%s entrypoint envelope application failed: %v", testCase["label"], err)
+		}
+		assertJSONEqual(t, resolveSessionOutcomeExpectedPaths(testCase["expected"], fixtureRoot), actual)
+	}
+
+	for _, rawCase := range fixture["rejections"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionEntrypointEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionEntrypointTransportImportErrorFromFixture(testCase["expected_error"])
+		imported, importErr := asttemplate.ImportSessionEntrypointEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s entrypoint envelope rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s entrypoint envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
 		}
 	}
 }
@@ -1781,6 +1835,14 @@ func decodeSessionEntrypointEnvelopeFromFixture(t *testing.T, raw any, fixtureRo
 	}
 }
 
+func decodeSessionEntrypointTransportImportErrorFromFixture(raw any) *asttemplate.SessionEntrypointTransportImportError {
+	section := raw.(map[string]any)
+	return &asttemplate.SessionEntrypointTransportImportError{
+		Category: asttemplate.SessionEntrypointTransportImportErrorCategory(stringOrZero(section["category"])),
+		Message:  stringOrZero(section["message"]),
+	}
+}
+
 func decodeSessionDispatchInputFromFixture(t *testing.T, raw any, fixtureRoot string) map[string]any {
 	t.Helper()
 	section := raw.(map[string]any)
@@ -1979,6 +2041,10 @@ func resolveSessionDispatchExpectedFixturePaths(raw any, fixtureRoot string) any
 		section["outcome"] = resolveSessionOutcomeExpectedFixturePaths(outcome, fixtureRoot)
 	}
 	return section
+}
+
+func resolveSessionOutcomeExpectedPaths(raw any, fixtureRoot string) any {
+	return cloneFixturePathMap(raw, fixtureRoot)
 }
 
 func resolveSessionOutcomeExpectedFixturePaths(raw any, fixtureRoot string) any {
