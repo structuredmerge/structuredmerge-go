@@ -860,6 +860,31 @@ func TestTemplateDirectorySessionRunnerPayloadOutcomeReportFixture(t *testing.T)
 	assertJSONEqual(t, profileBlocked["expected"], profileBlockedOutcome)
 }
 
+func TestTemplateDirectorySessionRunnerPayloadTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-401-template-directory-session-runner-payload-transport-envelope", "template-directory-session-runner-payload-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		payload := decodeSessionRunnerPayloadFromFixture(t, testCase["input"], fixtureRoot)
+		expected := decodeSessionRunnerPayloadEnvelopeFromFixture(t, testCase["expected_envelope"], fixtureRoot)
+
+		envelope := asttemplate.SessionRunnerPayloadEnvelopeFor(payload)
+		assertJSONEqual(t, envelope, expected)
+
+		imported, importErr := asttemplate.ImportSessionRunnerPayloadEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s runner payload envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s runner payload envelope import returned nil payload", testCase["label"])
+		}
+
+		assertJSONEqual(t, payload, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionEntrypointOutcomeReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-373-template-directory-session-entrypoint-outcome-report", "template-directory-session-entrypoint-outcome-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -1882,6 +1907,16 @@ func decodeSessionRunnerPayloadFromFixture(t *testing.T, raw any, fixtureRoot st
 		payload.DestinationRoot = filepath.Join(fixtureRoot, payload.DestinationRoot)
 	}
 	return payload
+}
+
+func decodeSessionRunnerPayloadEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionRunnerPayloadEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionRunnerPayloadEnvelope{
+		Kind:    stringOrZero(section["kind"]),
+		Version: int(section["version"].(float64)),
+		Payload: decodeSessionRunnerPayloadFromFixture(t, section["payload"], fixtureRoot),
+	}
 }
 
 func decodeSessionEntrypointFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionEntrypoint {

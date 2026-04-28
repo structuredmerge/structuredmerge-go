@@ -170,6 +170,55 @@ type SessionRunnerPayload struct {
 	AllowedFamilies    []string                             `json:"allowed_families"`
 }
 
+const SessionRunnerPayloadTransportVersion = 1
+
+type SessionRunnerPayloadTransportImportErrorCategory string
+
+const (
+	SessionRunnerPayloadTransportKindMismatch       SessionRunnerPayloadTransportImportErrorCategory = "kind_mismatch"
+	SessionRunnerPayloadTransportUnsupportedVersion SessionRunnerPayloadTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionRunnerPayloadTransportImportError struct {
+	Category SessionRunnerPayloadTransportImportErrorCategory `json:"category"`
+	Message  string                                           `json:"message"`
+}
+
+type SessionRunnerPayloadEnvelope struct {
+	Kind    string               `json:"kind"`
+	Version int                  `json:"version"`
+	Payload SessionRunnerPayload `json:"payload"`
+}
+
+func SessionRunnerPayloadEnvelopeFor(payload SessionRunnerPayload) SessionRunnerPayloadEnvelope {
+	return SessionRunnerPayloadEnvelope{
+		Kind:    "template_directory_session_runner_payload",
+		Version: SessionRunnerPayloadTransportVersion,
+		Payload: payload,
+	}
+}
+
+func ImportSessionRunnerPayloadEnvelope(
+	envelope SessionRunnerPayloadEnvelope,
+) (*SessionRunnerPayload, *SessionRunnerPayloadTransportImportError) {
+	if envelope.Kind != "template_directory_session_runner_payload" {
+		return nil, &SessionRunnerPayloadTransportImportError{
+			Category: SessionRunnerPayloadTransportKindMismatch,
+			Message:  "expected template_directory_session_runner_payload envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionRunnerPayloadTransportVersion {
+		return nil, &SessionRunnerPayloadTransportImportError{
+			Category: SessionRunnerPayloadTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_runner_payload envelope version %d.", envelope.Version),
+		}
+	}
+
+	payload := envelope.Payload
+	return &payload, nil
+}
+
 type SessionEntrypoint struct {
 	Payload *SessionRunnerPayload `json:"payload,omitempty"`
 	Request *SessionRunnerRequest `json:"request,omitempty"`
