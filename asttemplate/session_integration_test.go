@@ -1287,6 +1287,40 @@ func TestTemplateDirectorySessionCommandEnvelopeApplicationFixture(t *testing.T)
 	}
 }
 
+func TestTemplateDirectorySessionCommandPayloadEnvelopeApplicationFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-394-template-directory-session-command-payload-envelope-application", "template-directory-session-command-payload-envelope-application.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionCommandPayloadEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		imported, importErr := asttemplate.ImportSessionCommandPayloadEnvelope(envelope)
+		if importErr != nil {
+			t.Fatalf("%s command payload envelope import failed: %+v", testCase["label"], importErr)
+		}
+		actual, err := asttemplate.RunTemplateDirectorySessionCommandPayload(*imported, profiles)
+		if err != nil {
+			t.Fatalf("%s command payload envelope application failed: %v", testCase["label"], err)
+		}
+		assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(testCase["expected"], fixtureRoot), actual)
+	}
+
+	for _, rawCase := range fixture["rejections"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionCommandPayloadEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionCommandPayloadTransportImportErrorFromFixture(testCase["expected_error"])
+		imported, importErr := asttemplate.ImportSessionCommandPayloadEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s command payload envelope rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s command payload envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionInvocationReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-383-template-directory-session-invocation-report", "template-directory-session-invocation-report.json")
 	fixture := readJSONFixture(t, fixturePath)
