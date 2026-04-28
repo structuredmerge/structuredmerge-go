@@ -1206,6 +1206,40 @@ func TestTemplateDirectorySessionCommandTransportRejectionFixture(t *testing.T) 
 	}
 }
 
+func TestTemplateDirectorySessionCommandEnvelopeApplicationFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-391-template-directory-session-command-envelope-application", "template-directory-session-command-envelope-application.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+	profiles := decodeSessionProfiles(t, fixture["profiles"])
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionCommandEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		imported, importErr := asttemplate.ImportSessionCommandEnvelope(envelope)
+		if importErr != nil {
+			t.Fatalf("%s command envelope import failed: %+v", testCase["label"], importErr)
+		}
+		actual, err := asttemplate.RunTemplateDirectorySessionCommand(*imported, profiles)
+		if err != nil {
+			t.Fatalf("%s command envelope application failed: %v", testCase["label"], err)
+		}
+		assertJSONEqual(t, resolveSessionDispatchExpectedFixturePaths(testCase["expected"], fixtureRoot), actual)
+	}
+
+	for _, rawCase := range fixture["rejections"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeSessionCommandEnvelopeFromFixture(t, testCase["envelope"], fixtureRoot)
+		expected := decodeSessionCommandTransportImportErrorFromFixture(testCase["expected_error"])
+		imported, importErr := asttemplate.ImportSessionCommandEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("%s command envelope rejection unexpectedly imported %+v", testCase["label"], imported)
+		}
+		if !reflect.DeepEqual(importErr, expected) {
+			t.Fatalf("%s command envelope rejection mismatch: got %+v want %+v", testCase["label"], importErr, expected)
+		}
+	}
+}
+
 func TestTemplateDirectorySessionInvocationReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-383-template-directory-session-invocation-report", "template-directory-session-invocation-report.json")
 	fixture := readJSONFixture(t, fixturePath)
