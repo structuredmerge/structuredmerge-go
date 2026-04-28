@@ -390,6 +390,55 @@ type SessionInspectionReport struct {
 	Diagnostics         SessionDiagnosticsReport `json:"diagnostics"`
 }
 
+const SessionInspectionTransportVersion = 1
+
+type SessionInspectionTransportImportErrorCategory string
+
+const (
+	SessionInspectionTransportKindMismatch       SessionInspectionTransportImportErrorCategory = "kind_mismatch"
+	SessionInspectionTransportUnsupportedVersion SessionInspectionTransportImportErrorCategory = "unsupported_version"
+)
+
+type SessionInspectionTransportImportError struct {
+	Category SessionInspectionTransportImportErrorCategory `json:"category"`
+	Message  string                                        `json:"message"`
+}
+
+type SessionInspectionEnvelope struct {
+	Kind       string                  `json:"kind"`
+	Version    int                     `json:"version"`
+	Inspection SessionInspectionReport `json:"inspection"`
+}
+
+func SessionInspectionEnvelopeFor(inspection SessionInspectionReport) SessionInspectionEnvelope {
+	return SessionInspectionEnvelope{
+		Kind:       "template_directory_session_inspection",
+		Version:    SessionInspectionTransportVersion,
+		Inspection: inspection,
+	}
+}
+
+func ImportSessionInspectionEnvelope(
+	envelope SessionInspectionEnvelope,
+) (*SessionInspectionReport, *SessionInspectionTransportImportError) {
+	if envelope.Kind != "template_directory_session_inspection" {
+		return nil, &SessionInspectionTransportImportError{
+			Category: SessionInspectionTransportKindMismatch,
+			Message:  "expected template_directory_session_inspection envelope kind.",
+		}
+	}
+
+	if envelope.Version != SessionInspectionTransportVersion {
+		return nil, &SessionInspectionTransportImportError{
+			Category: SessionInspectionTransportUnsupportedVersion,
+			Message:  fmt.Sprintf("unsupported template_directory_session_inspection envelope version %d.", envelope.Version),
+		}
+	}
+
+	inspection := envelope.Inspection
+	return &inspection, nil
+}
+
 type SessionDispatchReport struct {
 	Operation  string                   `json:"operation"`
 	Inspection *SessionInspectionReport `json:"inspection"`

@@ -1243,6 +1243,31 @@ func TestTemplateDirectorySessionInspectionReportFixture(t *testing.T) {
 	assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(payloadBlocked["expected"], fixtureRoot), payloadBlockedActual)
 }
 
+func TestTemplateDirectorySessionInspectionTransportEnvelopeFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-410-template-directory-session-inspection-transport-envelope", "template-directory-session-inspection-envelope.json")
+	fixture := readJSONFixture(t, fixturePath)
+	fixtureRoot := filepath.Dir(fixturePath)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		inspection := decodeSessionInspectionReportFromFixture(t, testCase["input"], fixtureRoot)
+		expected := decodeSessionInspectionEnvelopeFromFixture(t, testCase["expected_envelope"], fixtureRoot)
+
+		envelope := asttemplate.SessionInspectionEnvelopeFor(inspection)
+		assertJSONEqual(t, envelope, expected)
+
+		imported, importErr := asttemplate.ImportSessionInspectionEnvelope(expected)
+		if importErr != nil {
+			t.Fatalf("%s inspection envelope import failed: %+v", testCase["label"], importErr)
+		}
+		if imported == nil {
+			t.Fatalf("%s inspection envelope import returned nil inspection", testCase["label"])
+		}
+
+		assertJSONEqual(t, inspection, *imported)
+	}
+}
+
 func TestTemplateDirectorySessionDispatchReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-377-template-directory-session-dispatch-report", "template-directory-session-dispatch-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -2050,6 +2075,30 @@ func decodeSessionRequestReportFromFixture(t *testing.T, raw any, fixtureRoot st
 		report.ResolvedOptions.DestinationRoot = filepath.Join(fixtureRoot, report.ResolvedOptions.DestinationRoot)
 	}
 	return report
+}
+
+func decodeSessionInspectionReportFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionInspectionReport {
+	t.Helper()
+	section := resolveSessionInspectionExpectedFixturePaths(raw, fixtureRoot)
+	bytes, err := json.Marshal(section)
+	if err != nil {
+		t.Fatalf("marshal session inspection fixture: %v", err)
+	}
+	var report asttemplate.SessionInspectionReport
+	if err := json.Unmarshal(bytes, &report); err != nil {
+		t.Fatalf("unmarshal session inspection fixture: %v", err)
+	}
+	return report
+}
+
+func decodeSessionInspectionEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionInspectionEnvelope {
+	t.Helper()
+	section := raw.(map[string]any)
+	return asttemplate.SessionInspectionEnvelope{
+		Kind:       stringOrZero(section["kind"]),
+		Version:    int(section["version"].(float64)),
+		Inspection: decodeSessionInspectionReportFromFixture(t, section["inspection"], fixtureRoot),
+	}
 }
 
 func decodeSessionRequestEnvelopeFromFixture(t *testing.T, raw any, fixtureRoot string) asttemplate.SessionRequestEnvelope {
