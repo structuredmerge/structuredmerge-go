@@ -275,6 +275,19 @@ type StructuredEditExecutionReport struct {
 	Metadata        map[string]any            `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionRequest struct {
+	Request         StructuredEditRequest `json:"request"`
+	ProviderFamily  string                `json:"provider_family"`
+	ProviderBackend *string               `json:"provider_backend,omitempty"`
+	Metadata        map[string]any        `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderExecutionRequestEnvelope struct {
+	Kind             string                                 `json:"kind"`
+	Version          int                                    `json:"version"`
+	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
+}
+
 type StructuredEditExecutionReportEnvelope struct {
 	Kind    string                        `json:"kind"`
 	Version int                           `json:"version"`
@@ -284,6 +297,17 @@ type StructuredEditExecutionReportEnvelope struct {
 type StructuredEditBatchRequest struct {
 	Requests []StructuredEditRequest `json:"requests"`
 	Metadata map[string]any          `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderBatchExecutionRequest struct {
+	Requests []StructuredEditProviderExecutionRequest `json:"requests"`
+	Metadata map[string]any                           `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderBatchExecutionRequestEnvelope struct {
+	Kind                  string                                      `json:"kind"`
+	Version               int                                         `json:"version"`
+	BatchExecutionRequest StructuredEditProviderBatchExecutionRequest `json:"batch_execution_request"`
 }
 
 type StructuredEditBatchReport struct {
@@ -2709,6 +2733,37 @@ func ImportStructuredEditApplicationEnvelope(
 	return &application, nil
 }
 
+func StructuredEditProviderExecutionRequestEnvelopeFor(
+	executionRequest StructuredEditProviderExecutionRequest,
+) StructuredEditProviderExecutionRequestEnvelope {
+	return StructuredEditProviderExecutionRequestEnvelope{
+		Kind:             "structured_edit_provider_execution_request",
+		Version:          StructuredEditTransportVersion,
+		ExecutionRequest: executionRequest,
+	}
+}
+
+func ImportStructuredEditProviderExecutionRequestEnvelope(
+	envelope StructuredEditProviderExecutionRequestEnvelope,
+) (*StructuredEditProviderExecutionRequest, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_request" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_request envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_request envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executionRequest := envelope.ExecutionRequest
+	return &executionRequest, nil
+}
+
 func StructuredEditExecutionReportEnvelopeFor(
 	report StructuredEditExecutionReport,
 ) StructuredEditExecutionReportEnvelope {
@@ -2738,6 +2793,37 @@ func ImportStructuredEditExecutionReportEnvelope(
 
 	report := envelope.Report
 	return &report, nil
+}
+
+func StructuredEditProviderBatchExecutionRequestEnvelopeFor(
+	batchExecutionRequest StructuredEditProviderBatchExecutionRequest,
+) StructuredEditProviderBatchExecutionRequestEnvelope {
+	return StructuredEditProviderBatchExecutionRequestEnvelope{
+		Kind:                  "structured_edit_provider_batch_execution_request",
+		Version:               StructuredEditTransportVersion,
+		BatchExecutionRequest: batchExecutionRequest,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionRequestEnvelope(
+	envelope StructuredEditProviderBatchExecutionRequestEnvelope,
+) (*StructuredEditProviderBatchExecutionRequest, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_request" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_request envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_request envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchExecutionRequest := envelope.BatchExecutionRequest
+	return &batchExecutionRequest, nil
 }
 
 func StructuredEditBatchReportEnvelopeFor(
