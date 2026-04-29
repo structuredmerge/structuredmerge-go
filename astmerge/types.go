@@ -178,6 +178,21 @@ type StructuredEditSelectionProfile struct {
 	Metadata              map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditMatchProfile struct {
+	StartBoundary       string         `json:"start_boundary"`
+	StartBoundaryFamily string         `json:"start_boundary_family,omitempty"`
+	KnownStartBoundary  bool           `json:"known_start_boundary"`
+	EndBoundary         string         `json:"end_boundary"`
+	EndBoundaryFamily   string         `json:"end_boundary_family,omitempty"`
+	KnownEndBoundary    bool           `json:"known_end_boundary"`
+	PayloadKind         string         `json:"payload_kind"`
+	PayloadFamily       string         `json:"payload_family,omitempty"`
+	KnownPayloadKind    bool           `json:"known_payload_kind"`
+	CommentAnchored     bool           `json:"comment_anchored"`
+	TrailingGapExtended bool           `json:"trailing_gap_extended"`
+	Metadata            map[string]any `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
