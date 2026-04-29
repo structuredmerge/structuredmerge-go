@@ -281,6 +281,11 @@ type StructuredEditExecutionReportEnvelope struct {
 	Report  StructuredEditExecutionReport `json:"report"`
 }
 
+type StructuredEditBatchRequest struct {
+	Requests []StructuredEditRequest `json:"requests"`
+	Metadata map[string]any          `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
