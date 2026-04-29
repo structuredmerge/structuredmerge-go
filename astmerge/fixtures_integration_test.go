@@ -3538,6 +3538,33 @@ func TestSharedFixtureStructuredEditApplicationEnvelopeApplication(t *testing.T)
 	}
 }
 
+func TestSharedFixtureStructuredEditExecutionReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_execution_report"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var report StructuredEditExecutionReport
+		if raw, err := json.Marshal(testCase["report"]); err != nil {
+			t.Fatalf("marshal structured edit execution report: %v", err)
+		} else if err := json.Unmarshal(raw, &report); err != nil {
+			t.Fatalf("unmarshal structured edit execution report: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(report)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit execution report: %v", err)
+		}
+		var decoded StructuredEditExecutionReport
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit execution report: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, report) {
+			t.Fatalf("unexpected structured edit execution report roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureProjectedChildReviewCases(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "projected_child_review_cases"))
 	var cases []ProjectedChildReviewCase

@@ -267,6 +267,14 @@ type StructuredEditApplicationEnvelope struct {
 	Application StructuredEditApplication `json:"application"`
 }
 
+type StructuredEditExecutionReport struct {
+	Application     StructuredEditApplication `json:"application"`
+	ProviderFamily  string                    `json:"provider_family"`
+	ProviderBackend *string                   `json:"provider_backend,omitempty"`
+	Diagnostics     []Diagnostic              `json:"diagnostics"`
+	Metadata        map[string]any            `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
