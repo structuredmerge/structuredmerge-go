@@ -164,6 +164,20 @@ type StructuredEditStructureProfile struct {
 	Metadata                map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditSelectionProfile struct {
+	OwnerScope            string         `json:"owner_scope"`
+	OwnerSelector         string         `json:"owner_selector"`
+	OwnerSelectorFamily   string         `json:"owner_selector_family,omitempty"`
+	SelectorKind          string         `json:"selector_kind"`
+	SelectionIntent       string         `json:"selection_intent"`
+	SelectionIntentFamily string         `json:"selection_intent_family,omitempty"`
+	KnownSelectionIntent  bool           `json:"known_selection_intent"`
+	CommentRegion         *string        `json:"comment_region,omitempty"`
+	IncludeTrailingGap    bool           `json:"include_trailing_gap"`
+	CommentAnchored       bool           `json:"comment_anchored"`
+	Metadata              map[string]any `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
