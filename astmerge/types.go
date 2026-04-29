@@ -155,6 +155,15 @@ type FamilyFeatureProfile struct {
 	SupportedPolicies []PolicyReference `json:"supported_policies"`
 }
 
+type StructuredEditStructureProfile struct {
+	OwnerScope              string         `json:"owner_scope"`
+	OwnerSelector           string         `json:"owner_selector"`
+	OwnerSelectorFamily     string         `json:"owner_selector_family,omitempty"`
+	KnownOwnerSelector      bool           `json:"known_owner_selector"`
+	SupportedCommentRegions []string       `json:"supported_comment_regions"`
+	Metadata                map[string]any `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
