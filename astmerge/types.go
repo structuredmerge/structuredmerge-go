@@ -286,6 +286,12 @@ type StructuredEditBatchRequest struct {
 	Metadata map[string]any          `json:"metadata,omitempty"`
 }
 
+type StructuredEditBatchReport struct {
+	Reports     []StructuredEditExecutionReport `json:"reports"`
+	Diagnostics []Diagnostic                    `json:"diagnostics"`
+	Metadata    map[string]any                  `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
