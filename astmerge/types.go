@@ -249,6 +249,24 @@ type StructuredEditApplication struct {
 	Metadata map[string]any        `json:"metadata,omitempty"`
 }
 
+type StructuredEditTransportImportErrorCategory string
+
+const (
+	StructuredEditTransportKindMismatch       StructuredEditTransportImportErrorCategory = "kind_mismatch"
+	StructuredEditTransportUnsupportedVersion StructuredEditTransportImportErrorCategory = "unsupported_version"
+)
+
+type StructuredEditTransportImportError struct {
+	Category StructuredEditTransportImportErrorCategory `json:"category"`
+	Message  string                                     `json:"message"`
+}
+
+type StructuredEditApplicationEnvelope struct {
+	Kind        string                    `json:"kind"`
+	Version     int                       `json:"version"`
+	Application StructuredEditApplication `json:"application"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
@@ -715,6 +733,7 @@ type ReviewReplayBundle struct {
 }
 
 const ReviewTransportVersion = 1
+const StructuredEditTransportVersion = 1
 
 type ReviewTransportImportErrorCategory string
 
@@ -2626,6 +2645,37 @@ func ImportReviewedNestedExecutionEnvelope(
 
 	execution := envelope.Execution
 	return &execution, nil
+}
+
+func StructuredEditApplicationEnvelopeFor(
+	application StructuredEditApplication,
+) StructuredEditApplicationEnvelope {
+	return StructuredEditApplicationEnvelope{
+		Kind:        "structured_edit_application",
+		Version:     StructuredEditTransportVersion,
+		Application: application,
+	}
+}
+
+func ImportStructuredEditApplicationEnvelope(
+	envelope StructuredEditApplicationEnvelope,
+) (*StructuredEditApplication, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_application" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_application envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_application envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	application := envelope.Application
+	return &application, nil
 }
 
 func ResolveConformanceFamilyContext(

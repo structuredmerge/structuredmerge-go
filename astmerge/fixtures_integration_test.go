@@ -3483,6 +3483,61 @@ func TestSharedFixtureStructuredEditApplication(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditApplicationEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_application_envelope"))
+	application := decodeFixtureValue[StructuredEditApplication](t, fixture["structured_edit_application"])
+	expected := decodeFixtureValue[StructuredEditApplicationEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditApplicationEnvelopeFor(application); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit application envelope: %+v", envelope)
+	}
+
+	if imported, importErr := ImportStructuredEditApplicationEnvelope(expected); importErr != nil {
+		t.Fatalf("unexpected structured edit application envelope import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, application) {
+		t.Fatalf("unexpected structured edit application envelope import: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditApplicationEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_application_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeFixtureValue[StructuredEditApplicationEnvelope](t, testCase["envelope"])
+		expected := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditApplicationEnvelope(envelope); importErr == nil {
+			t.Fatalf("expected structured edit application envelope rejection, got application: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expected) {
+			t.Fatalf("unexpected structured edit application envelope rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditApplicationEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_application_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditApplicationEnvelope](t, fixture["structured_edit_application_envelope"])
+	expected := decodeFixtureValue[StructuredEditApplication](t, fixture["expected_application"])
+
+	if imported, importErr := ImportStructuredEditApplicationEnvelope(envelope); importErr != nil {
+		t.Fatalf("unexpected structured edit application envelope application import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected structured edit application envelope application: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditApplicationEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditApplicationEnvelope(rejectedEnvelope); importErr == nil {
+			t.Fatalf("expected structured edit application envelope application rejection, got application: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit application envelope application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureProjectedChildReviewCases(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "projected_child_review_cases"))
 	var cases []ProjectedChildReviewCase
