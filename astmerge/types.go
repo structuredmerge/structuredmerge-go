@@ -292,6 +292,12 @@ type StructuredEditBatchReport struct {
 	Metadata    map[string]any                  `json:"metadata,omitempty"`
 }
 
+type StructuredEditBatchReportEnvelope struct {
+	Kind        string                    `json:"kind"`
+	Version     int                       `json:"version"`
+	BatchReport StructuredEditBatchReport `json:"batch_report"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
@@ -2732,6 +2738,37 @@ func ImportStructuredEditExecutionReportEnvelope(
 
 	report := envelope.Report
 	return &report, nil
+}
+
+func StructuredEditBatchReportEnvelopeFor(
+	batchReport StructuredEditBatchReport,
+) StructuredEditBatchReportEnvelope {
+	return StructuredEditBatchReportEnvelope{
+		Kind:        "structured_edit_batch_report",
+		Version:     StructuredEditTransportVersion,
+		BatchReport: batchReport,
+	}
+}
+
+func ImportStructuredEditBatchReportEnvelope(
+	envelope StructuredEditBatchReportEnvelope,
+) (*StructuredEditBatchReport, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_batch_report" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_batch_report envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_batch_report envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchReport := envelope.BatchReport
+	return &batchReport, nil
 }
 
 func ResolveConformanceFamilyContext(
