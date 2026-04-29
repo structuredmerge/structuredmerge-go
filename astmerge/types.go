@@ -193,6 +193,18 @@ type StructuredEditMatchProfile struct {
 	Metadata            map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditOperationProfile struct {
+	OperationKind          string         `json:"operation_kind"`
+	OperationFamily        string         `json:"operation_family,omitempty"`
+	KnownOperationKind     bool           `json:"known_operation_kind"`
+	SourceRequirement      string         `json:"source_requirement"`
+	DestinationRequirement string         `json:"destination_requirement"`
+	ReplacementSource      string         `json:"replacement_source"`
+	CapturesSourceText     bool           `json:"captures_source_text"`
+	SupportsIfMissing      bool           `json:"supports_if_missing"`
+	Metadata               map[string]any `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
