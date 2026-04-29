@@ -275,6 +275,12 @@ type StructuredEditExecutionReport struct {
 	Metadata        map[string]any            `json:"metadata,omitempty"`
 }
 
+type StructuredEditExecutionReportEnvelope struct {
+	Kind    string                        `json:"kind"`
+	Version int                           `json:"version"`
+	Report  StructuredEditExecutionReport `json:"report"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
@@ -2684,6 +2690,37 @@ func ImportStructuredEditApplicationEnvelope(
 
 	application := envelope.Application
 	return &application, nil
+}
+
+func StructuredEditExecutionReportEnvelopeFor(
+	report StructuredEditExecutionReport,
+) StructuredEditExecutionReportEnvelope {
+	return StructuredEditExecutionReportEnvelope{
+		Kind:    "structured_edit_execution_report",
+		Version: StructuredEditTransportVersion,
+		Report:  report,
+	}
+}
+
+func ImportStructuredEditExecutionReportEnvelope(
+	envelope StructuredEditExecutionReportEnvelope,
+) (*StructuredEditExecutionReport, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_execution_report" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_execution_report envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_execution_report envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	report := envelope.Report
+	return &report, nil
 }
 
 func ResolveConformanceFamilyContext(
