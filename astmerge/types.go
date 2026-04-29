@@ -243,6 +243,12 @@ type StructuredEditResult struct {
 	Metadata           map[string]any                    `json:"metadata,omitempty"`
 }
 
+type StructuredEditApplication struct {
+	Request  StructuredEditRequest `json:"request"`
+	Result   StructuredEditResult  `json:"result"`
+	Metadata map[string]any        `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
