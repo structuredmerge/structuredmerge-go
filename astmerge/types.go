@@ -232,6 +232,17 @@ type StructuredEditRequest struct {
 	Metadata                  map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditResult struct {
+	OperationKind      string                            `json:"operation_kind"`
+	UpdatedContent     string                            `json:"updated_content"`
+	Changed            bool                              `json:"changed"`
+	CapturedText       *string                           `json:"captured_text,omitempty"`
+	MatchCount         *int                              `json:"match_count,omitempty"`
+	OperationProfile   StructuredEditOperationProfile    `json:"operation_profile"`
+	DestinationProfile *StructuredEditDestinationProfile `json:"destination_profile,omitempty"`
+	Metadata           map[string]any                    `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`

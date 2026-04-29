@@ -3429,6 +3429,33 @@ func TestSharedFixtureStructuredEditRequest(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditResult(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_result"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var result StructuredEditResult
+		if raw, err := json.Marshal(testCase["result"]); err != nil {
+			t.Fatalf("marshal structured edit result: %v", err)
+		} else if err := json.Unmarshal(raw, &result); err != nil {
+			t.Fatalf("unmarshal structured edit result: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(result)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit result: %v", err)
+		}
+		var decoded StructuredEditResult
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit result: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, result) {
+			t.Fatalf("unexpected structured edit result roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureProjectedChildReviewCases(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "projected_child_review_cases"))
 	var cases []ProjectedChildReviewCase
