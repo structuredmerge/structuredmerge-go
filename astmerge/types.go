@@ -205,6 +205,20 @@ type StructuredEditOperationProfile struct {
 	Metadata               map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditDestinationProfile struct {
+	ResolutionKind         string         `json:"resolution_kind"`
+	ResolutionSource       string         `json:"resolution_source"`
+	AnchorBoundary         string         `json:"anchor_boundary"`
+	ResolutionFamily       string         `json:"resolution_family"`
+	ResolutionSourceFamily string         `json:"resolution_source_family"`
+	AnchorBoundaryFamily   string         `json:"anchor_boundary_family"`
+	KnownResolutionKind    bool           `json:"known_resolution_kind"`
+	KnownResolutionSource  bool           `json:"known_resolution_source"`
+	KnownAnchorBoundary    bool           `json:"known_anchor_boundary"`
+	UsedIfMissing          bool           `json:"used_if_missing"`
+	Metadata               map[string]any `json:"metadata,omitempty"`
+}
+
 type TemplateTargetClassification struct {
 	DestinationPath string `json:"destination_path"`
 	FileType        string `json:"file_type"`
