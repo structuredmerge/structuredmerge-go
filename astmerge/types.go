@@ -308,6 +308,12 @@ type StructuredEditProviderExecutionDispatchEnvelope struct {
 	ProviderExecutionDispatch StructuredEditProviderExecutionDispatch `json:"provider_execution_dispatch"`
 }
 
+type StructuredEditProviderExecutionOutcome struct {
+	Dispatch    StructuredEditProviderExecutionDispatch    `json:"dispatch"`
+	Application StructuredEditProviderExecutionApplication `json:"application"`
+	Metadata    map[string]any                             `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
