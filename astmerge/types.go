@@ -302,6 +302,12 @@ type StructuredEditProviderExecutionDispatch struct {
 	Metadata                map[string]any                         `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionDispatchEnvelope struct {
+	Kind                      string                                  `json:"kind"`
+	Version                   int                                     `json:"version"`
+	ProviderExecutionDispatch StructuredEditProviderExecutionDispatch `json:"provider_execution_dispatch"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -2825,6 +2831,37 @@ func ImportStructuredEditProviderExecutionApplicationEnvelope(
 
 	application := envelope.ProviderExecutionApplication
 	return &application, nil
+}
+
+func StructuredEditProviderExecutionDispatchEnvelopeFor(
+	dispatch StructuredEditProviderExecutionDispatch,
+) StructuredEditProviderExecutionDispatchEnvelope {
+	return StructuredEditProviderExecutionDispatchEnvelope{
+		Kind:                      "structured_edit_provider_execution_dispatch",
+		Version:                   StructuredEditTransportVersion,
+		ProviderExecutionDispatch: dispatch,
+	}
+}
+
+func ImportStructuredEditProviderExecutionDispatchEnvelope(
+	envelope StructuredEditProviderExecutionDispatchEnvelope,
+) (*StructuredEditProviderExecutionDispatch, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_dispatch" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_dispatch envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_dispatch envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	dispatch := envelope.ProviderExecutionDispatch
+	return &dispatch, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(
