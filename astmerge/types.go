@@ -294,6 +294,14 @@ type StructuredEditProviderExecutionApplication struct {
 	Metadata         map[string]any                         `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionDispatch struct {
+	ExecutionRequest        StructuredEditProviderExecutionRequest `json:"execution_request"`
+	ResolvedProviderFamily  string                                 `json:"resolved_provider_family"`
+	ResolvedProviderBackend string                                 `json:"resolved_provider_backend"`
+	ExecutorLabel           *string                                `json:"executor_label,omitempty"`
+	Metadata                map[string]any                         `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
