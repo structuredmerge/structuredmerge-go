@@ -4439,6 +4439,61 @@ func TestSharedFixtureStructuredEditProviderExecutorSelectionPolicy(t *testing.T
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutorSelectionPolicyEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_selection_policy_envelope"))
+	selectionPolicy := decodeFixtureValue[StructuredEditProviderExecutorSelectionPolicy](t, fixture["structured_edit_provider_executor_selection_policy"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutorSelectionPolicyEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditProviderExecutorSelectionPolicyEnvelopeFor(selectionPolicy); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit provider executor selection policy envelope: %+v", envelope)
+	}
+
+	if imported, importErr := ImportStructuredEditProviderExecutorSelectionPolicyEnvelope(expected); importErr != nil {
+		t.Fatalf("unexpected structured edit provider executor selection policy envelope import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, selectionPolicy) {
+		t.Fatalf("unexpected structured edit provider executor selection policy envelope import: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutorSelectionPolicyEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_selection_policy_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeFixtureValue[StructuredEditProviderExecutorSelectionPolicyEnvelope](t, testCase["envelope"])
+		expected := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutorSelectionPolicyEnvelope(envelope); importErr == nil {
+			t.Fatalf("expected structured edit provider executor selection policy envelope rejection, got selection policy: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expected) {
+			t.Fatalf("unexpected structured edit provider executor selection policy envelope rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutorSelectionPolicyEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_selection_policy_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditProviderExecutorSelectionPolicyEnvelope](t, fixture["structured_edit_provider_executor_selection_policy_envelope"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutorSelectionPolicy](t, fixture["expected_selection_policy"])
+
+	if imported, importErr := ImportStructuredEditProviderExecutorSelectionPolicyEnvelope(envelope); importErr != nil {
+		t.Fatalf("unexpected structured edit provider executor selection policy envelope application import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected structured edit provider executor selection policy envelope application: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditProviderExecutorSelectionPolicyEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutorSelectionPolicyEnvelope(rejectedEnvelope); importErr == nil {
+			t.Fatalf("expected structured edit provider executor selection policy envelope application rejection, got selection policy: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider executor selection policy envelope application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionApplicationEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_application_envelope"))
 	application := decodeFixtureValue[StructuredEditProviderExecutionApplication](t, fixture["structured_edit_provider_execution_application"])

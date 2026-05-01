@@ -416,6 +416,12 @@ type StructuredEditProviderExecutorSelectionPolicy struct {
 	Metadata              map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutorSelectionPolicyEnvelope struct {
+	Kind            string                                        `json:"kind"`
+	Version         int                                           `json:"version"`
+	SelectionPolicy StructuredEditProviderExecutorSelectionPolicy `json:"selection_policy"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -3229,6 +3235,37 @@ func ImportStructuredEditProviderExecutorRegistryEnvelope(
 
 	executorRegistry := envelope.ExecutorRegistry
 	return &executorRegistry, nil
+}
+
+func StructuredEditProviderExecutorSelectionPolicyEnvelopeFor(
+	selectionPolicy StructuredEditProviderExecutorSelectionPolicy,
+) StructuredEditProviderExecutorSelectionPolicyEnvelope {
+	return StructuredEditProviderExecutorSelectionPolicyEnvelope{
+		Kind:            "structured_edit_provider_executor_selection_policy",
+		Version:         StructuredEditTransportVersion,
+		SelectionPolicy: selectionPolicy,
+	}
+}
+
+func ImportStructuredEditProviderExecutorSelectionPolicyEnvelope(
+	envelope StructuredEditProviderExecutorSelectionPolicyEnvelope,
+) (*StructuredEditProviderExecutorSelectionPolicy, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_executor_selection_policy" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_executor_selection_policy envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_executor_selection_policy envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	selectionPolicy := envelope.SelectionPolicy
+	return &selectionPolicy, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(
