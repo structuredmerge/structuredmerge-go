@@ -314,6 +314,12 @@ type StructuredEditProviderExecutionOutcome struct {
 	Metadata    map[string]any                             `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionOutcomeEnvelope struct {
+	Kind                     string                                 `json:"kind"`
+	Version                  int                                    `json:"version"`
+	ProviderExecutionOutcome StructuredEditProviderExecutionOutcome `json:"provider_execution_outcome"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -2879,6 +2885,37 @@ func ImportStructuredEditProviderExecutionDispatchEnvelope(
 
 	dispatch := envelope.ProviderExecutionDispatch
 	return &dispatch, nil
+}
+
+func StructuredEditProviderExecutionOutcomeEnvelopeFor(
+	outcome StructuredEditProviderExecutionOutcome,
+) StructuredEditProviderExecutionOutcomeEnvelope {
+	return StructuredEditProviderExecutionOutcomeEnvelope{
+		Kind:                     "structured_edit_provider_execution_outcome",
+		Version:                  StructuredEditTransportVersion,
+		ProviderExecutionOutcome: outcome,
+	}
+}
+
+func ImportStructuredEditProviderExecutionOutcomeEnvelope(
+	envelope StructuredEditProviderExecutionOutcomeEnvelope,
+) (*StructuredEditProviderExecutionOutcome, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_outcome" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_outcome envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_outcome envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	outcome := envelope.ProviderExecutionOutcome
+	return &outcome, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(

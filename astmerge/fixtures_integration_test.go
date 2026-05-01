@@ -3783,6 +3783,61 @@ func TestSharedFixtureStructuredEditProviderExecutionOutcome(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionOutcomeEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_outcome_envelope"))
+	outcome := decodeFixtureValue[StructuredEditProviderExecutionOutcome](t, fixture["structured_edit_provider_execution_outcome"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionOutcomeEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditProviderExecutionOutcomeEnvelopeFor(outcome); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit provider execution outcome envelope: %+v", envelope)
+	}
+
+	if imported, importErr := ImportStructuredEditProviderExecutionOutcomeEnvelope(expected); importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution outcome envelope import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, outcome) {
+		t.Fatalf("unexpected structured edit provider execution outcome envelope import: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionOutcomeEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_outcome_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeFixtureValue[StructuredEditProviderExecutionOutcomeEnvelope](t, testCase["envelope"])
+		expected := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutionOutcomeEnvelope(envelope); importErr == nil {
+			t.Fatalf("expected structured edit provider execution outcome envelope rejection, got outcome: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expected) {
+			t.Fatalf("unexpected structured edit provider execution outcome envelope rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionOutcomeEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_outcome_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditProviderExecutionOutcomeEnvelope](t, fixture["structured_edit_provider_execution_outcome_envelope"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionOutcome](t, fixture["expected_outcome"])
+
+	if imported, importErr := ImportStructuredEditProviderExecutionOutcomeEnvelope(envelope); importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution outcome envelope application import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected structured edit provider execution outcome envelope application: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditProviderExecutionOutcomeEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutionOutcomeEnvelope(rejectedEnvelope); importErr == nil {
+			t.Fatalf("expected structured edit provider execution outcome envelope application rejection, got outcome: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider execution outcome envelope application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionApplicationEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_application_envelope"))
 	application := decodeFixtureValue[StructuredEditProviderExecutionApplication](t, fixture["structured_edit_provider_execution_application"])
