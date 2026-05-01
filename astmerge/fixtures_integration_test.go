@@ -3838,6 +3838,88 @@ func TestSharedFixtureStructuredEditProviderExecutionOutcomeEnvelopeApplication(
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderBatchExecutionOutcome(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_batch_execution_outcome"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var batchOutcome StructuredEditProviderBatchExecutionOutcome
+		if raw, err := json.Marshal(testCase["batch_outcome"]); err != nil {
+			t.Fatalf("marshal structured edit provider batch execution outcome: %v", err)
+		} else if err := json.Unmarshal(raw, &batchOutcome); err != nil {
+			t.Fatalf("unmarshal structured edit provider batch execution outcome: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(batchOutcome)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit provider batch execution outcome: %v", err)
+		}
+		var decoded StructuredEditProviderBatchExecutionOutcome
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider batch execution outcome: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, batchOutcome) {
+			t.Fatalf("unexpected structured edit provider batch execution outcome roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderBatchExecutionOutcomeEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_batch_execution_outcome_envelope"))
+	batchOutcome := decodeFixtureValue[StructuredEditProviderBatchExecutionOutcome](t, fixture["structured_edit_provider_batch_execution_outcome"])
+	expected := decodeFixtureValue[StructuredEditProviderBatchExecutionOutcomeEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditProviderBatchExecutionOutcomeEnvelopeFor(batchOutcome); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit provider batch execution outcome envelope: %+v", envelope)
+	}
+
+	if imported, importErr := ImportStructuredEditProviderBatchExecutionOutcomeEnvelope(expected); importErr != nil {
+		t.Fatalf("unexpected structured edit provider batch execution outcome envelope import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, batchOutcome) {
+		t.Fatalf("unexpected structured edit provider batch execution outcome envelope import: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderBatchExecutionOutcomeEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_batch_execution_outcome_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeFixtureValue[StructuredEditProviderBatchExecutionOutcomeEnvelope](t, testCase["envelope"])
+		expected := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderBatchExecutionOutcomeEnvelope(envelope); importErr == nil {
+			t.Fatalf("expected structured edit provider batch execution outcome envelope rejection, got batch outcome: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expected) {
+			t.Fatalf("unexpected structured edit provider batch execution outcome envelope rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderBatchExecutionOutcomeEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_batch_execution_outcome_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditProviderBatchExecutionOutcomeEnvelope](t, fixture["structured_edit_provider_batch_execution_outcome_envelope"])
+	expected := decodeFixtureValue[StructuredEditProviderBatchExecutionOutcome](t, fixture["expected_batch_outcome"])
+
+	if imported, importErr := ImportStructuredEditProviderBatchExecutionOutcomeEnvelope(envelope); importErr != nil {
+		t.Fatalf("unexpected structured edit provider batch execution outcome envelope application import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected structured edit provider batch execution outcome envelope application: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditProviderBatchExecutionOutcomeEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderBatchExecutionOutcomeEnvelope(rejectedEnvelope); importErr == nil {
+			t.Fatalf("expected structured edit provider batch execution outcome envelope application rejection, got batch outcome: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider batch execution outcome envelope application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionApplicationEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_application_envelope"))
 	application := decodeFixtureValue[StructuredEditProviderExecutionApplication](t, fixture["structured_edit_provider_execution_application"])
