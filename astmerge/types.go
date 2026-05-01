@@ -407,6 +407,15 @@ type StructuredEditProviderExecutorRegistryEnvelope struct {
 	ExecutorRegistry StructuredEditProviderExecutorRegistry `json:"executor_registry"`
 }
 
+type StructuredEditProviderExecutorSelectionPolicy struct {
+	ProviderFamily        string         `json:"provider_family"`
+	ProviderBackend       *string        `json:"provider_backend,omitempty"`
+	ExecutorLabel         *string        `json:"executor_label,omitempty"`
+	SelectionMode         string         `json:"selection_mode"`
+	AllowRegistryFallback bool           `json:"allow_registry_fallback"`
+	Metadata              map[string]any `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
