@@ -355,6 +355,29 @@ type StructuredEditProviderBatchExecutionProvenanceEnvelope struct {
 	BatchProvenance StructuredEditProviderBatchExecutionProvenance `json:"batch_provenance"`
 }
 
+type StructuredEditProviderExecutionReplayBundle struct {
+	ExecutionRequest StructuredEditProviderExecutionRequest    `json:"execution_request"`
+	Provenance       StructuredEditProviderExecutionProvenance `json:"provenance"`
+	Metadata         map[string]any                            `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderExecutionReplayBundleEnvelope struct {
+	Kind         string                                      `json:"kind"`
+	Version      int                                         `json:"version"`
+	ReplayBundle StructuredEditProviderExecutionReplayBundle `json:"replay_bundle"`
+}
+
+type StructuredEditProviderBatchExecutionReplayBundle struct {
+	ReplayBundles []StructuredEditProviderExecutionReplayBundle `json:"replay_bundles"`
+	Metadata      map[string]any                                `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderBatchExecutionReplayBundleEnvelope struct {
+	Kind              string                                           `json:"kind"`
+	Version           int                                              `json:"version"`
+	BatchReplayBundle StructuredEditProviderBatchExecutionReplayBundle `json:"batch_replay_bundle"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -3044,6 +3067,68 @@ func ImportStructuredEditProviderBatchExecutionProvenanceEnvelope(
 
 	batchProvenance := envelope.BatchProvenance
 	return &batchProvenance, nil
+}
+
+func StructuredEditProviderExecutionReplayBundleEnvelopeFor(
+	replayBundle StructuredEditProviderExecutionReplayBundle,
+) StructuredEditProviderExecutionReplayBundleEnvelope {
+	return StructuredEditProviderExecutionReplayBundleEnvelope{
+		Kind:         "structured_edit_provider_execution_replay_bundle",
+		Version:      StructuredEditTransportVersion,
+		ReplayBundle: replayBundle,
+	}
+}
+
+func ImportStructuredEditProviderExecutionReplayBundleEnvelope(
+	envelope StructuredEditProviderExecutionReplayBundleEnvelope,
+) (*StructuredEditProviderExecutionReplayBundle, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_replay_bundle" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_replay_bundle envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_replay_bundle envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	replayBundle := envelope.ReplayBundle
+	return &replayBundle, nil
+}
+
+func StructuredEditProviderBatchExecutionReplayBundleEnvelopeFor(
+	batchReplayBundle StructuredEditProviderBatchExecutionReplayBundle,
+) StructuredEditProviderBatchExecutionReplayBundleEnvelope {
+	return StructuredEditProviderBatchExecutionReplayBundleEnvelope{
+		Kind:              "structured_edit_provider_batch_execution_replay_bundle",
+		Version:           StructuredEditTransportVersion,
+		BatchReplayBundle: batchReplayBundle,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionReplayBundleEnvelope(
+	envelope StructuredEditProviderBatchExecutionReplayBundleEnvelope,
+) (*StructuredEditProviderBatchExecutionReplayBundle, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_replay_bundle" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_replay_bundle envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_replay_bundle envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchReplayBundle := envelope.BatchReplayBundle
+	return &batchReplayBundle, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(
