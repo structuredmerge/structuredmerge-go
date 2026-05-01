@@ -378,6 +378,24 @@ type StructuredEditProviderBatchExecutionReplayBundleEnvelope struct {
 	BatchReplayBundle StructuredEditProviderBatchExecutionReplayBundle `json:"batch_replay_bundle"`
 }
 
+type StructuredEditProviderExecutorProfile struct {
+	ProviderFamily     string                           `json:"provider_family"`
+	ProviderBackend    string                           `json:"provider_backend"`
+	ExecutorLabel      string                           `json:"executor_label"`
+	StructureProfile   StructuredEditStructureProfile   `json:"structure_profile"`
+	SelectionProfile   StructuredEditSelectionProfile   `json:"selection_profile"`
+	MatchProfile       StructuredEditMatchProfile       `json:"match_profile"`
+	OperationProfiles  []StructuredEditOperationProfile `json:"operation_profiles"`
+	DestinationProfile StructuredEditDestinationProfile `json:"destination_profile"`
+	Metadata           map[string]any                   `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderExecutorProfileEnvelope struct {
+	Kind            string                                `json:"kind"`
+	Version         int                                   `json:"version"`
+	ExecutorProfile StructuredEditProviderExecutorProfile `json:"executor_profile"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -3129,6 +3147,37 @@ func ImportStructuredEditProviderBatchExecutionReplayBundleEnvelope(
 
 	batchReplayBundle := envelope.BatchReplayBundle
 	return &batchReplayBundle, nil
+}
+
+func StructuredEditProviderExecutorProfileEnvelopeFor(
+	executorProfile StructuredEditProviderExecutorProfile,
+) StructuredEditProviderExecutorProfileEnvelope {
+	return StructuredEditProviderExecutorProfileEnvelope{
+		Kind:            "structured_edit_provider_executor_profile",
+		Version:         StructuredEditTransportVersion,
+		ExecutorProfile: executorProfile,
+	}
+}
+
+func ImportStructuredEditProviderExecutorProfileEnvelope(
+	envelope StructuredEditProviderExecutorProfileEnvelope,
+) (*StructuredEditProviderExecutorProfile, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_executor_profile" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_executor_profile envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_executor_profile envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executorProfile := envelope.ExecutorProfile
+	return &executorProfile, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(
