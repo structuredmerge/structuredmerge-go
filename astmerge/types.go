@@ -331,6 +331,30 @@ type StructuredEditProviderBatchExecutionOutcomeEnvelope struct {
 	BatchOutcome StructuredEditProviderBatchExecutionOutcome `json:"batch_outcome"`
 }
 
+type StructuredEditProviderExecutionProvenance struct {
+	Dispatch    StructuredEditProviderExecutionDispatch `json:"dispatch"`
+	Outcome     StructuredEditProviderExecutionOutcome  `json:"outcome"`
+	Diagnostics []Diagnostic                            `json:"diagnostics"`
+	Metadata    map[string]any                          `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderExecutionProvenanceEnvelope struct {
+	Kind       string                                    `json:"kind"`
+	Version    int                                       `json:"version"`
+	Provenance StructuredEditProviderExecutionProvenance `json:"provenance"`
+}
+
+type StructuredEditProviderBatchExecutionProvenance struct {
+	Provenances []StructuredEditProviderExecutionProvenance `json:"provenances"`
+	Metadata    map[string]any                              `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderBatchExecutionProvenanceEnvelope struct {
+	Kind            string                                         `json:"kind"`
+	Version         int                                            `json:"version"`
+	BatchProvenance StructuredEditProviderBatchExecutionProvenance `json:"batch_provenance"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -2958,6 +2982,68 @@ func ImportStructuredEditProviderBatchExecutionOutcomeEnvelope(
 
 	batchOutcome := envelope.BatchOutcome
 	return &batchOutcome, nil
+}
+
+func StructuredEditProviderExecutionProvenanceEnvelopeFor(
+	provenance StructuredEditProviderExecutionProvenance,
+) StructuredEditProviderExecutionProvenanceEnvelope {
+	return StructuredEditProviderExecutionProvenanceEnvelope{
+		Kind:       "structured_edit_provider_execution_provenance",
+		Version:    StructuredEditTransportVersion,
+		Provenance: provenance,
+	}
+}
+
+func ImportStructuredEditProviderExecutionProvenanceEnvelope(
+	envelope StructuredEditProviderExecutionProvenanceEnvelope,
+) (*StructuredEditProviderExecutionProvenance, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_provenance" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_provenance envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_provenance envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	provenance := envelope.Provenance
+	return &provenance, nil
+}
+
+func StructuredEditProviderBatchExecutionProvenanceEnvelopeFor(
+	batchProvenance StructuredEditProviderBatchExecutionProvenance,
+) StructuredEditProviderBatchExecutionProvenanceEnvelope {
+	return StructuredEditProviderBatchExecutionProvenanceEnvelope{
+		Kind:            "structured_edit_provider_batch_execution_provenance",
+		Version:         StructuredEditTransportVersion,
+		BatchProvenance: batchProvenance,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionProvenanceEnvelope(
+	envelope StructuredEditProviderBatchExecutionProvenanceEnvelope,
+) (*StructuredEditProviderBatchExecutionProvenance, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_provenance" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_provenance envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_provenance envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchProvenance := envelope.BatchProvenance
+	return &batchProvenance, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(
