@@ -4330,6 +4330,88 @@ func TestSharedFixtureStructuredEditProviderExecutorProfileEnvelopeApplication(t
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutorRegistry(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_registry"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var executorRegistry StructuredEditProviderExecutorRegistry
+		if raw, err := json.Marshal(testCase["executor_registry"]); err != nil {
+			t.Fatalf("marshal structured edit provider executor registry: %v", err)
+		} else if err := json.Unmarshal(raw, &executorRegistry); err != nil {
+			t.Fatalf("unmarshal structured edit provider executor registry: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(executorRegistry)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit provider executor registry: %v", err)
+		}
+		var decoded StructuredEditProviderExecutorRegistry
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider executor registry: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, executorRegistry) {
+			t.Fatalf("unexpected structured edit provider executor registry roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutorRegistryEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_registry_envelope"))
+	executorRegistry := decodeFixtureValue[StructuredEditProviderExecutorRegistry](t, fixture["structured_edit_provider_executor_registry"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutorRegistryEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditProviderExecutorRegistryEnvelopeFor(executorRegistry); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit provider executor registry envelope: %+v", envelope)
+	}
+
+	if imported, importErr := ImportStructuredEditProviderExecutorRegistryEnvelope(expected); importErr != nil {
+		t.Fatalf("unexpected structured edit provider executor registry envelope import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, executorRegistry) {
+		t.Fatalf("unexpected structured edit provider executor registry envelope import: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutorRegistryEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_registry_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeFixtureValue[StructuredEditProviderExecutorRegistryEnvelope](t, testCase["envelope"])
+		expected := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutorRegistryEnvelope(envelope); importErr == nil {
+			t.Fatalf("expected structured edit provider executor registry envelope rejection, got executor registry: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expected) {
+			t.Fatalf("unexpected structured edit provider executor registry envelope rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutorRegistryEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_registry_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditProviderExecutorRegistryEnvelope](t, fixture["structured_edit_provider_executor_registry_envelope"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutorRegistry](t, fixture["expected_executor_registry"])
+
+	if imported, importErr := ImportStructuredEditProviderExecutorRegistryEnvelope(envelope); importErr != nil {
+		t.Fatalf("unexpected structured edit provider executor registry envelope application import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected structured edit provider executor registry envelope application: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditProviderExecutorRegistryEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutorRegistryEnvelope(rejectedEnvelope); importErr == nil {
+			t.Fatalf("expected structured edit provider executor registry envelope application rejection, got executor registry: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider executor registry envelope application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionApplicationEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_application_envelope"))
 	application := decodeFixtureValue[StructuredEditProviderExecutionApplication](t, fixture["structured_edit_provider_execution_application"])

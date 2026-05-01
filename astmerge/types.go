@@ -396,6 +396,17 @@ type StructuredEditProviderExecutorProfileEnvelope struct {
 	ExecutorProfile StructuredEditProviderExecutorProfile `json:"executor_profile"`
 }
 
+type StructuredEditProviderExecutorRegistry struct {
+	ExecutorProfiles []StructuredEditProviderExecutorProfile `json:"executor_profiles"`
+	Metadata         map[string]any                          `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderExecutorRegistryEnvelope struct {
+	Kind             string                                 `json:"kind"`
+	Version          int                                    `json:"version"`
+	ExecutorRegistry StructuredEditProviderExecutorRegistry `json:"executor_registry"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -3178,6 +3189,37 @@ func ImportStructuredEditProviderExecutorProfileEnvelope(
 
 	executorProfile := envelope.ExecutorProfile
 	return &executorProfile, nil
+}
+
+func StructuredEditProviderExecutorRegistryEnvelopeFor(
+	executorRegistry StructuredEditProviderExecutorRegistry,
+) StructuredEditProviderExecutorRegistryEnvelope {
+	return StructuredEditProviderExecutorRegistryEnvelope{
+		Kind:             "structured_edit_provider_executor_registry",
+		Version:          StructuredEditTransportVersion,
+		ExecutorRegistry: executorRegistry,
+	}
+}
+
+func ImportStructuredEditProviderExecutorRegistryEnvelope(
+	envelope StructuredEditProviderExecutorRegistryEnvelope,
+) (*StructuredEditProviderExecutorRegistry, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_executor_registry" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_executor_registry envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_executor_registry envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executorRegistry := envelope.ExecutorRegistry
+	return &executorRegistry, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(
