@@ -334,6 +334,12 @@ type StructuredEditProviderBatchExecutionInvocationEnvelope struct {
 	BatchExecutionInvocation StructuredEditProviderBatchExecutionInvocation `json:"batch_execution_invocation"`
 }
 
+type StructuredEditProviderExecutionRunResult struct {
+	ExecutionInvocation StructuredEditProviderExecutionInvocation `json:"execution_invocation"`
+	Outcome             StructuredEditProviderExecutionOutcome    `json:"outcome"`
+	Metadata            map[string]any                            `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
