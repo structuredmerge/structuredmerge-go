@@ -5136,6 +5136,33 @@ func TestSharedFixtureStructuredEditProviderBatchExecutionReceiptEnvelopeApplica
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayRequest(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_request"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var receiptReplayRequest StructuredEditProviderExecutionReceiptReplayRequest
+		if raw, err := json.Marshal(testCase["receipt_replay_request"]); err != nil {
+			t.Fatalf("marshal structured edit provider execution receipt replay request: %v", err)
+		} else if err := json.Unmarshal(raw, &receiptReplayRequest); err != nil {
+			t.Fatalf("unmarshal structured edit provider execution receipt replay request: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(receiptReplayRequest)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit provider execution receipt replay request: %v", err)
+		}
+		var decoded StructuredEditProviderExecutionReceiptReplayRequest
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider execution receipt replay request: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, receiptReplayRequest) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay request roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderBatchExecutionHandoff(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_batch_execution_handoff"))
 	for _, rawCase := range fixture["cases"].([]any) {
