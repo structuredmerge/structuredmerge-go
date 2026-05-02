@@ -306,6 +306,12 @@ type StructuredEditProviderExecutionHandoff struct {
 	Metadata          map[string]any                          `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionHandoffEnvelope struct {
+	Kind             string                                 `json:"kind"`
+	Version          int                                    `json:"version"`
+	ExecutionHandoff StructuredEditProviderExecutionHandoff `json:"execution_handoff"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
@@ -2998,6 +3004,37 @@ func ImportStructuredEditProviderExecutionPlanEnvelope(
 
 	executionPlan := envelope.ExecutionPlan
 	return &executionPlan, nil
+}
+
+func StructuredEditProviderExecutionHandoffEnvelopeFor(
+	executionHandoff StructuredEditProviderExecutionHandoff,
+) StructuredEditProviderExecutionHandoffEnvelope {
+	return StructuredEditProviderExecutionHandoffEnvelope{
+		Kind:             "structured_edit_provider_execution_handoff",
+		Version:          StructuredEditTransportVersion,
+		ExecutionHandoff: executionHandoff,
+	}
+}
+
+func ImportStructuredEditProviderExecutionHandoffEnvelope(
+	envelope StructuredEditProviderExecutionHandoffEnvelope,
+) (*StructuredEditProviderExecutionHandoff, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_handoff" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_handoff envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_handoff envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executionHandoff := envelope.ExecutionHandoff
+	return &executionHandoff, nil
 }
 
 func StructuredEditProviderBatchExecutionPlanEnvelopeFor(
