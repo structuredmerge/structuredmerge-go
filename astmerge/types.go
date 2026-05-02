@@ -317,6 +317,12 @@ type StructuredEditProviderExecutionInvocation struct {
 	Metadata         map[string]any                         `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionInvocationEnvelope struct {
+	Kind                string                                    `json:"kind"`
+	Version             int                                       `json:"version"`
+	ExecutionInvocation StructuredEditProviderExecutionInvocation `json:"execution_invocation"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
@@ -3051,6 +3057,37 @@ func ImportStructuredEditProviderExecutionHandoffEnvelope(
 
 	executionHandoff := envelope.ExecutionHandoff
 	return &executionHandoff, nil
+}
+
+func StructuredEditProviderExecutionInvocationEnvelopeFor(
+	executionInvocation StructuredEditProviderExecutionInvocation,
+) StructuredEditProviderExecutionInvocationEnvelope {
+	return StructuredEditProviderExecutionInvocationEnvelope{
+		Kind:                "structured_edit_provider_execution_invocation",
+		Version:             StructuredEditTransportVersion,
+		ExecutionInvocation: executionInvocation,
+	}
+}
+
+func ImportStructuredEditProviderExecutionInvocationEnvelope(
+	envelope StructuredEditProviderExecutionInvocationEnvelope,
+) (*StructuredEditProviderExecutionInvocation, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_invocation" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_invocation envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_invocation envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executionInvocation := envelope.ExecutionInvocation
+	return &executionInvocation, nil
 }
 
 func StructuredEditProviderBatchExecutionHandoffEnvelopeFor(

@@ -4712,6 +4712,61 @@ func TestSharedFixtureStructuredEditProviderExecutionInvocation(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionInvocationEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_invocation_envelope"))
+	executionInvocation := decodeFixtureValue[StructuredEditProviderExecutionInvocation](t, fixture["structured_edit_provider_execution_invocation"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionInvocationEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditProviderExecutionInvocationEnvelopeFor(executionInvocation); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit provider execution invocation envelope: %+v", envelope)
+	}
+
+	if imported, importErr := ImportStructuredEditProviderExecutionInvocationEnvelope(expected); importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution invocation envelope import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, executionInvocation) {
+		t.Fatalf("unexpected structured edit provider execution invocation envelope import: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionInvocationEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_invocation_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeFixtureValue[StructuredEditProviderExecutionInvocationEnvelope](t, testCase["envelope"])
+		expected := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutionInvocationEnvelope(envelope); importErr == nil {
+			t.Fatalf("expected structured edit provider execution invocation envelope rejection, got execution invocation: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expected) {
+			t.Fatalf("unexpected structured edit provider execution invocation envelope rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionInvocationEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_invocation_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditProviderExecutionInvocationEnvelope](t, fixture["structured_edit_provider_execution_invocation_envelope"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionInvocation](t, fixture["expected_execution_invocation"])
+
+	if imported, importErr := ImportStructuredEditProviderExecutionInvocationEnvelope(envelope); importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution invocation envelope application import error: %+v", importErr)
+	} else if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected structured edit provider execution invocation envelope application: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditProviderExecutionInvocationEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		if imported, importErr := ImportStructuredEditProviderExecutionInvocationEnvelope(rejectedEnvelope); importErr == nil {
+			t.Fatalf("expected structured edit provider execution invocation envelope application rejection, got execution invocation: %+v", imported)
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider execution invocation envelope application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderBatchExecutionHandoff(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_batch_execution_handoff"))
 	for _, rawCase := range fixture["cases"].([]any) {
