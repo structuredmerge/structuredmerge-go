@@ -312,6 +312,11 @@ type StructuredEditProviderExecutionHandoffEnvelope struct {
 	ExecutionHandoff StructuredEditProviderExecutionHandoff `json:"execution_handoff"`
 }
 
+type StructuredEditProviderExecutionInvocation struct {
+	ExecutionHandoff StructuredEditProviderExecutionHandoff `json:"execution_handoff"`
+	Metadata         map[string]any                         `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`

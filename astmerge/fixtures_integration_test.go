@@ -4685,6 +4685,33 @@ func TestSharedFixtureStructuredEditProviderExecutionHandoffEnvelopeApplication(
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionInvocation(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_invocation"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var executionInvocation StructuredEditProviderExecutionInvocation
+		if raw, err := json.Marshal(testCase["execution_invocation"]); err != nil {
+			t.Fatalf("marshal structured edit provider execution invocation: %v", err)
+		} else if err := json.Unmarshal(raw, &executionInvocation); err != nil {
+			t.Fatalf("unmarshal structured edit provider execution invocation: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(executionInvocation)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit provider execution invocation: %v", err)
+		}
+		var decoded StructuredEditProviderExecutionInvocation
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider execution invocation: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, executionInvocation) {
+			t.Fatalf("unexpected structured edit provider execution invocation roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderBatchExecutionHandoff(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_batch_execution_handoff"))
 	for _, rawCase := range fixture["cases"].([]any) {
