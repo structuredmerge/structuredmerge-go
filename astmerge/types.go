@@ -487,6 +487,17 @@ type StructuredEditProviderBatchExecutionRequestEnvelope struct {
 	BatchExecutionRequest StructuredEditProviderBatchExecutionRequest `json:"batch_execution_request"`
 }
 
+type StructuredEditProviderBatchExecutionHandoff struct {
+	Handoffs []StructuredEditProviderExecutionHandoff `json:"handoffs"`
+	Metadata map[string]any                           `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderBatchExecutionHandoffEnvelope struct {
+	Kind                  string                                      `json:"kind"`
+	Version               int                                         `json:"version"`
+	BatchExecutionHandoff StructuredEditProviderBatchExecutionHandoff `json:"batch_execution_handoff"`
+}
+
 type StructuredEditProviderBatchExecutionPlan struct {
 	Plans    []StructuredEditProviderExecutionPlan `json:"plans"`
 	Metadata map[string]any                        `json:"metadata,omitempty"`
@@ -3035,6 +3046,37 @@ func ImportStructuredEditProviderExecutionHandoffEnvelope(
 
 	executionHandoff := envelope.ExecutionHandoff
 	return &executionHandoff, nil
+}
+
+func StructuredEditProviderBatchExecutionHandoffEnvelopeFor(
+	batchExecutionHandoff StructuredEditProviderBatchExecutionHandoff,
+) StructuredEditProviderBatchExecutionHandoffEnvelope {
+	return StructuredEditProviderBatchExecutionHandoffEnvelope{
+		Kind:                  "structured_edit_provider_batch_execution_handoff",
+		Version:               StructuredEditTransportVersion,
+		BatchExecutionHandoff: batchExecutionHandoff,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionHandoffEnvelope(
+	envelope StructuredEditProviderBatchExecutionHandoffEnvelope,
+) (*StructuredEditProviderBatchExecutionHandoff, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_handoff" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_handoff envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_handoff envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchExecutionHandoff := envelope.BatchExecutionHandoff
+	return &batchExecutionHandoff, nil
 }
 
 func StructuredEditProviderBatchExecutionPlanEnvelopeFor(
