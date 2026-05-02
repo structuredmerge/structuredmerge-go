@@ -429,6 +429,12 @@ type StructuredEditProviderExecutorResolution struct {
 	Metadata                map[string]any                                `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutorResolutionEnvelope struct {
+	Kind               string                                   `json:"kind"`
+	Version            int                                      `json:"version"`
+	ExecutorResolution StructuredEditProviderExecutorResolution `json:"executor_resolution"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`
@@ -3273,6 +3279,37 @@ func ImportStructuredEditProviderExecutorSelectionPolicyEnvelope(
 
 	selectionPolicy := envelope.SelectionPolicy
 	return &selectionPolicy, nil
+}
+
+func StructuredEditProviderExecutorResolutionEnvelopeFor(
+	executorResolution StructuredEditProviderExecutorResolution,
+) StructuredEditProviderExecutorResolutionEnvelope {
+	return StructuredEditProviderExecutorResolutionEnvelope{
+		Kind:               "structured_edit_provider_executor_resolution",
+		Version:            StructuredEditTransportVersion,
+		ExecutorResolution: executorResolution,
+	}
+}
+
+func ImportStructuredEditProviderExecutorResolutionEnvelope(
+	envelope StructuredEditProviderExecutorResolutionEnvelope,
+) (*StructuredEditProviderExecutorResolution, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_executor_resolution" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_executor_resolution envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_executor_resolution envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executorResolution := envelope.ExecutorResolution
+	return &executorResolution, nil
 }
 
 func StructuredEditExecutionReportEnvelopeFor(
