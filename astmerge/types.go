@@ -300,6 +300,12 @@ type StructuredEditProviderExecutionPlanEnvelope struct {
 	ExecutionPlan StructuredEditProviderExecutionPlan `json:"execution_plan"`
 }
 
+type StructuredEditProviderExecutionHandoff struct {
+	ExecutionPlan     StructuredEditProviderExecutionPlan     `json:"execution_plan"`
+	ExecutionDispatch StructuredEditProviderExecutionDispatch `json:"execution_dispatch"`
+	Metadata          map[string]any                          `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
