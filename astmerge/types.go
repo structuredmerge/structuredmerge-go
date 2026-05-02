@@ -340,6 +340,17 @@ type StructuredEditProviderExecutionRunResult struct {
 	Metadata            map[string]any                            `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionRunResultEnvelope struct {
+	Kind               string                                   `json:"kind"`
+	Version            int                                      `json:"version"`
+	ExecutionRunResult StructuredEditProviderExecutionRunResult `json:"execution_run_result"`
+}
+
+type StructuredEditProviderBatchExecutionRunResult struct {
+	RunResults []StructuredEditProviderExecutionRunResult `json:"run_results"`
+	Metadata   map[string]any                             `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
@@ -3291,6 +3302,37 @@ func ImportStructuredEditProviderExecutionOutcomeEnvelope(
 
 	outcome := envelope.ProviderExecutionOutcome
 	return &outcome, nil
+}
+
+func StructuredEditProviderExecutionRunResultEnvelopeFor(
+	executionRunResult StructuredEditProviderExecutionRunResult,
+) StructuredEditProviderExecutionRunResultEnvelope {
+	return StructuredEditProviderExecutionRunResultEnvelope{
+		Kind:               "structured_edit_provider_execution_run_result",
+		Version:            StructuredEditTransportVersion,
+		ExecutionRunResult: executionRunResult,
+	}
+}
+
+func ImportStructuredEditProviderExecutionRunResultEnvelope(
+	envelope StructuredEditProviderExecutionRunResultEnvelope,
+) (*StructuredEditProviderExecutionRunResult, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_run_result" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_run_result envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_run_result envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executionRunResult := envelope.ExecutionRunResult
+	return &executionRunResult, nil
 }
 
 func StructuredEditProviderBatchExecutionOutcomeEnvelopeFor(
