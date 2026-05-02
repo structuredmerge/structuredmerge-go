@@ -364,6 +364,12 @@ type StructuredEditProviderExecutionReceipt struct {
 	Metadata     map[string]any                               `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionReceiptEnvelope struct {
+	Kind             string                                 `json:"kind"`
+	Version          int                                    `json:"version"`
+	ExecutionReceipt StructuredEditProviderExecutionReceipt `json:"execution_receipt"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
@@ -3377,6 +3383,37 @@ func ImportStructuredEditProviderBatchExecutionRunResultEnvelope(
 
 	batchExecutionRunResult := envelope.BatchExecutionRunResult
 	return &batchExecutionRunResult, nil
+}
+
+func StructuredEditProviderExecutionReceiptEnvelopeFor(
+	executionReceipt StructuredEditProviderExecutionReceipt,
+) StructuredEditProviderExecutionReceiptEnvelope {
+	return StructuredEditProviderExecutionReceiptEnvelope{
+		Kind:             "structured_edit_provider_execution_receipt",
+		Version:          StructuredEditTransportVersion,
+		ExecutionReceipt: executionReceipt,
+	}
+}
+
+func ImportStructuredEditProviderExecutionReceiptEnvelope(
+	envelope StructuredEditProviderExecutionReceiptEnvelope,
+) (*StructuredEditProviderExecutionReceipt, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_receipt" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_receipt envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_receipt envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executionReceipt := envelope.ExecutionReceipt
+	return &executionReceipt, nil
 }
 
 func StructuredEditProviderBatchExecutionOutcomeEnvelopeFor(
