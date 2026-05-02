@@ -357,6 +357,13 @@ type StructuredEditProviderBatchExecutionRunResultEnvelope struct {
 	BatchExecutionRunResult StructuredEditProviderBatchExecutionRunResult `json:"batch_execution_run_result"`
 }
 
+type StructuredEditProviderExecutionReceipt struct {
+	RunResult    StructuredEditProviderExecutionRunResult     `json:"run_result"`
+	Provenance   *StructuredEditProviderExecutionProvenance   `json:"provenance,omitempty"`
+	ReplayBundle *StructuredEditProviderExecutionReplayBundle `json:"replay_bundle,omitempty"`
+	Metadata     map[string]any                               `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
