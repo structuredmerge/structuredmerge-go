@@ -288,6 +288,18 @@ type StructuredEditProviderExecutionRequestEnvelope struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 }
 
+type StructuredEditProviderExecutionPlan struct {
+	ExecutionRequest   StructuredEditProviderExecutionRequest   `json:"execution_request"`
+	ExecutorResolution StructuredEditProviderExecutorResolution `json:"executor_resolution"`
+	Metadata           map[string]any                           `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderExecutionPlanEnvelope struct {
+	Kind          string                              `json:"kind"`
+	Version       int                                 `json:"version"`
+	ExecutionPlan StructuredEditProviderExecutionPlan `json:"execution_plan"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
@@ -2938,6 +2950,37 @@ func ImportStructuredEditProviderExecutionRequestEnvelope(
 
 	executionRequest := envelope.ExecutionRequest
 	return &executionRequest, nil
+}
+
+func StructuredEditProviderExecutionPlanEnvelopeFor(
+	executionPlan StructuredEditProviderExecutionPlan,
+) StructuredEditProviderExecutionPlanEnvelope {
+	return StructuredEditProviderExecutionPlanEnvelope{
+		Kind:          "structured_edit_provider_execution_plan",
+		Version:       StructuredEditTransportVersion,
+		ExecutionPlan: executionPlan,
+	}
+}
+
+func ImportStructuredEditProviderExecutionPlanEnvelope(
+	envelope StructuredEditProviderExecutionPlanEnvelope,
+) (*StructuredEditProviderExecutionPlan, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_plan" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_plan envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_plan envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	executionPlan := envelope.ExecutionPlan
+	return &executionPlan, nil
 }
 
 func StructuredEditProviderExecutionApplicationEnvelopeFor(
