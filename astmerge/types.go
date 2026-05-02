@@ -422,6 +422,13 @@ type StructuredEditProviderExecutorSelectionPolicyEnvelope struct {
 	SelectionPolicy StructuredEditProviderExecutorSelectionPolicy `json:"selection_policy"`
 }
 
+type StructuredEditProviderExecutorResolution struct {
+	ExecutorRegistry        StructuredEditProviderExecutorRegistry        `json:"executor_registry"`
+	SelectionPolicy         StructuredEditProviderExecutorSelectionPolicy `json:"selection_policy"`
+	SelectedExecutorProfile StructuredEditProviderExecutorProfile         `json:"selected_executor_profile"`
+	Metadata                map[string]any                                `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplicationEnvelope struct {
 	Kind                         string                                     `json:"kind"`
 	Version                      int                                        `json:"version"`

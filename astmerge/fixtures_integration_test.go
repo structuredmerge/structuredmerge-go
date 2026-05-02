@@ -4494,6 +4494,33 @@ func TestSharedFixtureStructuredEditProviderExecutorSelectionPolicyEnvelopeAppli
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutorResolution(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_resolution"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var executorResolution StructuredEditProviderExecutorResolution
+		if raw, err := json.Marshal(testCase["executor_resolution"]); err != nil {
+			t.Fatalf("marshal structured edit provider executor resolution: %v", err)
+		} else if err := json.Unmarshal(raw, &executorResolution); err != nil {
+			t.Fatalf("unmarshal structured edit provider executor resolution: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(executorResolution)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit provider executor resolution: %v", err)
+		}
+		var decoded StructuredEditProviderExecutorResolution
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider executor resolution: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, executorResolution) {
+			t.Fatalf("unexpected structured edit provider executor resolution roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionApplicationEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_application_envelope"))
 	application := decodeFixtureValue[StructuredEditProviderExecutionApplication](t, fixture["structured_edit_provider_execution_application"])
