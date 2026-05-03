@@ -494,6 +494,11 @@ type StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequest struct {
 	Metadata                    map[string]any                                             `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequest struct {
+	ReceiptReplayWorkflowReviewRequest StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequest `json:"receipt_replay_workflow_review_request"`
+	Metadata                           map[string]any                                                    `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequestEnvelope struct {
 	Kind                               string                                                            `json:"kind"`
 	Version                            int                                                               `json:"version"`

@@ -6109,6 +6109,33 @@ func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowReview
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequest(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_request"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var receiptReplayWorkflowApplyRequest StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequest
+		if raw, err := json.Marshal(testCase["receipt_replay_workflow_apply_request"]); err != nil {
+			t.Fatalf("marshal structured edit provider execution receipt replay workflow apply request: %v", err)
+		} else if err := json.Unmarshal(raw, &receiptReplayWorkflowApplyRequest); err != nil {
+			t.Fatalf("unmarshal structured edit provider execution receipt replay workflow apply request: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(receiptReplayWorkflowApplyRequest)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit provider execution receipt replay workflow apply request: %v", err)
+		}
+		var decoded StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequest
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider execution receipt replay workflow apply request: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, receiptReplayWorkflowApplyRequest) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply request roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowReviewRequestEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_review_request_envelope"))
 	receiptReplayWorkflowReviewRequest := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequest](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_review_request"])
