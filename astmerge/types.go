@@ -523,6 +523,12 @@ type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionOutcome st
 	Metadata                           map[string]any                                                    `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionSettlement struct {
+	ReceiptReplayWorkflowApplyDecisionOutcome StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionOutcome `json:"receipt_replay_workflow_apply_decision_outcome"`
+	Settlement                                string                                                                   `json:"settlement"`
+	Metadata                                  map[string]any                                                           `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope struct {
 	Kind                             string                                                          `json:"kind"`
 	Version                          int                                                             `json:"version"`
