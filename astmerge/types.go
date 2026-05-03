@@ -511,6 +511,12 @@ type StructuredEditProviderExecutionReceiptReplayWorkflowApplyResult struct {
 	Metadata                          map[string]any                                                   `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope struct {
+	Kind                             string                                                          `json:"kind"`
+	Version                          int                                                             `json:"version"`
+	ReceiptReplayWorkflowApplyResult StructuredEditProviderExecutionReceiptReplayWorkflowApplyResult `json:"receipt_replay_workflow_apply_result"`
+}
+
 type StructuredEditProviderExecutionReceiptReplayWorkflowApplySessionEnvelope struct {
 	Kind                              string                                                           `json:"kind"`
 	Version                           int                                                              `json:"version"`
@@ -4046,6 +4052,37 @@ func ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplySessionEnvel
 
 	receiptReplayWorkflowApplySession := envelope.ReceiptReplayWorkflowApplySession
 	return &receiptReplayWorkflowApplySession, nil
+}
+
+func StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelopeFor(
+	receiptReplayWorkflowApplyResult StructuredEditProviderExecutionReceiptReplayWorkflowApplyResult,
+) StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope {
+	return StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope{
+		Kind:                             "structured_edit_provider_execution_receipt_replay_workflow_apply_result",
+		Version:                          StructuredEditTransportVersion,
+		ReceiptReplayWorkflowApplyResult: receiptReplayWorkflowApplyResult,
+	}
+}
+
+func ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope(
+	envelope StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope,
+) (*StructuredEditProviderExecutionReceiptReplayWorkflowApplyResult, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_receipt_replay_workflow_apply_result" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_receipt_replay_workflow_apply_result envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_receipt_replay_workflow_apply_result envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	receiptReplayWorkflowApplyResult := envelope.ReceiptReplayWorkflowApplyResult
+	return &receiptReplayWorkflowApplyResult, nil
 }
 
 func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelopeFor(
