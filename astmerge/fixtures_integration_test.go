@@ -6166,6 +6166,36 @@ func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyS
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyResult(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_result"))
+
+	cases := fixture["cases"].([]any)
+	for _, rawEntry := range cases {
+		entry := rawEntry.(map[string]any)
+
+		var receiptReplayWorkflowApplyResult StructuredEditProviderExecutionReceiptReplayWorkflowApplyResult
+		if raw, err := json.Marshal(entry["receipt_replay_workflow_apply_result"]); err != nil {
+			t.Fatalf("marshal apply result: %v", err)
+		} else if err := json.Unmarshal(raw, &receiptReplayWorkflowApplyResult); err != nil {
+			t.Fatalf("unmarshal apply result: %v", err)
+		}
+
+		payload, err := json.Marshal(receiptReplayWorkflowApplyResult)
+		if err != nil {
+			t.Fatalf("marshal apply result payload: %v", err)
+		}
+
+		var decoded StructuredEditProviderExecutionReceiptReplayWorkflowApplyResult
+		if err := json.Unmarshal(payload, &decoded); err != nil {
+			t.Fatalf("decode apply result payload: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, receiptReplayWorkflowApplyResult) {
+			t.Fatalf("apply result mismatch: %+v", decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplySessionEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_session_envelope"))
 	receiptReplayWorkflowApplySession := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplySession](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_apply_session"])
