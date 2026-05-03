@@ -275,6 +275,29 @@ type StructuredEditExecutionReport struct {
 	Metadata        map[string]any            `json:"metadata,omitempty"`
 }
 
+type StructuredEditCrisprExampleParityBackendNote struct {
+	Backend  string         `json:"backend"`
+	Scope    string         `json:"scope"`
+	Notes    []string       `json:"notes"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type StructuredEditCrisprExampleParityScenario struct {
+	Scenario            string                                         `json:"scenario"`
+	Family              string                                         `json:"family"`
+	Reproduced          bool                                           `json:"reproduced"`
+	ReferenceBackend    *string                                        `json:"reference_backend,omitempty"`
+	ImplementationNotes []string                                       `json:"implementation_notes"`
+	BackendNotes        []StructuredEditCrisprExampleParityBackendNote `json:"backend_notes,omitempty"`
+	Metadata            map[string]any                                 `json:"metadata,omitempty"`
+}
+
+type StructuredEditCrisprExampleParityReport struct {
+	Scenarios     []StructuredEditCrisprExampleParityScenario `json:"scenarios"`
+	RemainingGaps []string                                    `json:"remaining_gaps,omitempty"`
+	Metadata      map[string]any                              `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionRequest struct {
 	Request         StructuredEditRequest `json:"request"`
 	ProviderFamily  string                `json:"provider_family"`
