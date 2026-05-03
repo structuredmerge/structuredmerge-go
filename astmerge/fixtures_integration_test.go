@@ -6136,6 +6136,74 @@ func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyR
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_request_envelope"))
+	receiptReplayWorkflowApplyRequest := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequest](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_apply_request"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelopeFor(receiptReplayWorkflowApplyRequest); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply request envelope: %+v", envelope)
+	}
+
+	imported, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope(expected)
+	if importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply request envelope import error: %+v", *importErr)
+	}
+	if !reflect.DeepEqual(*imported, receiptReplayWorkflowApplyRequest) {
+		t.Fatalf("unexpected imported structured edit provider execution receipt replay workflow apply request: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_request_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		envelope := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		imported, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("expected no structured edit provider execution receipt replay workflow apply request for rejection %s", testCase["label"])
+		}
+		if importErr == nil {
+			t.Fatalf("expected structured edit provider execution receipt replay workflow apply request import error for %s", testCase["label"])
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply request rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_request_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_apply_request_envelope"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequest](t, fixture["expected_receipt_replay_workflow_apply_request"])
+
+	imported, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope(envelope)
+	if importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply request envelope application error: %+v", *importErr)
+	}
+	if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected applied structured edit provider execution receipt replay workflow apply request: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		rejected, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyRequestEnvelope(rejectedEnvelope)
+		if rejected != nil {
+			t.Fatalf("expected no structured edit provider execution receipt replay workflow apply request for application rejection %s", testCase["label"])
+		}
+		if importErr == nil {
+			t.Fatalf("expected structured edit provider execution receipt replay workflow apply request application import error for %s", testCase["label"])
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply request application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowReviewRequestEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_review_request_envelope"))
 	receiptReplayWorkflowReviewRequest := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequest](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_review_request"])
