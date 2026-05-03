@@ -541,6 +541,12 @@ type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureRep
 	Metadata                                       map[string]any                                                                `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionAuditRecord struct {
+	ReceiptReplayWorkflowApplyDecisionClosureReport StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReport `json:"receipt_replay_workflow_apply_decision_closure_report"`
+	AuditRecord                                     string                                                                         `json:"audit_record"`
+	Metadata                                        map[string]any                                                                 `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope struct {
 	Kind                             string                                                          `json:"kind"`
 	Version                          int                                                             `json:"version"`
