@@ -556,6 +556,11 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResult struct
 	Metadata     map[string]any                                                    `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecision struct {
+	ApplyDecisions []StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecision `json:"apply_decisions"`
+	Metadata       map[string]any                                                      `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelope struct {
 	Kind                                   string                                                                `json:"kind"`
 	Version                                int                                                                   `json:"version"`
@@ -572,6 +577,12 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResultEnvelop
 	Kind                                  string                                                               `json:"kind"`
 	Version                               int                                                                  `json:"version"`
 	BatchReceiptReplayWorkflowApplyResult StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResult `json:"batch_receipt_replay_workflow_apply_result"`
+}
+
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelope struct {
+	Kind                                    string                                                                 `json:"kind"`
+	Version                                 int                                                                    `json:"version"`
+	BatchReceiptReplayWorkflowApplyDecision StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecision `json:"batch_receipt_replay_workflow_apply_decision"`
 }
 
 type StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequestEnvelope struct {
@@ -4137,6 +4148,37 @@ func ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionEnve
 
 	receiptReplayWorkflowApplyDecision := envelope.ReceiptReplayWorkflowApplyDecision
 	return &receiptReplayWorkflowApplyDecision, nil
+}
+
+func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelopeFor(
+	batchReceiptReplayWorkflowApplyDecision StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecision,
+) StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelope {
+	return StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelope{
+		Kind:                                    "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision",
+		Version:                                 StructuredEditTransportVersion,
+		BatchReceiptReplayWorkflowApplyDecision: batchReceiptReplayWorkflowApplyDecision,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelope(
+	envelope StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelope,
+) (*StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecision, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchReceiptReplayWorkflowApplyDecision := envelope.BatchReceiptReplayWorkflowApplyDecision
+	return &batchReceiptReplayWorkflowApplyDecision, nil
 }
 
 func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelopeFor(
