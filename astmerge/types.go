@@ -573,6 +573,11 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecision stru
 	Metadata       map[string]any                                                      `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcome struct {
+	ApplyDecisionOutcomes []StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionOutcome `json:"apply_decision_outcomes"`
+	Metadata              map[string]any                                                             `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelope struct {
 	Kind                                   string                                                                `json:"kind"`
 	Version                                int                                                                   `json:"version"`
@@ -595,6 +600,12 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvel
 	Kind                                    string                                                                 `json:"kind"`
 	Version                                 int                                                                    `json:"version"`
 	BatchReceiptReplayWorkflowApplyDecision StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecision `json:"batch_receipt_replay_workflow_apply_decision"`
+}
+
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcomeEnvelope struct {
+	Kind                                           string                                                                        `json:"kind"`
+	Version                                        int                                                                           `json:"version"`
+	BatchReceiptReplayWorkflowApplyDecisionOutcome StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcome `json:"batch_receipt_replay_workflow_apply_decision_outcome"`
 }
 
 type StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequestEnvelope struct {
@@ -4222,6 +4233,37 @@ func ImportStructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisio
 
 	batchReceiptReplayWorkflowApplyDecision := envelope.BatchReceiptReplayWorkflowApplyDecision
 	return &batchReceiptReplayWorkflowApplyDecision, nil
+}
+
+func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcomeEnvelopeFor(
+	batchReceiptReplayWorkflowApplyDecisionOutcome StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcome,
+) StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcomeEnvelope {
+	return StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcomeEnvelope{
+		Kind:    "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_outcome",
+		Version: StructuredEditTransportVersion,
+		BatchReceiptReplayWorkflowApplyDecisionOutcome: batchReceiptReplayWorkflowApplyDecisionOutcome,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcomeEnvelope(
+	envelope StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcomeEnvelope,
+) (*StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionOutcome, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_outcome" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_outcome envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_outcome envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchReceiptReplayWorkflowApplyDecisionOutcome := envelope.BatchReceiptReplayWorkflowApplyDecisionOutcome
+	return &batchReceiptReplayWorkflowApplyDecisionOutcome, nil
 }
 
 func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelopeFor(
