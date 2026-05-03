@@ -535,6 +535,12 @@ type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmati
 	Metadata                                     map[string]any                                                              `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReport struct {
+	ReceiptReplayWorkflowApplyDecisionConfirmation StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmation `json:"receipt_replay_workflow_apply_decision_confirmation"`
+	ClosureReport                                  string                                                                        `json:"closure_report"`
+	Metadata                                       map[string]any                                                                `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionReceiptReplayWorkflowApplyResultEnvelope struct {
 	Kind                             string                                                          `json:"kind"`
 	Version                          int                                                             `json:"version"`
@@ -557,6 +563,12 @@ type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmati
 	Kind                                           string                                                                        `json:"kind"`
 	Version                                        int                                                                           `json:"version"`
 	ReceiptReplayWorkflowApplyDecisionConfirmation StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmation `json:"receipt_replay_workflow_apply_decision_confirmation"`
+}
+
+type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope struct {
+	Kind                                            string                                                                         `json:"kind"`
+	Version                                         int                                                                            `json:"version"`
+	ReceiptReplayWorkflowApplyDecisionClosureReport StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReport `json:"receipt_replay_workflow_apply_decision_closure_report"`
 }
 
 type StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionSettlementEnvelope struct {
@@ -612,6 +624,11 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionConfi
 	Metadata                   map[string]any                                                                  `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReport struct {
+	ClosureReports []StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReport `json:"closure_reports"`
+	Metadata       map[string]any                                                                   `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelope struct {
 	Kind                                   string                                                                `json:"kind"`
 	Version                                int                                                                   `json:"version"`
@@ -640,6 +657,12 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionConfi
 	Kind                                                string                                                                             `json:"kind"`
 	Version                                             int                                                                                `json:"version"`
 	BatchReceiptReplayWorkflowApplyDecisionConfirmation StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionConfirmation `json:"batch_receipt_replay_workflow_apply_decision_confirmation"`
+}
+
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope struct {
+	Kind                                                 string                                                                              `json:"kind"`
+	Version                                              int                                                                                 `json:"version"`
+	BatchReceiptReplayWorkflowApplyDecisionClosureReport StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReport `json:"batch_receipt_replay_workflow_apply_decision_closure_report"`
 }
 
 type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelope struct {
@@ -4312,6 +4335,37 @@ func ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConf
 	return &receiptReplayWorkflowApplyDecisionConfirmation, nil
 }
 
+func StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelopeFor(
+	receiptReplayWorkflowApplyDecisionClosureReport StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReport,
+) StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope {
+	return StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope{
+		Kind:    "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_closure_report",
+		Version: StructuredEditTransportVersion,
+		ReceiptReplayWorkflowApplyDecisionClosureReport: receiptReplayWorkflowApplyDecisionClosureReport,
+	}
+}
+
+func ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope(
+	envelope StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope,
+) (*StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionClosureReport, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_closure_report" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_receipt_replay_workflow_apply_decision_closure_report envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_receipt_replay_workflow_apply_decision_closure_report envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	receiptReplayWorkflowApplyDecisionClosureReport := envelope.ReceiptReplayWorkflowApplyDecisionClosureReport
+	return &receiptReplayWorkflowApplyDecisionClosureReport, nil
+}
+
 func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelopeFor(
 	batchReceiptReplayWorkflowApplyDecision StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecision,
 ) StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionEnvelope {
@@ -4434,6 +4488,37 @@ func ImportStructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisio
 
 	batchReceiptReplayWorkflowApplyDecisionConfirmation := envelope.BatchReceiptReplayWorkflowApplyDecisionConfirmation
 	return &batchReceiptReplayWorkflowApplyDecisionConfirmation, nil
+}
+
+func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelopeFor(
+	batchReceiptReplayWorkflowApplyDecisionClosureReport StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReport,
+) StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope {
+	return StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope{
+		Kind:    "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_closure_report",
+		Version: StructuredEditTransportVersion,
+		BatchReceiptReplayWorkflowApplyDecisionClosureReport: batchReceiptReplayWorkflowApplyDecisionClosureReport,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope(
+	envelope StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReportEnvelope,
+) (*StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyDecisionClosureReport, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_closure_report" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_closure_report envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_receipt_replay_workflow_apply_decision_closure_report envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchReceiptReplayWorkflowApplyDecisionClosureReport := envelope.BatchReceiptReplayWorkflowApplyDecisionClosureReport
+	return &batchReceiptReplayWorkflowApplyDecisionClosureReport, nil
 }
 
 func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelopeFor(
