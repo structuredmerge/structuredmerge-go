@@ -472,6 +472,12 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowEnvelope struct {
 	BatchReceiptReplayWorkflow StructuredEditProviderBatchExecutionReceiptReplayWorkflow `json:"batch_receipt_replay_workflow"`
 }
 
+type StructuredEditProviderExecutionReceiptReplayWorkflowResult struct {
+	ReceiptReplayWorkflow    StructuredEditProviderExecutionReceiptReplayWorkflow    `json:"receipt_replay_workflow"`
+	ReceiptReplayApplication StructuredEditProviderExecutionReceiptReplayApplication `json:"receipt_replay_application"`
+	Metadata                 map[string]any                                          `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
