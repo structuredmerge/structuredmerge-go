@@ -8013,6 +8013,34 @@ func TestSharedFixtureStructuredEditProviderExecutionApplicationEnvelopeApplicat
 	}
 }
 
+func TestSharedFixtureStructuredEditCrisprOvermatchFailClosed(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_crispr_overmatch_fail_closed"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var report StructuredEditExecutionReport
+		if raw, err := json.Marshal(testCase["report"]); err != nil {
+			t.Fatalf("marshal structured edit crispr overmatch fail closed report: %v", err)
+		} else if err := json.Unmarshal(raw, &report); err != nil {
+			t.Fatalf("unmarshal structured edit crispr overmatch fail closed report: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(report)
+		if err != nil {
+			t.Fatalf("marshal structured edit crispr overmatch fail closed report roundtrip: %v", err)
+		}
+
+		var decoded StructuredEditExecutionReport
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit crispr overmatch fail closed report: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, report) {
+			t.Fatalf("unexpected structured edit crispr overmatch fail closed report roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditExecutionReportEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_execution_report_envelope"))
 	report := decodeFixtureValue[StructuredEditExecutionReport](t, fixture["structured_edit_execution_report"])
