@@ -6799,6 +6799,73 @@ func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyD
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_confirmation_envelope"))
+	confirmation := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmation](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_apply_decision_confirmation"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope](t, fixture["expected_envelope"])
+
+	if envelope := StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelopeFor(confirmation); !reflect.DeepEqual(envelope, expected) {
+		t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision confirmation envelope: %+v", envelope)
+	}
+
+	imported, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope(expected)
+	if importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision confirmation envelope import error: %+v", *importErr)
+	}
+	if !reflect.DeepEqual(*imported, confirmation) {
+		t.Fatalf("unexpected imported structured edit provider execution receipt replay workflow apply decision confirmation: %+v", *imported)
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelopeRejection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_confirmation_envelope_rejection"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		envelope := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		imported, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope(envelope)
+		if imported != nil {
+			t.Fatalf("expected no structured edit provider execution receipt replay workflow apply decision confirmation for rejection %s", testCase["label"])
+		}
+		if importErr == nil {
+			t.Fatalf("expected structured edit provider execution receipt replay workflow apply decision confirmation import error for %s", testCase["label"])
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision confirmation rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelopeApplication(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_confirmation_envelope_application"))
+	envelope := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_apply_decision_confirmation_envelope"])
+	expected := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmation](t, fixture["expected_receipt_replay_workflow_apply_decision_confirmation"])
+
+	imported, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope(envelope)
+	if importErr != nil {
+		t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision confirmation envelope application error: %+v", *importErr)
+	}
+	if !reflect.DeepEqual(*imported, expected) {
+		t.Fatalf("unexpected applied structured edit provider execution receipt replay workflow apply decision confirmation: %+v", *imported)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rejectedEnvelope := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope](t, testCase["envelope"])
+		expectedError := decodeFixtureValue[StructuredEditTransportImportError](t, testCase["expected_error"])
+
+		imported, importErr := ImportStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionConfirmationEnvelope(rejectedEnvelope)
+		if imported != nil {
+			t.Fatalf("expected no structured edit provider execution receipt replay workflow apply decision confirmation for application rejection %s", testCase["label"])
+		}
+		if importErr == nil {
+			t.Fatalf("expected structured edit provider execution receipt replay workflow apply decision confirmation envelope application error for %s", testCase["label"])
+		} else if !reflect.DeepEqual(*importErr, expectedError) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision confirmation application rejection for %s: %+v", testCase["label"], *importErr)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionSettlementEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_settlement_envelope"))
 	settlement := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionSettlement](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_apply_decision_settlement"])
