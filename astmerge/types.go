@@ -404,6 +404,29 @@ type StructuredEditProviderBatchExecutionReceiptReplayRequestEnvelope struct {
 	BatchReceiptReplayRequest StructuredEditProviderBatchExecutionReceiptReplayRequest `json:"batch_receipt_replay_request"`
 }
 
+type StructuredEditProviderExecutionReceiptReplayApplication struct {
+	ReceiptReplayRequest StructuredEditProviderExecutionReceiptReplayRequest `json:"receipt_replay_request"`
+	RunResult            StructuredEditProviderExecutionRunResult            `json:"run_result"`
+	Metadata             map[string]any                                      `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderExecutionReceiptReplayApplicationEnvelope struct {
+	Kind                     string                                                  `json:"kind"`
+	Version                  int                                                     `json:"version"`
+	ReceiptReplayApplication StructuredEditProviderExecutionReceiptReplayApplication `json:"receipt_replay_application"`
+}
+
+type StructuredEditProviderBatchExecutionReceiptReplayApplication struct {
+	Applications []StructuredEditProviderExecutionReceiptReplayApplication `json:"applications"`
+	Metadata     map[string]any                                            `json:"metadata,omitempty"`
+}
+
+type StructuredEditProviderBatchExecutionReceiptReplayApplicationEnvelope struct {
+	Kind                          string                                                       `json:"kind"`
+	Version                       int                                                          `json:"version"`
+	BatchReceiptReplayApplication StructuredEditProviderBatchExecutionReceiptReplayApplication `json:"batch_receipt_replay_application"`
+}
+
 type StructuredEditProviderExecutionApplication struct {
 	ExecutionRequest StructuredEditProviderExecutionRequest `json:"execution_request"`
 	Report           StructuredEditExecutionReport          `json:"report"`
@@ -3541,6 +3564,68 @@ func ImportStructuredEditProviderBatchExecutionReceiptReplayRequestEnvelope(
 
 	batchReceiptReplayRequest := envelope.BatchReceiptReplayRequest
 	return &batchReceiptReplayRequest, nil
+}
+
+func StructuredEditProviderExecutionReceiptReplayApplicationEnvelopeFor(
+	receiptReplayApplication StructuredEditProviderExecutionReceiptReplayApplication,
+) StructuredEditProviderExecutionReceiptReplayApplicationEnvelope {
+	return StructuredEditProviderExecutionReceiptReplayApplicationEnvelope{
+		Kind:                     "structured_edit_provider_execution_receipt_replay_application",
+		Version:                  StructuredEditTransportVersion,
+		ReceiptReplayApplication: receiptReplayApplication,
+	}
+}
+
+func ImportStructuredEditProviderExecutionReceiptReplayApplicationEnvelope(
+	envelope StructuredEditProviderExecutionReceiptReplayApplicationEnvelope,
+) (*StructuredEditProviderExecutionReceiptReplayApplication, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_execution_receipt_replay_application" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_execution_receipt_replay_application envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_execution_receipt_replay_application envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	receiptReplayApplication := envelope.ReceiptReplayApplication
+	return &receiptReplayApplication, nil
+}
+
+func StructuredEditProviderBatchExecutionReceiptReplayApplicationEnvelopeFor(
+	batchReceiptReplayApplication StructuredEditProviderBatchExecutionReceiptReplayApplication,
+) StructuredEditProviderBatchExecutionReceiptReplayApplicationEnvelope {
+	return StructuredEditProviderBatchExecutionReceiptReplayApplicationEnvelope{
+		Kind:                          "structured_edit_provider_batch_execution_receipt_replay_application",
+		Version:                       StructuredEditTransportVersion,
+		BatchReceiptReplayApplication: batchReceiptReplayApplication,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionReceiptReplayApplicationEnvelope(
+	envelope StructuredEditProviderBatchExecutionReceiptReplayApplicationEnvelope,
+) (*StructuredEditProviderBatchExecutionReceiptReplayApplication, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_receipt_replay_application" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_receipt_replay_application envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_receipt_replay_application envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchReceiptReplayApplication := envelope.BatchReceiptReplayApplication
+	return &batchReceiptReplayApplication, nil
 }
 
 func StructuredEditProviderBatchExecutionOutcomeEnvelopeFor(
