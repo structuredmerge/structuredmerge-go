@@ -6715,6 +6715,34 @@ func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyD
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionOutcome(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_outcome"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var applyDecisionOutcome StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionOutcome
+		if raw, err := json.Marshal(testCase["receipt_replay_workflow_apply_decision_outcome"]); err != nil {
+			t.Fatalf("marshal structured edit provider execution receipt replay workflow apply decision outcome: %v", err)
+		} else if err := json.Unmarshal(raw, &applyDecisionOutcome); err != nil {
+			t.Fatalf("unmarshal structured edit provider execution receipt replay workflow apply decision outcome: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(applyDecisionOutcome)
+		if err != nil {
+			t.Fatalf("marshal structured edit provider execution receipt replay workflow apply decision outcome roundtrip: %v", err)
+		}
+
+		var decoded StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionOutcome
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider execution receipt replay workflow apply decision outcome: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, applyDecisionOutcome) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision outcome roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyDecisionEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_execution_receipt_replay_workflow_apply_decision_envelope"))
 	receiptReplayWorkflowApplyDecision := decodeFixtureValue[StructuredEditProviderExecutionReceiptReplayWorkflowApplyDecision](t, fixture["structured_edit_provider_execution_receipt_replay_workflow_apply_decision"])
