@@ -219,17 +219,27 @@ type StructuredEditDestinationProfile struct {
 	Metadata               map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditCallableDestination struct {
+	StrategyKind         string         `json:"strategy_kind"`
+	AnchorText           string         `json:"anchor_text"`
+	AnchorBoundary       string         `json:"anchor_boundary"`
+	AnchorBoundaryFamily string         `json:"anchor_boundary_family,omitempty"`
+	KnownAnchorBoundary  bool           `json:"known_anchor_boundary"`
+	Metadata             map[string]any `json:"metadata,omitempty"`
+}
+
 type StructuredEditRequest struct {
-	OperationKind             string         `json:"operation_kind"`
-	Content                   string         `json:"content"`
-	SourceLabel               string         `json:"source_label"`
-	TargetSelector            *string        `json:"target_selector,omitempty"`
-	TargetSelectorFamily      *string        `json:"target_selector_family,omitempty"`
-	DestinationSelector       *string        `json:"destination_selector,omitempty"`
-	DestinationSelectorFamily *string        `json:"destination_selector_family,omitempty"`
-	PayloadText               *string        `json:"payload_text,omitempty"`
-	IfMissing                 *string        `json:"if_missing,omitempty"`
-	Metadata                  map[string]any `json:"metadata,omitempty"`
+	OperationKind             string                             `json:"operation_kind"`
+	Content                   string                             `json:"content"`
+	SourceLabel               string                             `json:"source_label"`
+	TargetSelector            *string                            `json:"target_selector,omitempty"`
+	TargetSelectorFamily      *string                            `json:"target_selector_family,omitempty"`
+	DestinationSelector       *string                            `json:"destination_selector,omitempty"`
+	DestinationSelectorFamily *string                            `json:"destination_selector_family,omitempty"`
+	PayloadText               *string                            `json:"payload_text,omitempty"`
+	IfMissing                 *string                            `json:"if_missing,omitempty"`
+	CallableDestination       *StructuredEditCallableDestination `json:"callable_destination,omitempty"`
+	Metadata                  map[string]any                     `json:"metadata,omitempty"`
 }
 
 type StructuredEditResult struct {
