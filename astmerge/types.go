@@ -539,6 +539,11 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplySession struc
 	Metadata      map[string]any                                                     `json:"metadata,omitempty"`
 }
 
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResult struct {
+	ApplyResults []StructuredEditProviderExecutionReceiptReplayWorkflowApplyResult `json:"apply_results"`
+	Metadata     map[string]any                                                    `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyRequestEnvelope struct {
 	Kind                                   string                                                                `json:"kind"`
 	Version                                int                                                                   `json:"version"`
@@ -549,6 +554,12 @@ type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplySessionEnvelo
 	Kind                                   string                                                                `json:"kind"`
 	Version                                int                                                                   `json:"version"`
 	BatchReceiptReplayWorkflowApplySession StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplySession `json:"batch_receipt_replay_workflow_apply_session"`
+}
+
+type StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResultEnvelope struct {
+	Kind                                  string                                                               `json:"kind"`
+	Version                               int                                                                  `json:"version"`
+	BatchReceiptReplayWorkflowApplyResult StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResult `json:"batch_receipt_replay_workflow_apply_result"`
 }
 
 type StructuredEditProviderExecutionReceiptReplayWorkflowReviewRequestEnvelope struct {
@@ -4145,6 +4156,37 @@ func ImportStructuredEditProviderBatchExecutionReceiptReplayWorkflowApplySession
 
 	batchReceiptReplayWorkflowApplySession := envelope.BatchReceiptReplayWorkflowApplySession
 	return &batchReceiptReplayWorkflowApplySession, nil
+}
+
+func StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResultEnvelopeFor(
+	batchReceiptReplayWorkflowApplyResult StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResult,
+) StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResultEnvelope {
+	return StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResultEnvelope{
+		Kind:                                  "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_result",
+		Version:                               StructuredEditTransportVersion,
+		BatchReceiptReplayWorkflowApplyResult: batchReceiptReplayWorkflowApplyResult,
+	}
+}
+
+func ImportStructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResultEnvelope(
+	envelope StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResultEnvelope,
+) (*StructuredEditProviderBatchExecutionReceiptReplayWorkflowApplyResult, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_provider_batch_execution_receipt_replay_workflow_apply_result" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_provider_batch_execution_receipt_replay_workflow_apply_result envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_provider_batch_execution_receipt_replay_workflow_apply_result envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	batchReceiptReplayWorkflowApplyResult := envelope.BatchReceiptReplayWorkflowApplyResult
+	return &batchReceiptReplayWorkflowApplyResult, nil
 }
 
 func StructuredEditProviderBatchExecutionReceiptReplayWorkflowReviewRequestEnvelopeFor(
