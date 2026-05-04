@@ -8342,6 +8342,35 @@ func TestSharedFixtureStructuredEditParityMatchSemantics(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditOperationTriadParity(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_operation_triad_parity"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		applicationValue := testCase["application"].(map[string]any)
+
+		var application StructuredEditApplication
+		if raw, err := json.Marshal(applicationValue); err != nil {
+			t.Fatalf("marshal structured edit operation triad application: %v", err)
+		} else if err := json.Unmarshal(raw, &application); err != nil {
+			t.Fatalf("unmarshal structured edit operation triad application: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(application)
+		if err != nil {
+			t.Fatalf("marshal structured edit operation triad application roundtrip: %v", err)
+		}
+
+		var decoded StructuredEditApplication
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit operation triad application: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, application) {
+			t.Fatalf("unexpected structured edit operation triad application roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditExecutionReportEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_execution_report_envelope"))
 	report := decodeFixtureValue[StructuredEditExecutionReport](t, fixture["structured_edit_execution_report"])
