@@ -178,6 +178,17 @@ type StructuredEditSelectionProfile struct {
 	Metadata              map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditTargetSelection struct {
+	SelectorKind          string         `json:"selector_kind"`
+	SelectionIntent       string         `json:"selection_intent"`
+	SelectionIntentFamily string         `json:"selection_intent_family,omitempty"`
+	KnownSelectionIntent  bool           `json:"known_selection_intent"`
+	CommentRegion         *string        `json:"comment_region,omitempty"`
+	IncludeTrailingGap    bool           `json:"include_trailing_gap"`
+	CommentAnchored       bool           `json:"comment_anchored"`
+	Metadata              map[string]any `json:"metadata,omitempty"`
+}
+
 type StructuredEditMatchProfile struct {
 	StartBoundary       string         `json:"start_boundary"`
 	StartBoundaryFamily string         `json:"start_boundary_family,omitempty"`
@@ -234,6 +245,7 @@ type StructuredEditRequest struct {
 	SourceLabel               string                             `json:"source_label"`
 	TargetSelector            *string                            `json:"target_selector,omitempty"`
 	TargetSelectorFamily      *string                            `json:"target_selector_family,omitempty"`
+	TargetSelection           *StructuredEditTargetSelection     `json:"target_selection,omitempty"`
 	DestinationSelector       *string                            `json:"destination_selector,omitempty"`
 	DestinationSelectorFamily *string                            `json:"destination_selector_family,omitempty"`
 	PayloadText               *string                            `json:"payload_text,omitempty"`
