@@ -8233,6 +8233,31 @@ func TestSharedFixtureStructuredEditCrisprExampleParityReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditCrisprParitySubstrateReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_crispr_parity_substrate_report"))
+
+	var report StructuredEditCrisprExampleParityReport
+	if raw, err := json.Marshal(fixture["report"]); err != nil {
+		t.Fatalf("marshal structured edit crispr parity substrate report: %v", err)
+	} else if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("unmarshal structured edit crispr parity substrate report: %v", err)
+	}
+
+	roundtrip, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal structured edit crispr parity substrate report roundtrip: %v", err)
+	}
+
+	var decoded StructuredEditCrisprExampleParityReport
+	if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+		t.Fatalf("unmarshal roundtrip structured edit crispr parity substrate report: %v", err)
+	}
+
+	if !reflect.DeepEqual(decoded, report) {
+		t.Fatalf("unexpected structured edit crispr parity substrate report roundtrip: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
