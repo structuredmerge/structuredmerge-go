@@ -8366,6 +8366,34 @@ func TestSharedFixtureContentRecipeExecutionEnvelope(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSingleFileReadmeHeadingSectionAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "single_file_readme_heading_section_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var requestEnvelope ContentRecipeExecutionRequestEnvelope
+		if raw, err := json.Marshal(testCase["request_envelope"]); err != nil {
+			t.Fatalf("marshal README acceptance request envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &requestEnvelope); err != nil {
+			t.Fatalf("unmarshal README acceptance request envelope: %v", err)
+		}
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal README acceptance report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal README acceptance report envelope: %v", err)
+		}
+
+		if reportEnvelope.Report.FinalContent == "" {
+			t.Fatalf("expected README acceptance final content")
+		}
+		if len(reportEnvelope.Report.StepReports) != len(reportEnvelope.Report.Request.Steps) {
+			t.Fatalf("expected README acceptance to include one step report per request step")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
