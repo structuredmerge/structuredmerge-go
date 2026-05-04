@@ -8672,6 +8672,36 @@ func TestSharedFixtureRubyGemfileSelfDependencyPolicyAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRubyAppraisalsSelfDependencyPolicyAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_appraisals_self_dependency_policy_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby Appraisals self-dependency policy report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby Appraisals self-dependency policy report envelope: %v", err)
+		}
+
+		if testCase["label"] == "delete-appraisals-self-dependencies" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "gem \"demo\"") {
+				t.Fatalf("expected Appraisals self dependencies to be deleted")
+			}
+			if !strings.Contains(finalContent, "appraise(\"rails-6\")") || !strings.Contains(finalContent, "gem \"rspec\" # Testing") {
+				t.Fatalf("expected appraisal structure and unrelated dependencies to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "delete" {
+				t.Fatalf("expected canonical delete operation")
+			}
+		}
+		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing project identity to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
