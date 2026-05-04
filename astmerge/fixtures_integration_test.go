@@ -8394,6 +8394,31 @@ func TestSharedFixtureSingleFileReadmeHeadingSectionAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNativeStructuredEditRecipeSteps(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "native_structured_edit_recipe_steps"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal native structured edit recipe steps report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal native structured edit recipe steps report envelope: %v", err)
+		}
+
+		kinds := []string{}
+		for _, step := range reportEnvelope.Report.StepReports {
+			if step.Application == nil {
+				t.Fatalf("expected structured edit step report to include application")
+			}
+			kinds = append(kinds, step.Application.Request.OperationKind)
+		}
+		if !reflect.DeepEqual(kinds, []string{"replace", "insert", "delete"}) {
+			t.Fatalf("unexpected structured edit recipe operation order: %v", kinds)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
