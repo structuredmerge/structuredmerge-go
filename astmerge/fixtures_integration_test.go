@@ -8639,6 +8639,96 @@ func TestSharedFixtureRubyGemspecSelfDependencyPolicyAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRubyGemfileSelfDependencyPolicyAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_gemfile_self_dependency_policy_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby Gemfile self-dependency policy report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby Gemfile self-dependency policy report envelope: %v", err)
+		}
+
+		if testCase["label"] == "delete-gemfile-self-dependencies-across-nesting" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "gem \"demo\", \"~> 1.0\"") || strings.Contains(finalContent, "path: \"../dev/demo\"") {
+				t.Fatalf("expected active Gemfile self dependencies to be deleted")
+			}
+			if !strings.Contains(finalContent, "# gem \"demo\", \"~> 0\"") || !strings.Contains(finalContent, "gem \"fallback-gem\"") {
+				t.Fatalf("expected comments and unrelated dependencies to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "delete" {
+				t.Fatalf("expected canonical delete operation")
+			}
+		}
+		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing project identity to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureRubyAppraisalsSelfDependencyPolicyAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_appraisals_self_dependency_policy_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby Appraisals self-dependency policy report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby Appraisals self-dependency policy report envelope: %v", err)
+		}
+
+		if testCase["label"] == "delete-appraisals-self-dependencies" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "gem \"demo\"") {
+				t.Fatalf("expected Appraisals self dependencies to be deleted")
+			}
+			if !strings.Contains(finalContent, "appraise(\"rails-6\")") || !strings.Contains(finalContent, "gem \"rspec\" # Testing") {
+				t.Fatalf("expected unrelated appraisals and dependencies to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "delete" {
+				t.Fatalf("expected canonical delete operation")
+			}
+		}
+		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing project identity to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureRubyAppraisalsMinRubyPrunePolicyAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_appraisals_min_ruby_prune_policy_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby Appraisals min-Ruby prune policy report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby Appraisals min-Ruby prune policy report envelope: %v", err)
+		}
+
+		if testCase["label"] == "delete-ruby-appraisals-below-min-ruby" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "ruby-2-3") || strings.Contains(finalContent, "ruby-2-7") || strings.Contains(finalContent, "ruby-3-0") {
+				t.Fatalf("expected appraisals below min_ruby to be deleted")
+			}
+			if !strings.Contains(finalContent, "ruby-3-2") || !strings.Contains(finalContent, "appraise \"style\"") {
+				t.Fatalf("expected appraisals at min_ruby and non-Ruby appraisals to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "delete" {
+				t.Fatalf("expected canonical delete operation")
+			}
+		}
+		if testCase["label"] == "missing-min-ruby-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing min_ruby to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
