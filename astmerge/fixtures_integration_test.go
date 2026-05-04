@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -8460,6 +8461,28 @@ func TestSharedFixtureRubyGemspecNativeBoundaryReport(t *testing.T) {
 	}
 	if !wrapperNames["dependency_ruby_floor_comment_alignment"] {
 		t.Fatalf("expected resolver-backed dependency floor comment alignment to require wrapper")
+	}
+}
+
+func TestSharedFixtureRubyGemspecSignatureMergeAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_gemspec_signature_merge_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby gemspec signature merge report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby gemspec signature merge report envelope: %v", err)
+		}
+
+		step := reportEnvelope.Report.Request.Steps[0]
+		if step.MergeProfile["signature_profile"] != "gemspec_declarations" {
+			t.Fatalf("expected gemspec_declarations signature profile")
+		}
+		if !strings.Contains(reportEnvelope.Report.FinalContent, "spec.add_development_dependency(\"rubocop\"") {
+			t.Fatalf("expected destination-only development dependency to be preserved")
+		}
 	}
 }
 
