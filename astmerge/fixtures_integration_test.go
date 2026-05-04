@@ -8338,6 +8338,34 @@ func TestSharedFixtureStructuredEditKettleJemPrimitiveGapReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureContentRecipeExecutionEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "content_recipe_execution_envelope"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var requestEnvelope ContentRecipeExecutionRequestEnvelope
+		if raw, err := json.Marshal(testCase["request_envelope"]); err != nil {
+			t.Fatalf("marshal content recipe execution request envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &requestEnvelope); err != nil {
+			t.Fatalf("unmarshal content recipe execution request envelope: %v", err)
+		}
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal content recipe execution report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal content recipe execution report envelope: %v", err)
+		}
+
+		if reportEnvelope.Report.FinalContent == reportEnvelope.Report.Request.DestinationContent {
+			t.Fatalf("expected content recipe report to carry changed final content")
+		}
+		if len(reportEnvelope.Report.StepReports) != len(reportEnvelope.Report.Request.Steps) {
+			t.Fatalf("expected one step report per request step")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {

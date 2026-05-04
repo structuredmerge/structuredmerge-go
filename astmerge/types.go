@@ -388,6 +388,65 @@ type StructuredEditProviderExecutionRequest struct {
 	Metadata        map[string]any        `json:"metadata,omitempty"`
 }
 
+type ContentRecipeStep struct {
+	StepID                string                 `json:"step_id"`
+	StepKind              string                 `json:"step_kind"`
+	Name                  string                 `json:"name"`
+	ProviderFamily        *string                `json:"provider_family,omitempty"`
+	ProviderBackend       *string                `json:"provider_backend,omitempty"`
+	MergeProfile          map[string]any         `json:"merge_profile,omitempty"`
+	PartialTarget         map[string]any         `json:"partial_target,omitempty"`
+	StructuredEditRequest *StructuredEditRequest `json:"structured_edit_request,omitempty"`
+	Policy                map[string]any         `json:"policy,omitempty"`
+	Metadata              map[string]any         `json:"metadata,omitempty"`
+}
+
+type ContentRecipeExecutionRequest struct {
+	RecipeName         string              `json:"recipe_name"`
+	RecipeVersion      string              `json:"recipe_version"`
+	RelativePath       string              `json:"relative_path"`
+	ProviderFamily     string              `json:"provider_family"`
+	ProviderBackend    *string             `json:"provider_backend,omitempty"`
+	TemplateContent    string              `json:"template_content"`
+	DestinationContent string              `json:"destination_content"`
+	Steps              []ContentRecipeStep `json:"steps"`
+	RuntimeContext     map[string]any      `json:"runtime_context,omitempty"`
+	Metadata           map[string]any      `json:"metadata,omitempty"`
+}
+
+type ContentRecipeExecutionRequestEnvelope struct {
+	Kind    string                        `json:"kind"`
+	Version int                           `json:"version"`
+	Request ContentRecipeExecutionRequest `json:"request"`
+}
+
+type ContentRecipeStepReport struct {
+	StepID        string                     `json:"step_id"`
+	StepKind      string                     `json:"step_kind"`
+	Status        string                     `json:"status"`
+	Changed       bool                       `json:"changed"`
+	InputContent  string                     `json:"input_content"`
+	OutputContent string                     `json:"output_content"`
+	Application   *StructuredEditApplication `json:"application,omitempty"`
+	Diagnostics   []Diagnostic               `json:"diagnostics"`
+	Metadata      map[string]any             `json:"metadata,omitempty"`
+}
+
+type ContentRecipeExecutionReport struct {
+	Request      ContentRecipeExecutionRequest `json:"request"`
+	FinalContent string                        `json:"final_content"`
+	Changed      bool                          `json:"changed"`
+	StepReports  []ContentRecipeStepReport     `json:"step_reports"`
+	Diagnostics  []Diagnostic                  `json:"diagnostics"`
+	Metadata     map[string]any                `json:"metadata,omitempty"`
+}
+
+type ContentRecipeExecutionReportEnvelope struct {
+	Kind    string                       `json:"kind"`
+	Version int                          `json:"version"`
+	Report  ContentRecipeExecutionReport `json:"report"`
+}
+
 type StructuredEditProviderExecutionRequestEnvelope struct {
 	Kind             string                                 `json:"kind"`
 	Version          int                                    `json:"version"`
