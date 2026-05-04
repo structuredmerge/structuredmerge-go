@@ -8313,6 +8313,31 @@ func TestSharedFixtureStructuredEditCrisprParitySubstrateReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditKettleJemPrimitiveGapReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_kettle_jem_primitive_gap_report"))
+
+	var report StructuredEditKettleJemPrimitiveGapReport
+	if raw, err := json.Marshal(fixture["report"]); err != nil {
+		t.Fatalf("marshal structured edit kettle-jem primitive gap report: %v", err)
+	} else if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("unmarshal structured edit kettle-jem primitive gap report: %v", err)
+	}
+
+	roundtrip, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal structured edit kettle-jem primitive gap report roundtrip: %v", err)
+	}
+
+	var decoded StructuredEditKettleJemPrimitiveGapReport
+	if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+		t.Fatalf("unmarshal roundtrip structured edit kettle-jem primitive gap report: %v", err)
+	}
+
+	if !reflect.DeepEqual(decoded, report) {
+		t.Fatalf("unexpected structured edit kettle-jem primitive gap report roundtrip: %+v", decoded)
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {

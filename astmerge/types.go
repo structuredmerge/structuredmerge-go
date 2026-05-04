@@ -342,6 +342,45 @@ type StructuredEditCrisprExampleParityReport struct {
 	Metadata      map[string]any                              `json:"metadata,omitempty"`
 }
 
+type StructuredEditKettleJemSubstrateCapability struct {
+	Capability string         `json:"capability"`
+	Status     string         `json:"status"`
+	Evidence   []string       `json:"evidence"`
+	Notes      []string       `json:"notes,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
+}
+
+type StructuredEditKettleJemRequiredPrimitive struct {
+	Name              string         `json:"name"`
+	CapabilityKind    string         `json:"capability_kind"`
+	PortabilityStatus string         `json:"portability_status"`
+	NativeContract    string         `json:"native_contract"`
+	SourceReferences  []string       `json:"source_references"`
+	DependsOn         []string       `json:"depends_on,omitempty"`
+	Notes             []string       `json:"notes,omitempty"`
+	Metadata          map[string]any `json:"metadata,omitempty"`
+}
+
+type StructuredEditKettleJemScriptClassification struct {
+	Source         string         `json:"source"`
+	Classification string         `json:"classification"`
+	SharedContract string         `json:"shared_contract"`
+	Notes          []string       `json:"notes,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
+}
+
+type StructuredEditKettleJemPrimitiveGapReport struct {
+	ReferenceProject      string                                        `json:"reference_project"`
+	Scope                 string                                        `json:"scope"`
+	ProductTarget         string                                        `json:"product_target"`
+	CurrentSubstrate      []StructuredEditKettleJemSubstrateCapability  `json:"current_substrate"`
+	RequiredPrimitives    []StructuredEditKettleJemRequiredPrimitive    `json:"required_primitives"`
+	ScriptClassifications []StructuredEditKettleJemScriptClassification `json:"script_classifications"`
+	NonGoals              []string                                      `json:"non_goals,omitempty"`
+	NextSlices            []string                                      `json:"next_slices,omitempty"`
+	Metadata              map[string]any                                `json:"metadata,omitempty"`
+}
+
 type StructuredEditProviderExecutionRequest struct {
 	Request         StructuredEditRequest `json:"request"`
 	ProviderFamily  string                `json:"provider_family"`
