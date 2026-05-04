@@ -8528,6 +8528,29 @@ func TestSharedFixtureRubyGemspecDependencySectionPolicyAcceptance(t *testing.T)
 	}
 }
 
+func TestSharedFixtureRubyGemspecFilesPolicyAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_gemspec_files_policy_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby gemspec files policy report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby gemspec files policy report envelope: %v", err)
+		}
+
+		if testCase["label"] == "gemspec-files-literal-dir-union-and-duplicate-cleanup" {
+			if strings.Count(reportEnvelope.Report.FinalContent, "spec.files =") != 1 {
+				t.Fatalf("expected duplicate spec.files assignments to be removed")
+			}
+			if !strings.Contains(reportEnvelope.Report.FinalContent, "sig/**/*.rbs") {
+				t.Fatalf("expected template-only files entry to be unioned")
+			}
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
