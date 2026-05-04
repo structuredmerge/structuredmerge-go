@@ -8486,6 +8486,27 @@ func TestSharedFixtureRubyGemspecSignatureMergeAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRubyGemspecFieldPolicyAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_gemspec_field_policy_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby gemspec field policy report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby gemspec field policy report envelope: %v", err)
+		}
+
+		if !strings.Contains(reportEnvelope.Report.FinalContent, "Real project summary") {
+			t.Fatalf("expected non-placeholder summary to be preserved")
+		}
+		if strings.Contains(reportEnvelope.Report.FinalContent, "spec.license =") {
+			t.Fatalf("expected singular license field to be deleted")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
