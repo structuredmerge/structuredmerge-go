@@ -8123,6 +8123,34 @@ func TestSharedFixtureStructuredEditCrisprOvermatchFailClosed(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditCrisprAcceptanceScenario(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_crispr_acceptance_scenario"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var report StructuredEditExecutionReport
+		if raw, err := json.Marshal(testCase["report"]); err != nil {
+			t.Fatalf("marshal structured edit crispr acceptance scenario report: %v", err)
+		} else if err := json.Unmarshal(raw, &report); err != nil {
+			t.Fatalf("unmarshal structured edit crispr acceptance scenario report: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(report)
+		if err != nil {
+			t.Fatalf("marshal structured edit crispr acceptance scenario report roundtrip: %v", err)
+		}
+
+		var decoded StructuredEditExecutionReport
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit crispr acceptance scenario report: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, report) {
+			t.Fatalf("unexpected structured edit crispr acceptance scenario report roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCrisprAppendFallbackInsert(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_crispr_append_fallback_insert"))
 	for _, rawCase := range fixture["cases"].([]any) {
