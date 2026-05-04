@@ -277,6 +277,12 @@ type StructuredEditApplicationEnvelope struct {
 	Application StructuredEditApplication `json:"application"`
 }
 
+type StructuredEditRequestEnvelope struct {
+	Kind    string                `json:"kind"`
+	Version int                   `json:"version"`
+	Request StructuredEditRequest `json:"request"`
+}
+
 type StructuredEditExecutionReport struct {
 	Application     StructuredEditApplication `json:"application"`
 	ProviderFamily  string                    `json:"provider_family"`
@@ -3380,6 +3386,37 @@ func ImportStructuredEditApplicationEnvelope(
 
 	application := envelope.Application
 	return &application, nil
+}
+
+func StructuredEditRequestEnvelopeFor(
+	request StructuredEditRequest,
+) StructuredEditRequestEnvelope {
+	return StructuredEditRequestEnvelope{
+		Kind:    "structured_edit_request",
+		Version: StructuredEditTransportVersion,
+		Request: request,
+	}
+}
+
+func ImportStructuredEditRequestEnvelope(
+	envelope StructuredEditRequestEnvelope,
+) (*StructuredEditRequest, *StructuredEditTransportImportError) {
+	if envelope.Kind != "structured_edit_request" {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportKindMismatch,
+			Message:  "expected structured_edit_request envelope kind.",
+		}
+	}
+
+	if envelope.Version != StructuredEditTransportVersion {
+		return nil, &StructuredEditTransportImportError{
+			Category: StructuredEditTransportUnsupportedVersion,
+			Message:  "unsupported structured_edit_request envelope version " + strconv.Itoa(envelope.Version) + ".",
+		}
+	}
+
+	request := envelope.Request
+	return &request, nil
 }
 
 func StructuredEditProviderExecutionRequestEnvelopeFor(
