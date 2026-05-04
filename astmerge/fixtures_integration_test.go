@@ -8573,26 +8573,26 @@ func TestSharedFixtureRubyGemspecVersionLoaderPolicyAcceptance(t *testing.T) {
 	}
 }
 
-func TestSharedFixtureProjectFactsRuntimeContext(t *testing.T) {
-	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "project_facts_runtime_context"))
+func TestSharedFixtureRuntimeFactsContext(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runtime_facts_context"))
 	for _, rawCase := range fixture["cases"].([]any) {
 		testCase := rawCase.(map[string]any)
 
 		var reportEnvelope ContentRecipeExecutionReportEnvelope
 		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
-			t.Fatalf("marshal project facts runtime context report envelope: %v", err)
+			t.Fatalf("marshal runtime facts runtime context report envelope: %v", err)
 		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
-			t.Fatalf("unmarshal project facts runtime context report envelope: %v", err)
+			t.Fatalf("unmarshal runtime facts runtime context report envelope: %v", err)
 		}
 
-		projectFacts := reportEnvelope.Report.Request.RuntimeContext["project_facts"].(map[string]any)
-		if projectFacts["schema"] != "project_facts.v1" {
-			t.Fatalf("expected project_facts.v1 schema")
+		runtimeFacts := reportEnvelope.Report.Request.RuntimeContext["facts"].(map[string]any)
+		if runtimeFacts["schema"] != "runtime_facts.v1" {
+			t.Fatalf("expected runtime_facts.v1 schema")
 		}
 
 		if testCase["label"] == "dependency-floor-comments-from-project-facts" {
 			if !strings.Contains(reportEnvelope.Report.FinalContent, "# Required for Ruby < 3.4.") {
-				t.Fatalf("expected dependency floor comment from project facts")
+				t.Fatalf("expected dependency floor comment from runtime facts")
 			}
 			if reportEnvelope.Report.StepReports[0].Metadata["consumed_fact_id"] != "dependency.ruby_floor" {
 				t.Fatalf("expected dependency.ruby_floor facts to be consumed")
@@ -8634,7 +8634,7 @@ func TestSharedFixtureRubyGemspecSelfDependencyPolicyAcceptance(t *testing.T) {
 			}
 		}
 		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
-			t.Fatalf("expected missing project identity to fail closed")
+			t.Fatalf("expected missing package identity to fail closed")
 		}
 	}
 }
@@ -8664,7 +8664,7 @@ func TestSharedFixtureRubyGemfileSelfDependencyPolicyAcceptance(t *testing.T) {
 			}
 		}
 		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
-			t.Fatalf("expected missing project identity to fail closed")
+			t.Fatalf("expected missing package identity to fail closed")
 		}
 	}
 }
@@ -8694,7 +8694,7 @@ func TestSharedFixtureRubyAppraisalsSelfDependencyPolicyAcceptance(t *testing.T)
 			}
 		}
 		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
-			t.Fatalf("expected missing project identity to fail closed")
+			t.Fatalf("expected missing package identity to fail closed")
 		}
 	}
 }
