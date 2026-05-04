@@ -8507,6 +8507,27 @@ func TestSharedFixtureRubyGemspecFieldPolicyAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRubyGemspecDependencySectionPolicyAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_gemspec_dependency_section_policy_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby gemspec dependency section policy report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby gemspec dependency section policy report envelope: %v", err)
+		}
+
+		if strings.Contains(reportEnvelope.Report.FinalContent, "add_development_dependency(\"json\"") {
+			t.Fatalf("expected runtime-shadowed development dependency to be removed")
+		}
+		if !strings.Contains(reportEnvelope.Report.FinalContent, "add_development_dependency(\"rubocop\"") {
+			t.Fatalf("expected destination-only development dependency to be preserved")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
