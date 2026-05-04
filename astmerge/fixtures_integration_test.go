@@ -8761,6 +8761,39 @@ func TestSharedFixtureChangelogUnreleasedNormalizationAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReadmeSuppliedMetadataSynchronizationAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "readme_supplied_metadata_synchronization_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal README supplied metadata synchronization report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal README supplied metadata synchronization report envelope: %v", err)
+		}
+
+		if testCase["label"] == "sync-readme-heading-and-summary-from-supplied-metadata" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.HasPrefix(finalContent, "# Demo Toolkit\n") {
+				t.Fatalf("expected README H1 to come from supplied metadata")
+			}
+			if !strings.Contains(finalContent, "A deterministic toolkit for structured merges.") || !strings.Contains(finalContent, "Destination usage.") {
+				t.Fatalf("expected supplied summary and unrelated destination section to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["consumed_context"] != "readme_metadata.title" {
+				t.Fatalf("expected title context to be consumed")
+			}
+			if reportEnvelope.Report.StepReports[1].Metadata["consumed_context"] != "readme_metadata.summary" {
+				t.Fatalf("expected summary context to be consumed")
+			}
+		}
+		if testCase["label"] == "missing-readme-metadata-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing README metadata to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
