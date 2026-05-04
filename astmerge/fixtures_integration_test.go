@@ -4330,6 +4330,33 @@ func TestSharedFixtureStructuredEditProviderExecutorProfile(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditProviderExecutorOperationTriadProfile(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_operation_triad_profile"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var executorProfile StructuredEditProviderExecutorProfile
+		if raw, err := json.Marshal(testCase["executor_profile"]); err != nil {
+			t.Fatalf("marshal structured edit provider executor operation triad profile: %v", err)
+		} else if err := json.Unmarshal(raw, &executorProfile); err != nil {
+			t.Fatalf("unmarshal structured edit provider executor operation triad profile: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(executorProfile)
+		if err != nil {
+			t.Fatalf("marshal roundtrip structured edit provider executor operation triad profile: %v", err)
+		}
+		var decoded StructuredEditProviderExecutorProfile
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit provider executor operation triad profile: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, executorProfile) {
+			t.Fatalf("unexpected structured edit provider executor operation triad profile roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditProviderExecutorProfileEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_provider_executor_profile_envelope"))
 	executorProfile := decodeFixtureValue[StructuredEditProviderExecutorProfile](t, fixture["structured_edit_provider_executor_profile"])
