@@ -8573,6 +8573,42 @@ func TestSharedFixtureRubyGemspecVersionLoaderPolicyAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProjectFactsRuntimeContext(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "project_facts_runtime_context"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal project facts runtime context report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal project facts runtime context report envelope: %v", err)
+		}
+
+		projectFacts := reportEnvelope.Report.Request.RuntimeContext["project_facts"].(map[string]any)
+		if projectFacts["schema"] != "project_facts.v1" {
+			t.Fatalf("expected project_facts.v1 schema")
+		}
+
+		if testCase["label"] == "dependency-floor-comments-from-project-facts" {
+			if !strings.Contains(reportEnvelope.Report.FinalContent, "# Required for Ruby < 3.4.") {
+				t.Fatalf("expected dependency floor comment from project facts")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["consumed_fact_id"] != "dependency.ruby_floor" {
+				t.Fatalf("expected dependency.ruby_floor facts to be consumed")
+			}
+		}
+		if testCase["label"] == "dependency-floor-comments-missing-project-facts-fail-closed" {
+			if reportEnvelope.Report.Changed {
+				t.Fatalf("expected missing dependency facts to fail closed without changes")
+			}
+			if reportEnvelope.Report.StepReports[0].Status != "failed" {
+				t.Fatalf("expected missing dependency facts to fail the policy step")
+			}
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
