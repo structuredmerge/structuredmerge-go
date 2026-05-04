@@ -8794,6 +8794,39 @@ func TestSharedFixtureReadmeSuppliedMetadataSynchronizationAcceptance(t *testing
 	}
 }
 
+func TestSharedFixtureSuppliedMarkdownPruningAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_markdown_pruning_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied Markdown pruning report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied Markdown pruning report envelope: %v", err)
+		}
+
+		if testCase["label"] == "prune-supplied-table-rows-and-reference-definitions" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "Works with JRuby") || strings.Contains(finalContent, "[jruby-9.4]:") || strings.Contains(finalContent, "[jruby-head]:") {
+				t.Fatalf("expected supplied Markdown selectors to be pruned")
+			}
+			if !strings.Contains(finalContent, "Works with MRI Ruby") || !strings.Contains(finalContent, "[ruby-3.2]:") {
+				t.Fatalf("expected unmatched Markdown content to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["deleted_rows"] != float64(1) {
+				t.Fatalf("expected one table row to be deleted")
+			}
+			if reportEnvelope.Report.StepReports[1].Metadata["deleted_reference_definitions"] != float64(2) {
+				t.Fatalf("expected two reference definitions to be deleted")
+			}
+		}
+		if testCase["label"] == "missing-prune-selectors-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing prune selectors to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
