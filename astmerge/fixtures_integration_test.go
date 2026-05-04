@@ -8442,6 +8442,27 @@ func TestSharedFixtureRubyGemfileSignatureMergeAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRubyGemspecNativeBoundaryReport(t *testing.T) {
+	report := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_gemspec_native_boundary_report"))
+	if report["kind"] != "ruby_gemspec_native_boundary_report" {
+		t.Fatalf("unexpected gemspec native boundary report kind: %v", report["kind"])
+	}
+
+	nativeSurface := report["native_recipe_surface"].(map[string]any)
+	if nativeSurface["signature_profile"] != "gemspec_declarations" {
+		t.Fatalf("expected gemspec_declarations signature profile")
+	}
+
+	wrapperNames := map[string]bool{}
+	for _, rawBehavior := range report["wrapper_required_behaviors"].([]any) {
+		behavior := rawBehavior.(map[string]any)
+		wrapperNames[behavior["name"].(string)] = true
+	}
+	if !wrapperNames["dependency_ruby_floor_comment_alignment"] {
+		t.Fatalf("expected resolver-backed dependency floor comment alignment to require wrapper")
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
