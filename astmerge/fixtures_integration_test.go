@@ -8729,6 +8729,38 @@ func TestSharedFixtureRubyAppraisalsMinRubyPrunePolicyAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureChangelogUnreleasedNormalizationAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "changelog_unreleased_normalization_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal CHANGELOG Unreleased normalization report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal CHANGELOG Unreleased normalization report envelope: %v", err)
+		}
+
+		if testCase["label"] == "create-unreleased-section-from-supplied-entries" {
+			finalContent := reportEnvelope.Report.FinalContent
+			unreleasedIndex := strings.Index(finalContent, "## Unreleased")
+			releaseIndex := strings.Index(finalContent, "## 1.2.0")
+			if unreleasedIndex == -1 || releaseIndex == -1 || unreleasedIndex > releaseIndex {
+				t.Fatalf("expected Unreleased section before first release heading")
+			}
+			if !strings.Contains(finalContent, "- Added native Markdown recipe boundary.") || !strings.Contains(finalContent, "- Existing release.") {
+				t.Fatalf("expected supplied entries and release history to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "insert_or_replace_section" {
+				t.Fatalf("expected canonical insert_or_replace_section operation")
+			}
+		}
+		if testCase["label"] == "missing-entries-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing entries to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
