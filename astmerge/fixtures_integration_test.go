@@ -8827,6 +8827,39 @@ func TestSharedFixtureSuppliedMarkdownPruningAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSuppliedSourceSelectorDeletionAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_source_selector_deletion_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied source selector deletion report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied source selector deletion report envelope: %v", err)
+		}
+
+		if testCase["label"] == "delete-supplied-structural-owner-ranges" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "kettle/scaffold") || strings.Contains(finalContent, "task :scaffold") {
+				t.Fatalf("expected supplied source selectors to be deleted")
+			}
+			if !strings.Contains(finalContent, "require \"bundler/gem_tasks\"") || !strings.Contains(finalContent, "task :spec") {
+				t.Fatalf("expected unmatched source content to be preserved")
+			}
+			if strings.Contains(finalContent, "\n\n\n") {
+				t.Fatalf("expected deletion gaps to be normalized")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["deleted_ranges"] != float64(2) {
+				t.Fatalf("expected two structural owner ranges to be deleted")
+			}
+		}
+		if testCase["label"] == "missing-delete-selectors-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing delete selectors to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
