@@ -13,7 +13,7 @@ type RustDialect string
 type RustBackend string
 
 const (
-	DialectRust RustDialect = "rust"
+	DialectRust       RustDialect = "rust"
 	BackendTreeSitter RustBackend = "kreuzberg-language-pack"
 )
 

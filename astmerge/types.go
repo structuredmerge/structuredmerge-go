@@ -2158,7 +2158,7 @@ func PlanTemplateExecution(
 			}
 		}
 
-		executionAction := TemplateExecutionMergePrepared
+		var executionAction TemplateExecutionAction
 		switch {
 		case entry.Blocked:
 			executionAction = TemplateExecutionBlocked
