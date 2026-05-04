@@ -8419,6 +8419,29 @@ func TestSharedFixtureNativeStructuredEditRecipeSteps(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRubyGemfileSignatureMergeAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "ruby_gemfile_signature_merge_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		label := testCase["label"].(string)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal Ruby Gemfile signature merge report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal Ruby Gemfile signature merge report envelope: %v", err)
+		}
+
+		step := reportEnvelope.Report.Request.Steps[0]
+		if step.MergeProfile["signature_profile"] != "gemfile_declarations" {
+			t.Fatalf("expected gemfile_declarations signature profile")
+		}
+		if label == "gemfile-cross-nesting-duplicates-fail-closed" && reportEnvelope.Report.Changed {
+			t.Fatalf("cross-nesting duplicate case should fail closed without changes")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
