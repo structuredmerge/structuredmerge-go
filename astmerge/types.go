@@ -204,6 +204,21 @@ type StructuredEditMatchProfile struct {
 	Metadata            map[string]any `json:"metadata,omitempty"`
 }
 
+type StructuredEditTargetMatch struct {
+	StartBoundary       string         `json:"start_boundary"`
+	StartBoundaryFamily string         `json:"start_boundary_family,omitempty"`
+	KnownStartBoundary  bool           `json:"known_start_boundary"`
+	EndBoundary         string         `json:"end_boundary"`
+	EndBoundaryFamily   string         `json:"end_boundary_family,omitempty"`
+	KnownEndBoundary    bool           `json:"known_end_boundary"`
+	PayloadKind         string         `json:"payload_kind"`
+	PayloadFamily       string         `json:"payload_family,omitempty"`
+	KnownPayloadKind    bool           `json:"known_payload_kind"`
+	CommentAnchored     bool           `json:"comment_anchored"`
+	TrailingGapExtended bool           `json:"trailing_gap_extended"`
+	Metadata            map[string]any `json:"metadata,omitempty"`
+}
+
 type StructuredEditOperationProfile struct {
 	OperationKind          string         `json:"operation_kind"`
 	OperationFamily        string         `json:"operation_family,omitempty"`
@@ -246,6 +261,7 @@ type StructuredEditRequest struct {
 	TargetSelector            *string                            `json:"target_selector,omitempty"`
 	TargetSelectorFamily      *string                            `json:"target_selector_family,omitempty"`
 	TargetSelection           *StructuredEditTargetSelection     `json:"target_selection,omitempty"`
+	TargetMatch               *StructuredEditTargetMatch         `json:"target_match,omitempty"`
 	DestinationSelector       *string                            `json:"destination_selector,omitempty"`
 	DestinationSelectorFamily *string                            `json:"destination_selector_family,omitempty"`
 	PayloadText               *string                            `json:"payload_text,omitempty"`

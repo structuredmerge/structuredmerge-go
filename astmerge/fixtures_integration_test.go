@@ -8289,6 +8289,34 @@ func TestSharedFixtureStructuredEditParitySelectionSemantics(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditParityMatchSemantics(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_parity_match_semantics"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var request StructuredEditRequest
+		if raw, err := json.Marshal(testCase["request"]); err != nil {
+			t.Fatalf("marshal structured edit parity match semantics request: %v", err)
+		} else if err := json.Unmarshal(raw, &request); err != nil {
+			t.Fatalf("unmarshal structured edit parity match semantics request: %v", err)
+		}
+
+		roundtrip, err := json.Marshal(request)
+		if err != nil {
+			t.Fatalf("marshal structured edit parity match semantics request roundtrip: %v", err)
+		}
+
+		var decoded StructuredEditRequest
+		if err := json.Unmarshal(roundtrip, &decoded); err != nil {
+			t.Fatalf("unmarshal roundtrip structured edit parity match semantics request: %v", err)
+		}
+
+		if !reflect.DeepEqual(decoded, request) {
+			t.Fatalf("unexpected structured edit parity match semantics request roundtrip for %s: %+v", testCase["label"], decoded)
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditExecutionReportEnvelope(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_execution_report_envelope"))
 	report := decodeFixtureValue[StructuredEditExecutionReport](t, fixture["structured_edit_execution_report"])
