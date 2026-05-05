@@ -8941,6 +8941,42 @@ func TestSharedFixtureSuppliedManagedTextBlockReplacementAcceptance(t *testing.T
 	}
 }
 
+func TestSharedFixtureSuppliedYAMLPlaceholderScalarBackfillAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_yaml_placeholder_scalar_backfill_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied YAML placeholder scalar backfill report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied YAML placeholder scalar backfill report envelope: %v", err)
+		}
+
+		if testCase["label"] == "backfill-placeholder-and-blank-scalars" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "name: \"demo-toolkit\"") || !strings.Contains(finalContent, "namespace: 'Demo::Toolkit'") {
+				t.Fatalf("expected placeholder and blank YAML scalars to be backfilled")
+			}
+			if !strings.Contains(finalContent, "homepage: \"https://example.invalid/existing\"") {
+				t.Fatalf("expected concrete YAML scalar to be preserved")
+			}
+			if !strings.Contains(finalContent, "# ENV: KJ_GEM_NAME") || !strings.Contains(finalContent, "# keep concrete value") {
+				t.Fatalf("expected YAML comments to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["updated_scalars"] != float64(2) {
+				t.Fatalf("expected two YAML scalars to be updated")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["preserved_scalars"] != float64(1) {
+				t.Fatalf("expected one concrete YAML scalar to be preserved")
+			}
+		}
+		if testCase["label"] == "missing-yaml-scalar-backfills-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing YAML scalar backfills to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
