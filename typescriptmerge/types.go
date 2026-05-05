@@ -13,8 +13,8 @@ type TypeScriptDialect string
 type TypeScriptBackend string
 
 const (
-	DialectTypeScript  TypeScriptDialect = "typescript"
-	BackendTreeSitter  TypeScriptBackend = "kreuzberg-language-pack"
+	DialectTypeScript TypeScriptDialect = "typescript"
+	BackendTreeSitter TypeScriptBackend = "kreuzberg-language-pack"
 )
 
 type TypeScriptOwnerKind string

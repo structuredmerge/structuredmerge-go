@@ -366,12 +366,12 @@ func TestExecuteReviewedNestedExecutionsPreservesOrder(t *testing.T) {
 								RequestedStrategy: "delegate_child_surface",
 								LanguageChain:     []string{"ruby", "ruby"},
 								Surface: DiscoveredSurface{
-									SurfaceKind:       "yard_example",
-									EffectiveLanguage: "ruby",
-									Address:           rubyAddress,
-									Owner:             SurfaceOwnerRef{Kind: SurfaceOwnerOwnedRegion, Address: "/yard_example/1"},
+									SurfaceKind:            "yard_example",
+									EffectiveLanguage:      "ruby",
+									Address:                rubyAddress,
+									Owner:                  SurfaceOwnerRef{Kind: SurfaceOwnerOwnedRegion, Address: "/yard_example/1"},
 									ReconstructionStrategy: "portable_write",
-									Metadata: map[string]any{"family": "ruby"},
+									Metadata:               map[string]any{"family": "ruby"},
 								},
 							}},
 						}

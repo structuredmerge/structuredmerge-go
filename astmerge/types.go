@@ -155,6 +155,147 @@ type FamilyFeatureProfile struct {
 	SupportedPolicies []PolicyReference `json:"supported_policies"`
 }
 
+type CompactRulesetDirective struct {
+	Name      string   `json:"name"`
+	Arguments []string `json:"arguments"`
+	Line      int      `json:"line"`
+}
+
+type CompactRuleset struct {
+	Directives []CompactRulesetDirective `json:"directives"`
+	Comments   []string                  `json:"comments"`
+}
+
+var (
+	compactRulesetIdentifierPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]*$`)
+	compactRulesetTokenPattern      = regexp.MustCompile(`^[\x21\x24-\x7e]+$`)
+)
+
+var compactRulesetRequiredDirectives = []string{"format", "owners", "match", "read", "attach"}
+
+var compactRulesetSingletonDirectives = map[string]bool{
+	"format":        true,
+	"owners":        true,
+	"match":         true,
+	"read":          true,
+	"attach":        true,
+	"comment_style": true,
+	"render":        true,
+}
+
+var compactRulesetRepeatableKeyedDirectives = map[string]bool{
+	"capability":    true,
+	"logical_owner": true,
+	"repair":        true,
+	"surface":       true,
+	"delegate":      true,
+}
+
+var compactRulesetReadValues = map[string]bool{
+	"source_augmented_portable_write": true,
+	"native_read_portable_write":      true,
+	"native_mutation":                 true,
+}
+
+var compactRulesetAttachValues = map[string]bool{
+	"layout_only":                        true,
+	"tracker_layout_merge":               true,
+	"augmenter_preferred_tracker_layout": true,
+	"normalize_tracked_layout_merge":     true,
+}
+
+func ParseCompactRuleset(source string) ParseResult[CompactRuleset] {
+	ruleset := CompactRuleset{
+		Directives: []CompactRulesetDirective{},
+		Comments:   []string{},
+	}
+	diagnostics := []Diagnostic{}
+	seenDirectives := map[string]int{}
+	seenRepeatableKeys := map[string]bool{}
+
+	for index, rawLine := range strings.Split(source, "\n") {
+		lineNumber := index + 1
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			ruleset.Comments = append(ruleset.Comments, line)
+			continue
+		}
+
+		parts := strings.Fields(line)
+		name := parts[0]
+		args := parts[1:]
+		path := strconv.Itoa(lineNumber)
+		if !compactRulesetIdentifierPattern.MatchString(name) {
+			diagnostics = append(diagnostics, compactRulesetDiagnostic("invalid directive token "+strconv.Quote(name), path))
+			continue
+		}
+		if !compactRulesetKnownDirective(name) {
+			diagnostics = append(diagnostics, compactRulesetDiagnostic("unknown directive "+strconv.Quote(name), path))
+			continue
+		}
+		if len(args) == 0 {
+			diagnostics = append(diagnostics, compactRulesetDiagnostic("directive "+strconv.Quote(name)+" requires at least one argument", path))
+			continue
+		}
+		for _, arg := range args {
+			if arg != "true" && arg != "false" && !compactRulesetIdentifierPattern.MatchString(arg) && !compactRulesetTokenPattern.MatchString(arg) {
+				diagnostics = append(diagnostics, compactRulesetDiagnostic("invalid argument token "+strconv.Quote(arg), path))
+			}
+		}
+
+		if compactRulesetSingletonDirectives[name] {
+			if firstLine, ok := seenDirectives[name]; ok {
+				diagnostics = append(diagnostics, compactRulesetDiagnostic("repeated singleton directive "+strconv.Quote(name)+" first seen on line "+strconv.Itoa(firstLine), path))
+			}
+		}
+		if compactRulesetRepeatableKeyedDirectives[name] {
+			key := name + "\x00" + args[0]
+			if seenRepeatableKeys[key] {
+				diagnostics = append(diagnostics, compactRulesetDiagnostic("repeated "+strconv.Quote(name)+" key "+strconv.Quote(args[0]), path))
+			}
+			seenRepeatableKeys[key] = true
+		}
+		if name == "read" && !compactRulesetReadValues[args[0]] {
+			diagnostics = append(diagnostics, compactRulesetDiagnostic("unknown read value "+strconv.Quote(args[0]), path))
+		}
+		if name == "attach" && !compactRulesetAttachValues[args[0]] {
+			diagnostics = append(diagnostics, compactRulesetDiagnostic("unknown attach value "+strconv.Quote(args[0]), path))
+		}
+
+		seenDirectives[name] = lineNumber
+		ruleset.Directives = append(ruleset.Directives, CompactRulesetDirective{Name: name, Arguments: args, Line: lineNumber})
+	}
+
+	for _, required := range compactRulesetRequiredDirectives {
+		if _, ok := seenDirectives[required]; !ok {
+			diagnostics = append(diagnostics, compactRulesetDiagnostic("missing required directive "+strconv.Quote(required), ""))
+		}
+	}
+
+	ok := len(diagnostics) == 0
+	var analysis *CompactRuleset
+	if ok {
+		analysis = &ruleset
+	}
+	return ParseResult[CompactRuleset]{OK: ok, Diagnostics: diagnostics, Analysis: analysis, Policies: []PolicyReference{}}
+}
+
+func compactRulesetKnownDirective(name string) bool {
+	return compactRulesetSingletonDirectives[name] || compactRulesetRepeatableKeyedDirectives[name]
+}
+
+func compactRulesetDiagnostic(message string, path string) Diagnostic {
+	return Diagnostic{
+		Severity: SeverityError,
+		Category: CategoryConfigurationError,
+		Message:  message,
+		Path:     path,
+	}
+}
+
 type StructuredEditStructureProfile struct {
 	OwnerScope              string         `json:"owner_scope"`
 	OwnerSelector           string         `json:"owner_selector"`
@@ -2158,7 +2299,7 @@ func PlanTemplateExecution(
 			}
 		}
 
-		executionAction := TemplateExecutionMergePrepared
+		var executionAction TemplateExecutionAction
 		switch {
 		case entry.Blocked:
 			executionAction = TemplateExecutionBlocked

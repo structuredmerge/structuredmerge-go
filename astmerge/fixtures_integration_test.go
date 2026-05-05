@@ -8573,26 +8573,26 @@ func TestSharedFixtureRubyGemspecVersionLoaderPolicyAcceptance(t *testing.T) {
 	}
 }
 
-func TestSharedFixtureProjectFactsRuntimeContext(t *testing.T) {
-	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "project_facts_runtime_context"))
+func TestSharedFixtureRuntimeFactsContext(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "runtime_facts_context"))
 	for _, rawCase := range fixture["cases"].([]any) {
 		testCase := rawCase.(map[string]any)
 
 		var reportEnvelope ContentRecipeExecutionReportEnvelope
 		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
-			t.Fatalf("marshal project facts runtime context report envelope: %v", err)
+			t.Fatalf("marshal runtime facts runtime context report envelope: %v", err)
 		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
-			t.Fatalf("unmarshal project facts runtime context report envelope: %v", err)
+			t.Fatalf("unmarshal runtime facts runtime context report envelope: %v", err)
 		}
 
-		projectFacts := reportEnvelope.Report.Request.RuntimeContext["project_facts"].(map[string]any)
-		if projectFacts["schema"] != "project_facts.v1" {
-			t.Fatalf("expected project_facts.v1 schema")
+		runtimeFacts := reportEnvelope.Report.Request.RuntimeContext["facts"].(map[string]any)
+		if runtimeFacts["schema"] != "runtime_facts.v1" {
+			t.Fatalf("expected runtime_facts.v1 schema")
 		}
 
 		if testCase["label"] == "dependency-floor-comments-from-project-facts" {
 			if !strings.Contains(reportEnvelope.Report.FinalContent, "# Required for Ruby < 3.4.") {
-				t.Fatalf("expected dependency floor comment from project facts")
+				t.Fatalf("expected dependency floor comment from runtime facts")
 			}
 			if reportEnvelope.Report.StepReports[0].Metadata["consumed_fact_id"] != "dependency.ruby_floor" {
 				t.Fatalf("expected dependency.ruby_floor facts to be consumed")
@@ -8634,7 +8634,7 @@ func TestSharedFixtureRubyGemspecSelfDependencyPolicyAcceptance(t *testing.T) {
 			}
 		}
 		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
-			t.Fatalf("expected missing project identity to fail closed")
+			t.Fatalf("expected missing package identity to fail closed")
 		}
 	}
 }
@@ -8656,18 +8656,15 @@ func TestSharedFixtureRubyGemfileSelfDependencyPolicyAcceptance(t *testing.T) {
 			if strings.Contains(finalContent, "gem \"demo\", \"~> 1.0\"") || strings.Contains(finalContent, "path: \"../dev/demo\"") {
 				t.Fatalf("expected active Gemfile self dependencies to be deleted")
 			}
-			if !strings.Contains(finalContent, "# gem \"demo\", \"~> 0\"") {
-				t.Fatalf("expected commented Gemfile self dependency to be preserved")
-			}
-			if !strings.Contains(finalContent, "gem \"ast-merge\"") || !strings.Contains(finalContent, "gem \"fallback-gem\"") {
-				t.Fatalf("expected unrelated nested Gemfile dependencies to be preserved")
+			if !strings.Contains(finalContent, "# gem \"demo\", \"~> 0\"") || !strings.Contains(finalContent, "gem \"fallback-gem\"") {
+				t.Fatalf("expected comments and unrelated dependencies to be preserved")
 			}
 			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "delete" {
 				t.Fatalf("expected canonical delete operation")
 			}
 		}
 		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
-			t.Fatalf("expected missing project identity to fail closed")
+			t.Fatalf("expected missing package identity to fail closed")
 		}
 	}
 }
@@ -8690,14 +8687,14 @@ func TestSharedFixtureRubyAppraisalsSelfDependencyPolicyAcceptance(t *testing.T)
 				t.Fatalf("expected Appraisals self dependencies to be deleted")
 			}
 			if !strings.Contains(finalContent, "appraise(\"rails-6\")") || !strings.Contains(finalContent, "gem \"rspec\" # Testing") {
-				t.Fatalf("expected appraisal structure and unrelated dependencies to be preserved")
+				t.Fatalf("expected unrelated appraisals and dependencies to be preserved")
 			}
 			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "delete" {
 				t.Fatalf("expected canonical delete operation")
 			}
 		}
 		if testCase["label"] == "missing-project-identity-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
-			t.Fatalf("expected missing project identity to fail closed")
+			t.Fatalf("expected missing package identity to fail closed")
 		}
 	}
 }
@@ -8709,18 +8706,21 @@ func TestSharedFixtureRubyAppraisalsMinRubyPrunePolicyAcceptance(t *testing.T) {
 
 		var reportEnvelope ContentRecipeExecutionReportEnvelope
 		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
-			t.Fatalf("marshal Ruby Appraisals min-ruby prune policy report envelope: %v", err)
+			t.Fatalf("marshal Ruby Appraisals min-Ruby prune policy report envelope: %v", err)
 		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
-			t.Fatalf("unmarshal Ruby Appraisals min-ruby prune policy report envelope: %v", err)
+			t.Fatalf("unmarshal Ruby Appraisals min-Ruby prune policy report envelope: %v", err)
 		}
 
 		if testCase["label"] == "delete-ruby-appraisals-below-min-ruby" {
 			finalContent := reportEnvelope.Report.FinalContent
-			if strings.Contains(finalContent, "ruby-2-7") || strings.Contains(finalContent, "ruby-3-0") {
-				t.Fatalf("expected Ruby appraisals below min_ruby to be deleted")
+			if strings.Contains(finalContent, "ruby-2-3") || strings.Contains(finalContent, "ruby-2-7") || strings.Contains(finalContent, "ruby-3-0") {
+				t.Fatalf("expected appraisals below min_ruby to be deleted")
 			}
 			if !strings.Contains(finalContent, "ruby-3-2") || !strings.Contains(finalContent, "appraise \"style\"") {
-				t.Fatalf("expected appraisals at/above min_ruby and non-Ruby appraisals to be preserved")
+				t.Fatalf("expected appraisals at min_ruby and non-Ruby appraisals to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "delete" {
+				t.Fatalf("expected canonical delete operation")
 			}
 			if strings.Contains(finalContent, "\n\n\n") {
 				t.Fatalf("expected excessive blank lines to be normalized")
@@ -8728,6 +8728,254 @@ func TestSharedFixtureRubyAppraisalsMinRubyPrunePolicyAcceptance(t *testing.T) {
 		}
 		if testCase["label"] == "missing-min-ruby-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
 			t.Fatalf("expected missing min_ruby to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureChangelogUnreleasedNormalizationAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "changelog_unreleased_normalization_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal CHANGELOG Unreleased normalization report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal CHANGELOG Unreleased normalization report envelope: %v", err)
+		}
+
+		if testCase["label"] == "create-unreleased-section-from-supplied-entries" {
+			finalContent := reportEnvelope.Report.FinalContent
+			unreleasedIndex := strings.Index(finalContent, "## Unreleased")
+			releaseIndex := strings.Index(finalContent, "## 1.2.0")
+			if unreleasedIndex == -1 || releaseIndex == -1 || unreleasedIndex > releaseIndex {
+				t.Fatalf("expected Unreleased section before first release heading")
+			}
+			if !strings.Contains(finalContent, "- Added native Markdown recipe boundary.") || !strings.Contains(finalContent, "- Existing release.") {
+				t.Fatalf("expected supplied entries and release history to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["operation"] != "insert_or_replace_section" {
+				t.Fatalf("expected canonical insert_or_replace_section operation")
+			}
+		}
+		if testCase["label"] == "missing-entries-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing entries to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureReadmeSuppliedMetadataSynchronizationAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "readme_supplied_metadata_synchronization_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal README supplied metadata synchronization report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal README supplied metadata synchronization report envelope: %v", err)
+		}
+
+		if testCase["label"] == "sync-readme-heading-and-summary-from-supplied-metadata" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.HasPrefix(finalContent, "# Demo Toolkit\n") {
+				t.Fatalf("expected README H1 to come from supplied metadata")
+			}
+			if !strings.Contains(finalContent, "A deterministic toolkit for structured merges.") || !strings.Contains(finalContent, "Destination usage.") {
+				t.Fatalf("expected supplied summary and unrelated destination section to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["consumed_context"] != "readme_metadata.title" {
+				t.Fatalf("expected title context to be consumed")
+			}
+			if reportEnvelope.Report.StepReports[1].Metadata["consumed_context"] != "readme_metadata.summary" {
+				t.Fatalf("expected summary context to be consumed")
+			}
+		}
+		if testCase["label"] == "missing-readme-metadata-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing README metadata to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureSuppliedMarkdownPruningAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_markdown_pruning_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied Markdown pruning report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied Markdown pruning report envelope: %v", err)
+		}
+
+		if testCase["label"] == "prune-supplied-table-rows-and-reference-definitions" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "Works with JRuby") || strings.Contains(finalContent, "[jruby-9.4]:") || strings.Contains(finalContent, "[jruby-head]:") {
+				t.Fatalf("expected supplied Markdown selectors to be pruned")
+			}
+			if !strings.Contains(finalContent, "Works with MRI Ruby") || !strings.Contains(finalContent, "[ruby-3.2]:") {
+				t.Fatalf("expected unmatched Markdown content to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["deleted_rows"] != float64(1) {
+				t.Fatalf("expected one table row to be deleted")
+			}
+			if reportEnvelope.Report.StepReports[1].Metadata["deleted_reference_definitions"] != float64(2) {
+				t.Fatalf("expected two reference definitions to be deleted")
+			}
+		}
+		if testCase["label"] == "missing-prune-selectors-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing prune selectors to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureSuppliedSourceSelectorDeletionAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_source_selector_deletion_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied source selector deletion report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied source selector deletion report envelope: %v", err)
+		}
+
+		if testCase["label"] == "delete-supplied-structural-owner-ranges" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if strings.Contains(finalContent, "kettle/scaffold") || strings.Contains(finalContent, "task :scaffold") {
+				t.Fatalf("expected supplied source selectors to be deleted")
+			}
+			if !strings.Contains(finalContent, "require \"bundler/gem_tasks\"") || !strings.Contains(finalContent, "task :spec") {
+				t.Fatalf("expected unmatched source content to be preserved")
+			}
+			if strings.Contains(finalContent, "\n\n\n") {
+				t.Fatalf("expected deletion gaps to be normalized")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["deleted_ranges"] != float64(2) {
+				t.Fatalf("expected two structural owner ranges to be deleted")
+			}
+		}
+		if testCase["label"] == "missing-delete-selectors-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing delete selectors to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureSuppliedYAMLSnippetSynchronizationAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_yaml_snippet_synchronization_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied YAML snippet synchronization report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied YAML snippet synchronization report envelope: %v", err)
+		}
+
+		if testCase["label"] == "apply-supplied-sections-and-scalar-pins" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "concurrency:") || !strings.Contains(finalContent, "permissions:") {
+				t.Fatalf("expected supplied YAML sections to be applied")
+			}
+			if !strings.Contains(finalContent, "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd") || !strings.Contains(finalContent, "ruby/setup-ruby@e65c17d16e57e481586a6a5a0282698790062f92") {
+				t.Fatalf("expected supplied YAML scalar pins to be applied")
+			}
+			if strings.Contains(finalContent, "actions/checkout@v3") || strings.Contains(finalContent, "ruby/setup-ruby@v1") {
+				t.Fatalf("expected old action pins to be replaced")
+			}
+			if !strings.Contains(finalContent, "gemfiles/current.gemfile") || !strings.Contains(finalContent, "ruby-version: ${{ matrix.ruby }}") {
+				t.Fatalf("expected unmatched workflow YAML to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["updated_sections"] != float64(2) {
+				t.Fatalf("expected two YAML sections to be updated")
+			}
+			if reportEnvelope.Report.StepReports[1].Metadata["updated_scalars"] != float64(2) {
+				t.Fatalf("expected two YAML scalars to be updated")
+			}
+		}
+		if testCase["label"] == "missing-yaml-updates-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing YAML updates to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureSuppliedManagedTextBlockReplacementAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_managed_text_block_replacement_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied managed text block replacement report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied managed text block replacement report envelope: %v", err)
+		}
+
+		if testCase["label"] == "replace-existing-managed-text-block" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "gem \"debug\", \"~> 1.9\"") || !strings.Contains(finalContent, "gem \"irb\", \"~> 1.15\"") {
+				t.Fatalf("expected generated block content to replace old content")
+			}
+			if strings.Contains(finalContent, "old-debug") {
+				t.Fatalf("expected old generated block content to be removed")
+			}
+			if !strings.Contains(finalContent, "gem \"rake\"") || !strings.Contains(finalContent, "gem \"rspec\"") {
+				t.Fatalf("expected content outside managed block to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["replaced_blocks"] != float64(1) {
+				t.Fatalf("expected one managed block to be replaced")
+			}
+		}
+		if testCase["label"] == "append-missing-managed-text-block" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "# <<kettle-jem:generated>>") || !strings.Contains(finalContent, "# (no shunted dependencies)") {
+				t.Fatalf("expected missing managed block to be appended")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["appended_blocks"] != float64(1) {
+				t.Fatalf("expected one managed block to be appended")
+			}
+		}
+		if testCase["label"] == "missing-managed-block-updates-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing managed block updates to fail closed")
+		}
+	}
+}
+
+func TestSharedFixtureSuppliedYAMLPlaceholderScalarBackfillAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_yaml_placeholder_scalar_backfill_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied YAML placeholder scalar backfill report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied YAML placeholder scalar backfill report envelope: %v", err)
+		}
+
+		if testCase["label"] == "backfill-placeholder-and-blank-scalars" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "name: \"demo-toolkit\"") || !strings.Contains(finalContent, "namespace: 'Demo::Toolkit'") {
+				t.Fatalf("expected placeholder and blank YAML scalars to be backfilled")
+			}
+			if !strings.Contains(finalContent, "homepage: \"https://example.invalid/existing\"") {
+				t.Fatalf("expected concrete YAML scalar to be preserved")
+			}
+			if !strings.Contains(finalContent, "# ENV: KJ_GEM_NAME") || !strings.Contains(finalContent, "# keep concrete value") {
+				t.Fatalf("expected YAML comments to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["updated_scalars"] != float64(2) {
+				t.Fatalf("expected two YAML scalars to be updated")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["preserved_scalars"] != float64(1) {
+				t.Fatalf("expected one concrete YAML scalar to be preserved")
+			}
+		}
+		if testCase["label"] == "missing-yaml-scalar-backfills-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing YAML scalar backfills to fail closed")
 		}
 	}
 }

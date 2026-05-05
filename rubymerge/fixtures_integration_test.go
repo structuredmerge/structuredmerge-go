@@ -338,82 +338,82 @@ func TestRubyFixtures(t *testing.T) {
 		DialectRuby,
 		reviewStateArtifact,
 	)
-		if stateRejectionResult.OK || stateRejectionResult.Output != nil || len(stateRejectionResult.Diagnostics) != 1 || stateRejectionResult.Diagnostics[0].Message != rejectionFixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
-			t.Fatalf("unexpected review-state rejection: %+v", stateRejectionResult)
-		}
+	if stateRejectionResult.OK || stateRejectionResult.Output != nil || len(stateRejectionResult.Diagnostics) != 1 || stateRejectionResult.Diagnostics[0].Message != rejectionFixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected review-state rejection: %+v", stateRejectionResult)
+	}
 
-		envelopeFixture := readRubyFixture(t, "ruby", "slice-314-reviewed-nested-review-artifact-envelope-application", "yard-example-reviewed-nested-review-artifact-envelope-application.json")
-		replayEnvelopeSource, err := json.Marshal(envelopeFixture["replay_bundle_envelope"])
-		if err != nil {
-			t.Fatalf("marshal reviewed nested replay bundle envelope: %v", err)
-		}
-		var replayEnvelope astmerge.ReviewReplayBundleEnvelope
-		if err := json.Unmarshal(replayEnvelopeSource, &replayEnvelope); err != nil {
-			t.Fatalf("decode reviewed nested replay bundle envelope: %v", err)
-		}
-		reviewStateEnvelopeSource, err := json.Marshal(envelopeFixture["review_state_envelope"])
-		if err != nil {
-			t.Fatalf("marshal reviewed nested review state envelope: %v", err)
-		}
-		var reviewStateEnvelope astmerge.ConformanceManifestReviewStateEnvelope
-		if err := json.Unmarshal(reviewStateEnvelopeSource, &reviewStateEnvelope); err != nil {
-			t.Fatalf("decode reviewed nested review state envelope: %v", err)
-		}
-		replayEnvelopeResult := MergeRubyWithReviewedNestedOutputsFromReplayBundleEnvelope(
-			envelopeFixture["template"].(string),
-			envelopeFixture["destination"].(string),
-			DialectRuby,
-			replayEnvelope,
-		)
-		if !replayEnvelopeResult.OK || replayEnvelopeResult.Output == nil || *replayEnvelopeResult.Output != envelopeFixture["expected"].(map[string]any)["output"].(string) {
-			t.Fatalf("unexpected replay-bundle-envelope reviewed nested merge: %+v", replayEnvelopeResult)
-		}
-		stateEnvelopeResult := MergeRubyWithReviewedNestedOutputsFromReviewStateEnvelope(
-			envelopeFixture["template"].(string),
-			envelopeFixture["destination"].(string),
-			DialectRuby,
-			reviewStateEnvelope,
-		)
-		if !stateEnvelopeResult.OK || stateEnvelopeResult.Output == nil || *stateEnvelopeResult.Output != envelopeFixture["expected"].(map[string]any)["output"].(string) {
-			t.Fatalf("unexpected review-state-envelope reviewed nested merge: %+v", stateEnvelopeResult)
-		}
+	envelopeFixture := readRubyFixture(t, "ruby", "slice-314-reviewed-nested-review-artifact-envelope-application", "yard-example-reviewed-nested-review-artifact-envelope-application.json")
+	replayEnvelopeSource, err := json.Marshal(envelopeFixture["replay_bundle_envelope"])
+	if err != nil {
+		t.Fatalf("marshal reviewed nested replay bundle envelope: %v", err)
+	}
+	var replayEnvelope astmerge.ReviewReplayBundleEnvelope
+	if err := json.Unmarshal(replayEnvelopeSource, &replayEnvelope); err != nil {
+		t.Fatalf("decode reviewed nested replay bundle envelope: %v", err)
+	}
+	reviewStateEnvelopeSource, err := json.Marshal(envelopeFixture["review_state_envelope"])
+	if err != nil {
+		t.Fatalf("marshal reviewed nested review state envelope: %v", err)
+	}
+	var reviewStateEnvelope astmerge.ConformanceManifestReviewStateEnvelope
+	if err := json.Unmarshal(reviewStateEnvelopeSource, &reviewStateEnvelope); err != nil {
+		t.Fatalf("decode reviewed nested review state envelope: %v", err)
+	}
+	replayEnvelopeResult := MergeRubyWithReviewedNestedOutputsFromReplayBundleEnvelope(
+		envelopeFixture["template"].(string),
+		envelopeFixture["destination"].(string),
+		DialectRuby,
+		replayEnvelope,
+	)
+	if !replayEnvelopeResult.OK || replayEnvelopeResult.Output == nil || *replayEnvelopeResult.Output != envelopeFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected replay-bundle-envelope reviewed nested merge: %+v", replayEnvelopeResult)
+	}
+	stateEnvelopeResult := MergeRubyWithReviewedNestedOutputsFromReviewStateEnvelope(
+		envelopeFixture["template"].(string),
+		envelopeFixture["destination"].(string),
+		DialectRuby,
+		reviewStateEnvelope,
+	)
+	if !stateEnvelopeResult.OK || stateEnvelopeResult.Output == nil || *stateEnvelopeResult.Output != envelopeFixture["expected"].(map[string]any)["output"].(string) {
+		t.Fatalf("unexpected review-state-envelope reviewed nested merge: %+v", stateEnvelopeResult)
+	}
 
-		envelopeRejectionFixture := readRubyFixture(t, "ruby", "slice-316-reviewed-nested-review-artifact-envelope-rejection", "yard-example-reviewed-nested-review-artifact-envelope-rejection.json")
-		replayEnvelopeSource, err = json.Marshal(envelopeRejectionFixture["replay_bundle_envelope"])
-		if err != nil {
-			t.Fatalf("marshal rejection replay bundle envelope: %v", err)
-		}
-		if err := json.Unmarshal(replayEnvelopeSource, &replayEnvelope); err != nil {
-			t.Fatalf("decode rejection replay bundle envelope: %v", err)
-		}
-		reviewStateEnvelopeSource, err = json.Marshal(envelopeRejectionFixture["review_state_envelope"])
-		if err != nil {
-			t.Fatalf("marshal rejection review state envelope: %v", err)
-		}
-		if err := json.Unmarshal(reviewStateEnvelopeSource, &reviewStateEnvelope); err != nil {
-			t.Fatalf("decode rejection review state envelope: %v", err)
-		}
-		replayEnvelopeRejectionResult := MergeRubyWithReviewedNestedOutputsFromReplayBundleEnvelope(
-			envelopeRejectionFixture["template"].(string),
-			envelopeRejectionFixture["destination"].(string),
-			DialectRuby,
-			replayEnvelope,
-		)
-		if replayEnvelopeRejectionResult.OK || replayEnvelopeRejectionResult.Output != nil || len(replayEnvelopeRejectionResult.Diagnostics) != 1 || replayEnvelopeRejectionResult.Diagnostics[0].Message != envelopeRejectionFixture["expected_replay_bundle"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
-			t.Fatalf("unexpected replay-bundle-envelope rejection: %+v", replayEnvelopeRejectionResult)
-		}
-		stateEnvelopeRejectionResult := MergeRubyWithReviewedNestedOutputsFromReviewStateEnvelope(
-			envelopeRejectionFixture["template"].(string),
-			envelopeRejectionFixture["destination"].(string),
-			DialectRuby,
-			reviewStateEnvelope,
-		)
-		if stateEnvelopeRejectionResult.OK || stateEnvelopeRejectionResult.Output != nil || len(stateEnvelopeRejectionResult.Diagnostics) != 1 || stateEnvelopeRejectionResult.Diagnostics[0].Message != envelopeRejectionFixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
-			t.Fatalf("unexpected review-state-envelope rejection: %+v", stateEnvelopeRejectionResult)
-		}
+	envelopeRejectionFixture := readRubyFixture(t, "ruby", "slice-316-reviewed-nested-review-artifact-envelope-rejection", "yard-example-reviewed-nested-review-artifact-envelope-rejection.json")
+	replayEnvelopeSource, err = json.Marshal(envelopeRejectionFixture["replay_bundle_envelope"])
+	if err != nil {
+		t.Fatalf("marshal rejection replay bundle envelope: %v", err)
+	}
+	if err := json.Unmarshal(replayEnvelopeSource, &replayEnvelope); err != nil {
+		t.Fatalf("decode rejection replay bundle envelope: %v", err)
+	}
+	reviewStateEnvelopeSource, err = json.Marshal(envelopeRejectionFixture["review_state_envelope"])
+	if err != nil {
+		t.Fatalf("marshal rejection review state envelope: %v", err)
+	}
+	if err := json.Unmarshal(reviewStateEnvelopeSource, &reviewStateEnvelope); err != nil {
+		t.Fatalf("decode rejection review state envelope: %v", err)
+	}
+	replayEnvelopeRejectionResult := MergeRubyWithReviewedNestedOutputsFromReplayBundleEnvelope(
+		envelopeRejectionFixture["template"].(string),
+		envelopeRejectionFixture["destination"].(string),
+		DialectRuby,
+		replayEnvelope,
+	)
+	if replayEnvelopeRejectionResult.OK || replayEnvelopeRejectionResult.Output != nil || len(replayEnvelopeRejectionResult.Diagnostics) != 1 || replayEnvelopeRejectionResult.Diagnostics[0].Message != envelopeRejectionFixture["expected_replay_bundle"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected replay-bundle-envelope rejection: %+v", replayEnvelopeRejectionResult)
+	}
+	stateEnvelopeRejectionResult := MergeRubyWithReviewedNestedOutputsFromReviewStateEnvelope(
+		envelopeRejectionFixture["template"].(string),
+		envelopeRejectionFixture["destination"].(string),
+		DialectRuby,
+		reviewStateEnvelope,
+	)
+	if stateEnvelopeRejectionResult.OK || stateEnvelopeRejectionResult.Output != nil || len(stateEnvelopeRejectionResult.Diagnostics) != 1 || stateEnvelopeRejectionResult.Diagnostics[0].Message != envelopeRejectionFixture["expected_review_state"].(map[string]any)["diagnostics"].([]any)[0].(map[string]any)["message"].(string) {
+		t.Fatalf("unexpected review-state-envelope rejection: %+v", stateEnvelopeRejectionResult)
+	}
 
-		invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
-		invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
+	invalidTemplateFixture := readRubyFixture(t, "ruby", "slice-287-merge", "invalid-template.json")
+	invalidTemplateResult := MergeRuby(invalidTemplateFixture["template"].(string), invalidTemplateFixture["destination"].(string), DialectRuby)
 	if invalidTemplateResult.OK {
 		t.Fatalf("expected invalid template merge failure: %+v", invalidTemplateResult)
 	}

@@ -2,6 +2,7 @@ package jsonmerge
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 	"slices"
@@ -30,6 +31,11 @@ const (
 	OwnerMember  JSONOwnerKind = "member"
 	OwnerElement JSONOwnerKind = "element"
 )
+
+type orderedJSONObject struct {
+	keys   []string
+	values map[string]any
+}
 
 type JSONOwner struct {
 	Path      string
@@ -567,16 +573,94 @@ func parseNormalizedJSON(source string, dialect JSONDialect, diagnosticFactory f
 		return nil, diagnosticFactory("JSON parse failed."), false
 	}
 
-	var decoded any
-	if err := json.Unmarshal([]byte(result.Analysis.NormalizedSource), &decoded); err != nil {
+	decoded, err := parseOrderedJSON(result.Analysis.NormalizedSource)
+	if err != nil {
 		return nil, diagnosticFactory("JSON parse failed."), false
 	}
 
 	return decoded, astmerge.Diagnostic{}, true
 }
 
+func parseOrderedJSON(source string) (any, error) {
+	decoder := json.NewDecoder(strings.NewReader(source))
+	return decodeOrderedJSONValue(decoder)
+}
+
+func decodeOrderedJSONValue(decoder *json.Decoder) (any, error) {
+	token, err := decoder.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	switch typed := token.(type) {
+	case json.Delim:
+		switch typed {
+		case '{':
+			object := orderedJSONObject{values: map[string]any{}}
+			for decoder.More() {
+				keyToken, err := decoder.Token()
+				if err != nil {
+					return nil, err
+				}
+				key := keyToken.(string)
+				value, err := decodeOrderedJSONValue(decoder)
+				if err != nil {
+					return nil, err
+				}
+				object.keys = append(object.keys, key)
+				object.values[key] = value
+			}
+			if _, err := decoder.Token(); err != nil {
+				return nil, err
+			}
+			return object, nil
+		case '[':
+			items := []any{}
+			for decoder.More() {
+				value, err := decodeOrderedJSONValue(decoder)
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, value)
+			}
+			if _, err := decoder.Token(); err != nil {
+				return nil, err
+			}
+			return items, nil
+		default:
+			return nil, fmt.Errorf("unexpected JSON delimiter %q", typed)
+		}
+	default:
+		return typed, nil
+	}
+}
+
 func mergeValues(template any, destination any) any {
 	switch templateTyped := template.(type) {
+	case orderedJSONObject:
+		destinationTyped, ok := destination.(orderedJSONObject)
+		if !ok {
+			return destination
+		}
+
+		merged := orderedJSONObject{values: map[string]any{}}
+		for _, key := range templateTyped.keys {
+			templateValue := templateTyped.values[key]
+			destinationValue, hasDestination := destinationTyped.values[key]
+			if hasDestination {
+				merged.values[key] = mergeValues(templateValue, destinationValue)
+			} else {
+				merged.values[key] = templateValue
+			}
+			merged.keys = append(merged.keys, key)
+		}
+		for _, key := range destinationTyped.keys {
+			if _, hasTemplate := templateTyped.values[key]; !hasTemplate {
+				merged.keys = append(merged.keys, key)
+				merged.values[key] = destinationTyped.values[key]
+			}
+		}
+		return merged
 	case map[string]any:
 		destinationTyped, ok := destination.(map[string]any)
 		if !ok {
@@ -658,6 +742,13 @@ func canonicalJSON(value any) string {
 		default:
 			return ""
 		}
+	case orderedJSONObject:
+		parts := make([]string, 0, len(typed.keys))
+		for _, key := range typed.keys {
+			keyBytes, _ := json.Marshal(key)
+			parts = append(parts, string(keyBytes)+":"+canonicalJSON(typed.values[key]))
+		}
+		return "{" + strings.Join(parts, ",") + "}"
 	default:
 		bytes, _ := json.Marshal(typed)
 		return string(bytes)

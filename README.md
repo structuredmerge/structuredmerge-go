@@ -1,6 +1,20 @@
-# Structured Merge Go
+# StructuredMerge Go
 
-Monorepo for the Go implementation of the Structured Merge library family.
+Go implementation of the StructuredMerge contract.
+
+This repository is one of four peer launch implementations: [Go](https://github.com/structuredmerge/structuredmerge-go), [TypeScript](https://github.com/structuredmerge/structuredmerge-typescript), [Rust](https://github.com/structuredmerge/structuredmerge-rust), and [Ruby](https://github.com/structuredmerge/structuredmerge-ruby). The language repos are not separate products. They consume the same public spec and shared fixture corpus so tools can choose the runtime surface that fits their environment.
+
+Project links:
+
+- Website: <https://structuredmerge.org>
+- Implementations overview: <https://structuredmerge.org/implementations.html>
+- Conformance model: <https://structuredmerge.org/conformance.html>
+- Specification: <https://github.com/structuredmerge/structuredmerge-spec>
+- Shared fixtures: <https://github.com/structuredmerge/structuredmerge-fixtures>
+
+## Workspace
+
+This is a Go module workspace for StructuredMerge packages.
 
 Initial packages:
 
@@ -9,29 +23,26 @@ Initial packages:
 - `textmerge`
 - `jsonmerge`
 
+## Conformance
+
+Integration tests should consume the shared fixture corpus from the sibling `../structuredmerge-fixtures` checkout. A ruleset, fixture, diagnostic shape, or review outcome should mean the same thing whether exercised through Go, TypeScript, Rust, or Ruby.
+
+Use the spec repository's conformance matrix for the current launch-readiness snapshot:
+
+- <https://github.com/structuredmerge/structuredmerge-spec/blob/main/conformance-matrix.md>
+- <https://github.com/structuredmerge/structuredmerge-spec/blob/main/IMPLEMENTATION_STATUS.md>
+
 ## Development
 
-Standard repo tasks are exposed through `mise` and native Go tooling:
+Standard repo tasks are exposed through `mise` and native Go tooling.
 
-- `mise run format`
-- `mise run format-check`
-- `mise run lint`
-- `mise run typecheck`
-- `mise run test`
+Common checks:
+
 - `mise run check`
+- `go test ./...`
 
-The Go monorepo uses:
+The current tree-sitter backend path uses the sibling `../tree-sitter-language-pack` checkout through a local `replace` in `go.mod`. Repo tasks build its `ts-pack-ffi` crate first and compile with the `tspack_dev` build tag while the upstream packaging fix is pending.
 
-- `gofmt` for formatting
-- `golangci-lint` for linting
-- `go test ./... -run '^$'` for type-checking/compilation
-- `go test ./...` for unit and integration tests
+## Status
 
-The current tree-sitter backend path uses the sibling
-`../tree-sitter-language-pack` checkout through a local `replace` in
-`go.mod`. Repo tasks build its `ts-pack-ffi` crate first and compile with the
-`tspack_dev` build tag so the Go binding can link against the local fork while
-the upstream packaging fix is pending.
-
-Integration tests consume the shared fixture corpus from the sibling
-`../fixtures` repository instead of copying fixture data into this monorepo.
+Early implementation work. Public compatibility claims should be tied to shared fixtures and documented conformance status rather than runtime-specific assumptions.

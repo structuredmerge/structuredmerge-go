@@ -113,7 +113,7 @@ func TestMergeJSON(t *testing.T) {
 		t.Fatalf("expected merge success, got diagnostics: %+v", result.Diagnostics)
 	}
 
-	expected := "{\"destination_only\":2,\"meta\":{\"enabled\":true,\"mode\":\"template\"},\"name\":\"structuredmerge\",\"tags\":[\"destination\"],\"template_only\":1}"
+	expected := "{\"name\":\"structuredmerge\",\"meta\":{\"enabled\":true,\"mode\":\"template\"},\"tags\":[\"destination\"],\"template_only\":1,\"destination_only\":2}"
 	if *result.Output != expected {
 		t.Fatalf("unexpected merged output: %s", *result.Output)
 	}
@@ -140,7 +140,7 @@ func TestMergeJSONPreservesDestinationArrayAsBaselineArrayPolicy(t *testing.T) {
 	if !result.OK || result.Output == nil {
 		t.Fatalf("expected merge success, got diagnostics: %+v", result.Diagnostics)
 	}
-	if *result.Output != "{\"items\":[9],\"meta\":{\"mode\":\"template\",\"tags\":[\"destination\"]}}" {
+	if *result.Output != "{\"items\":[9],\"meta\":{\"tags\":[\"destination\"],\"mode\":\"template\"}}" {
 		t.Fatalf("unexpected output: %q", *result.Output)
 	}
 	if len(result.Policies) != 1 || result.Policies[0].Name != "destination_wins_array" {

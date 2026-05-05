@@ -37,6 +37,11 @@ const (
 	OwnerSequenceItem YAMLOwnerKind = "sequence_item"
 )
 
+type orderedYAMLMapping struct {
+	keys   []string
+	values map[string]any
+}
+
 type YAMLOwner struct {
 	Path      string
 	OwnerKind YAMLOwnerKind
@@ -309,6 +314,8 @@ func renderYAMLNode(key string, value any, indent int) []string {
 		return lines
 	case map[string]any:
 		return append([]string{prefix + key + ":"}, renderYAMLMapping(node, indent+2)...)
+	case orderedYAMLMapping:
+		return append([]string{prefix + key + ":"}, renderOrderedYAMLMapping(node, indent+2)...)
 	default:
 		return []string{prefix + key + ": " + renderYAMLScalar(node)}
 	}
@@ -331,6 +338,19 @@ func renderYAMLMapping(mapping map[string]any, indent int) []string {
 
 func canonicalYAML(mapping map[string]any) string {
 	return strings.Join(renderYAMLMapping(mapping, 0), "\n") + "\n"
+}
+
+func renderOrderedYAMLMapping(mapping orderedYAMLMapping, indent int) []string {
+	lines := make([]string, 0)
+	for _, key := range mapping.keys {
+		lines = append(lines, renderYAMLNode(key, mapping.values[key], indent)...)
+	}
+
+	return lines
+}
+
+func canonicalOrderedYAML(mapping orderedYAMLMapping) string {
+	return strings.Join(renderOrderedYAMLMapping(mapping, 0), "\n") + "\n"
 }
 
 func collectYAMLOwners(mapping map[string]any, prefix string) []YAMLOwner {
@@ -389,6 +409,53 @@ func parseYAMLMapping(source string, backend YAMLBackend) (map[string]any, error
 		return nil, fmt.Errorf("YAML documents must parse to a mapping root")
 	}
 	return normalized, nil
+}
+
+func parseOrderedYAMLMapping(source string, backend YAMLBackend) (orderedYAMLMapping, error) {
+	if backend != BackendKreuzberg {
+		return orderedYAMLMapping{}, fmt.Errorf("unsupported YAML backend %s", backend)
+	}
+
+	var document yamlv3.Node
+	if err := yamlv3.Unmarshal([]byte(source), &document); err != nil {
+		return orderedYAMLMapping{}, err
+	}
+	if len(document.Content) == 0 {
+		return orderedYAMLMapping{}, fmt.Errorf("YAML documents must parse to a mapping root")
+	}
+
+	normalized, ok := normalizeOrderedYAMLNode(document.Content[0]).(orderedYAMLMapping)
+	if !ok {
+		return orderedYAMLMapping{}, fmt.Errorf("YAML documents must parse to a mapping root")
+	}
+	return normalized, nil
+}
+
+func normalizeOrderedYAMLNode(node *yamlv3.Node) any {
+	switch node.Kind {
+	case yamlv3.MappingNode:
+		mapping := orderedYAMLMapping{values: map[string]any{}}
+		for index := 0; index+1 < len(node.Content); index += 2 {
+			key := node.Content[index].Value
+			mapping.keys = append(mapping.keys, key)
+			mapping.values[key] = normalizeOrderedYAMLNode(node.Content[index+1])
+		}
+		return mapping
+	case yamlv3.SequenceNode:
+		items := make([]any, 0, len(node.Content))
+		for _, child := range node.Content {
+			items = append(items, normalizeOrderedYAMLNode(child))
+		}
+		return items
+	case yamlv3.ScalarNode:
+		var decoded any
+		if err := node.Decode(&decoded); err == nil {
+			return decoded
+		}
+		return node.Value
+	default:
+		return nil
+	}
 }
 
 func ParseYAML(source string, dialect YAMLDialect) astmerge.ParseResult[YAMLAnalysis] {
@@ -474,19 +541,6 @@ func ParseYAMLWithParser(source string, dialect YAMLDialect, parser func(string,
 	return parser(source, dialect)
 }
 
-func parseCanonicalYAMLMapping(source string) (map[string]any, error) {
-	var parsed any
-	if err := yamlv3.Unmarshal([]byte(source), &parsed); err != nil {
-		return nil, err
-	}
-
-	normalized, ok := normalizeYAMLValue(parsed).(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("YAML documents must parse to a mapping root")
-	}
-	return normalized, nil
-}
-
 func MergeYAMLWithParser(templateSource string, destinationSource string, dialect YAMLDialect, parser func(string, YAMLDialect) astmerge.ParseResult[YAMLAnalysis]) astmerge.MergeResult[string] {
 	template := ParseYAMLWithParser(templateSource, dialect, parser)
 	if !template.OK || template.Analysis == nil {
@@ -511,14 +565,14 @@ func MergeYAMLWithParser(templateSource string, destinationSource string, dialec
 		}
 	}
 
-	templateMapping, err := parseCanonicalYAMLMapping(template.Analysis.NormalizedSource)
+	templateMapping, err := parseOrderedYAMLMapping(templateSource, BackendKreuzberg)
 	if err != nil {
 		return astmerge.MergeResult[string]{
 			OK:          false,
 			Diagnostics: []astmerge.Diagnostic{parseError(err.Error())},
 		}
 	}
-	destinationMapping, err := parseCanonicalYAMLMapping(destination.Analysis.NormalizedSource)
+	destinationMapping, err := parseOrderedYAMLMapping(destinationSource, BackendKreuzberg)
 	if err != nil {
 		return astmerge.MergeResult[string]{
 			OK: false,
@@ -530,7 +584,7 @@ func MergeYAMLWithParser(templateSource string, destinationSource string, dialec
 		}
 	}
 
-	output := canonicalYAML(mergeYAMLMappings(templateMapping, destinationMapping))
+	output := canonicalOrderedYAML(mergeYAMLMappings(templateMapping, destinationMapping))
 	return astmerge.MergeResult[string]{
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},
@@ -577,36 +631,32 @@ func MatchYAMLOwners(template YAMLAnalysis, destination YAMLAnalysis) YAMLOwnerM
 	}
 }
 
-func mergeYAMLMappings(template map[string]any, destination map[string]any) map[string]any {
-	merged := make(map[string]any, len(template)+len(destination))
-	keys := make([]string, 0, len(template)+len(destination))
-	for key := range template {
-		keys = append(keys, key)
-	}
-	for key := range destination {
-		if !slices.Contains(keys, key) {
-			keys = append(keys, key)
+func mergeYAMLMappings(template orderedYAMLMapping, destination orderedYAMLMapping) orderedYAMLMapping {
+	merged := orderedYAMLMapping{values: map[string]any{}}
+
+	for _, key := range template.keys {
+		templateValue := template.values[key]
+		destinationValue, inDestination := destination.values[key]
+		if !inDestination {
+			merged.values[key] = templateValue
+			merged.keys = append(merged.keys, key)
+			continue
 		}
+
+		templateMapping, templateIsMapping := templateValue.(orderedYAMLMapping)
+		destinationMapping, destinationIsMapping := destinationValue.(orderedYAMLMapping)
+		if templateIsMapping && destinationIsMapping {
+			merged.values[key] = mergeYAMLMappings(templateMapping, destinationMapping)
+		} else {
+			merged.values[key] = destinationValue
+		}
+		merged.keys = append(merged.keys, key)
 	}
-	slices.Sort(keys)
 
-	for _, key := range keys {
-		templateValue, inTemplate := template[key]
-		destinationValue, inDestination := destination[key]
-
-		switch {
-		case !inTemplate && inDestination:
-			merged[key] = destinationValue
-		case inTemplate && !inDestination:
-			merged[key] = templateValue
-		default:
-			templateMapping, templateIsMapping := templateValue.(map[string]any)
-			destinationMapping, destinationIsMapping := destinationValue.(map[string]any)
-			if templateIsMapping && destinationIsMapping {
-				merged[key] = mergeYAMLMappings(templateMapping, destinationMapping)
-			} else {
-				merged[key] = destinationValue
-			}
+	for _, key := range destination.keys {
+		if _, inTemplate := template.values[key]; !inTemplate {
+			merged.keys = append(merged.keys, key)
+			merged.values[key] = destination.values[key]
 		}
 	}
 
