@@ -8899,6 +8899,48 @@ func TestSharedFixtureSuppliedYAMLSnippetSynchronizationAcceptance(t *testing.T)
 	}
 }
 
+func TestSharedFixtureSuppliedManagedTextBlockReplacementAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_managed_text_block_replacement_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied managed text block replacement report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied managed text block replacement report envelope: %v", err)
+		}
+
+		if testCase["label"] == "replace-existing-managed-text-block" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "gem \"debug\", \"~> 1.9\"") || !strings.Contains(finalContent, "gem \"irb\", \"~> 1.15\"") {
+				t.Fatalf("expected generated block content to replace old content")
+			}
+			if strings.Contains(finalContent, "old-debug") {
+				t.Fatalf("expected old generated block content to be removed")
+			}
+			if !strings.Contains(finalContent, "gem \"rake\"") || !strings.Contains(finalContent, "gem \"rspec\"") {
+				t.Fatalf("expected content outside managed block to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["replaced_blocks"] != float64(1) {
+				t.Fatalf("expected one managed block to be replaced")
+			}
+		}
+		if testCase["label"] == "append-missing-managed-text-block" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "# <<kettle-jem:generated>>") || !strings.Contains(finalContent, "# (no shunted dependencies)") {
+				t.Fatalf("expected missing managed block to be appended")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["appended_blocks"] != float64(1) {
+				t.Fatalf("expected one managed block to be appended")
+			}
+		}
+		if testCase["label"] == "missing-managed-block-updates-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing managed block updates to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
