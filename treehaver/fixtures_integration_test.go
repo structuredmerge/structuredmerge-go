@@ -303,6 +303,73 @@ func TestSharedFixturePortableByteLocationContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureBinaryCoreContract(t *testing.T) {
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "binary_core_contract"))
+	scalars := fixture["scalar_values"].([]any)
+	policiesFixture := fixture["render_policies"].([]any)
+	reportFixture := fixture["merge_report"].(map[string]any)
+
+	values := make([]BinaryScalarValue, 0, len(scalars))
+	for _, raw := range scalars {
+		item := raw.(map[string]any)
+		values = append(values, BinaryScalarValue{
+			Kind:        item["kind"].(string),
+			Value:       item["value"],
+			Symbol:      stringValue(item["symbol"]),
+			RawValue:    item["raw_value"],
+			Encoding:    stringValue(item["encoding"]),
+			Format:      stringValue(item["format"]),
+			Description: stringValue(item["description"]),
+		})
+	}
+	if len(values) != 9 || values[0].Kind != "string" || values[8].Kind != "null" {
+		t.Fatalf("unexpected scalar values: %+v", values)
+	}
+
+	policies := make([]BinaryRenderPolicy, 0, len(policiesFixture))
+	for _, raw := range policiesFixture {
+		item := raw.(map[string]any)
+		policies = append(policies, BinaryRenderPolicy{
+			SchemaPath:  item["schema_path"].(string),
+			ByteRange:   byteRangePointer(item["byte_range"]),
+			Operation:   item["operation"].(string),
+			Disposition: item["disposition"].(string),
+			Reason:      item["reason"].(string),
+		})
+	}
+	if policies[0].Operation != "preserve" || policies[1].Disposition != "requires_renderer" || policies[2].Disposition != "unsafe" {
+		t.Fatalf("unexpected render policies: %+v", policies)
+	}
+
+	report := BinaryMergeReport{
+		Format:             reportFixture["format"].(string),
+		Schema:             reportFixture["schema"].(string),
+		MatchedSchemaPaths: stringSlice(reportFixture["matched_schema_paths"]),
+		PreservedRanges:    byteRangeSlice(reportFixture["preserved_ranges"]),
+		RewrittenNodes:     stringSlice(reportFixture["rewritten_nodes"]),
+		ChecksumUpdates:    stringSlice(reportFixture["checksum_updates"]),
+		NestedDispatches: []BinaryNestedDispatch{
+			{
+				SchemaPath: reportFixture["nested_dispatches"].([]any)[0].(map[string]any)["schema_path"].(string),
+				Family:     reportFixture["nested_dispatches"].([]any)[0].(map[string]any)["family"].(string),
+				Status:     reportFixture["nested_dispatches"].([]any)[0].(map[string]any)["status"].(string),
+			},
+		},
+		Diagnostics: []BinaryDiagnostic{
+			{
+				Severity:   reportFixture["diagnostics"].([]any)[0].(map[string]any)["severity"].(string),
+				Category:   reportFixture["diagnostics"].([]any)[0].(map[string]any)["category"].(string),
+				Message:    reportFixture["diagnostics"].([]any)[0].(map[string]any)["message"].(string),
+				SchemaPath: reportFixture["diagnostics"].([]any)[0].(map[string]any)["schema_path"].(string),
+				ByteRange:  byteRangePointer(reportFixture["diagnostics"].([]any)[0].(map[string]any)["byte_range"]),
+			},
+		},
+	}
+	if report.Format != "png" || report.PreservedRanges[0].Length() != 25 || report.NestedDispatches[0].Family != "text" || report.Diagnostics[0].Category != "unsupported_checksum_rewrite" {
+		t.Fatalf("unexpected binary merge report: %+v", report)
+	}
+}
+
 func TestRuntimeBackendRegistration(t *testing.T) {
 	RegisterBackend(BackendReference{ID: "custom-toml", Family: "native"})
 
@@ -322,6 +389,43 @@ func TestRuntimeBackendRegistration(t *testing.T) {
 	if !found {
 		t.Fatalf("custom backend not present in registry: %+v", backends)
 	}
+}
+
+func stringValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	return value.(string)
+}
+
+func byteRangePointer(value any) *ByteRange {
+	if value == nil {
+		return nil
+	}
+	fixture := value.(map[string]any)
+	return &ByteRange{
+		StartByte: int(fixture["start_byte"].(float64)),
+		EndByte:   int(fixture["end_byte"].(float64)),
+	}
+}
+
+func byteRangeSlice(value any) []ByteRange {
+	values := value.([]any)
+	result := make([]ByteRange, 0, len(values))
+	for _, item := range values {
+		byteRange := byteRangePointer(item)
+		result = append(result, *byteRange)
+	}
+	return result
+}
+
+func stringSlice(value any) []string {
+	values := value.([]any)
+	result := make([]string, 0, len(values))
+	for _, item := range values {
+		result = append(result, item.(string))
+	}
+	return result
 }
 
 func TestSharedFixtureProcessBaseline(t *testing.T) {

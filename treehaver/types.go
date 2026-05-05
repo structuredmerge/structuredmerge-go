@@ -103,6 +103,49 @@ type SourceSpan struct {
 	EndPoint   SourcePoint
 }
 
+type BinaryScalarValue struct {
+	Kind        string
+	Value       any
+	Symbol      string
+	RawValue    any
+	Encoding    string
+	Format      string
+	Description string
+}
+
+type BinaryRenderPolicy struct {
+	SchemaPath  string
+	ByteRange   *ByteRange
+	Operation   string
+	Disposition string
+	Reason      string
+}
+
+type BinaryDiagnostic struct {
+	Severity   string
+	Category   string
+	Message    string
+	SchemaPath string
+	ByteRange  *ByteRange
+}
+
+type BinaryNestedDispatch struct {
+	SchemaPath string
+	Family     string
+	Status     string
+}
+
+type BinaryMergeReport struct {
+	Format             string
+	Schema             string
+	MatchedSchemaPaths []string
+	PreservedRanges    []ByteRange
+	RewrittenNodes     []string
+	ChecksumUpdates    []string
+	NestedDispatches   []BinaryNestedDispatch
+	Diagnostics        []BinaryDiagnostic
+}
+
 func SliceByteRange(source string, byteRange ByteRange) (string, error) {
 	sourceBytes := []byte(source)
 	if !byteRange.Valid() || byteRange.EndByte > len(sourceBytes) {
