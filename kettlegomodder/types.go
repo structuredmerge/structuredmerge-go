@@ -53,6 +53,7 @@ const (
 	RecipeReadmeMetadata      PackagingRecipeName = "readme_metadata"
 	RecipeChangelogUnreleased PackagingRecipeName = "changelog_unreleased"
 	RecipeGeneratedBlockSync  PackagingRecipeName = "generated_block_sync"
+	RecipeTemplateApplication PackagingRecipeName = "template_source_application"
 )
 
 type PackagingRecipe struct {
@@ -143,6 +144,20 @@ func RecipePackForFacts() RecipePack {
 	}
 }
 
+func PackagedTemplateInventoryPack() RecipePack {
+	return RecipePack{
+		Name:      "kettle-gomodder-packaged-template-inventory",
+		Version:   1,
+		Ecosystem: "gomod",
+		Recipes: []PackagingRecipe{
+			templateRecipe(".editorconfig"),
+			templateRecipe(".github/workflows/ci.yml"),
+			templateRecipe(".gitignore"),
+			templateRecipe(".golangci.yml"),
+		},
+	}
+}
+
 func PlanProject(projectRoot string) (ProjectReport, error) {
 	facts, err := DiscoverFacts(projectRoot)
 	if err != nil {
@@ -157,13 +172,7 @@ func PlanProject(projectRoot string) (ProjectReport, error) {
 	for _, recipe := range pack.Recipes {
 		reports = append(reports, executeRecipe(projectRoot, recipe, facts, files))
 	}
-	changedFiles := make([]string, 0, len(reports))
-	for _, report := range reports {
-		if report.Changed {
-			changedFiles = append(changedFiles, report.RelativePath)
-		}
-	}
-	sort.Strings(changedFiles)
+	changedFiles := changedFilesForReports(reports)
 
 	return ProjectReport{
 		Mode:          "plan",
@@ -174,6 +183,54 @@ func PlanProject(projectRoot string) (ProjectReport, error) {
 		ChangedFiles:  changedFiles,
 		Diagnostics:   []astmerge.Diagnostic{},
 	}, nil
+}
+
+func PlanPackagedTemplateInventory(projectRoot string) (ProjectReport, error) {
+	facts, err := DiscoverFacts(projectRoot)
+	if err != nil {
+		return ProjectReport{}, err
+	}
+	pack := PackagedTemplateInventoryPack()
+	files, err := readProjectFiles(projectRoot, pack)
+	if err != nil {
+		return ProjectReport{}, err
+	}
+	reports := make([]RecipeRunReport, 0, len(pack.Recipes))
+	for _, recipe := range pack.Recipes {
+		reports = append(reports, executeRecipe(projectRoot, recipe, facts, files))
+	}
+
+	return ProjectReport{
+		Mode:          "plan",
+		Ready:         true,
+		Facts:         facts,
+		RecipePack:    pack,
+		RecipeReports: reports,
+		ChangedFiles:  changedFilesForReports(reports),
+		Diagnostics:   []astmerge.Diagnostic{},
+	}, nil
+}
+
+func ApplyPackagedTemplateInventory(projectRoot string) (ProjectReport, error) {
+	report, err := PlanPackagedTemplateInventory(projectRoot)
+	if err != nil {
+		return ProjectReport{}, err
+	}
+	report.Mode = "apply"
+	for _, recipeReport := range report.RecipeReports {
+		if !recipeReport.Changed {
+			continue
+		}
+		targetPath := filepath.Join(projectRoot, recipeReport.RelativePath)
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			return ProjectReport{}, fmt.Errorf("create parent directory for %s: %w", recipeReport.RelativePath, err)
+		}
+		if err := os.WriteFile(targetPath, []byte(recipeReport.FinalContent), 0o644); err != nil {
+			return ProjectReport{}, fmt.Errorf("write %s: %w", recipeReport.RelativePath, err)
+		}
+	}
+
+	return report, nil
 }
 
 func ApplyProject(projectRoot string) (ProjectReport, error) {
@@ -232,6 +289,8 @@ func executeRecipe(projectRoot string, recipe PackagingRecipe, facts PackageFact
 		finalContent = normalizeChangelog(original)
 	case RecipeGeneratedBlockSync:
 		finalContent = synchronizeManagedBlock(original, facts)
+	case RecipeTemplateApplication:
+		finalContent = renderPackagedTemplate(recipe.TargetPath, facts)
 	}
 	request := ContentRecipeExecutionRequest(astmerge.ContentRecipeExecutionRequest{
 		RecipeName:         recipe.Primitive,
@@ -268,6 +327,54 @@ func executeRecipe(projectRoot string, recipe PackagingRecipe, facts PackageFact
 		ReportEnvelope:  ContentRecipeExecutionReportEnvelope(report),
 		FinalContent:    finalContent,
 		Diagnostics:     []astmerge.Diagnostic{},
+	}
+}
+
+func templateRecipe(targetPath string) PackagingRecipe {
+	return recipeEntry(
+		RecipeTemplateApplication,
+		targetPath,
+		"text",
+		"supplied_template_source_application",
+		[]string{"package", "templates"},
+	)
+}
+
+func changedFilesForReports(reports []RecipeRunReport) []string {
+	changedFiles := make([]string, 0, len(reports))
+	for _, report := range reports {
+		if report.Changed {
+			changedFiles = append(changedFiles, report.RelativePath)
+		}
+	}
+	sort.Strings(changedFiles)
+	return changedFiles
+}
+
+func renderPackagedTemplate(targetPath string, facts PackageFacts) string {
+	template := packagedTemplateContent(targetPath)
+	replacements := map[string]string{
+		"{{PACKAGE_NAME}}": facts.Package.Name,
+		"{{GO_VERSION}}":   facts.GoMod.GoVersion,
+	}
+	for token, value := range replacements {
+		template = strings.ReplaceAll(template, token, value)
+	}
+	return template
+}
+
+func packagedTemplateContent(targetPath string) string {
+	switch targetPath {
+	case ".editorconfig":
+		return "root = true\n\n[*]\ncharset = utf-8\nend_of_line = lf\ninsert_final_newline = true\ntrim_trailing_whitespace = true\n"
+	case ".github/workflows/ci.yml":
+		return "name: CI\n\non:\n  push:\n  pull_request:\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-go@v5\n        with:\n          go-version: \"{{GO_VERSION}}\"\n      - run: go test ./...\n"
+	case ".gitignore":
+		return "bin/\ncoverage/\ndist/\n"
+	case ".golangci.yml":
+		return "run:\n  timeout: 5m\nlinters:\n  enable:\n    - gofmt\n    - govet\n"
+	default:
+		return ""
 	}
 }
 

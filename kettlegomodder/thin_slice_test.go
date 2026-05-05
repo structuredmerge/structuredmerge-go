@@ -96,6 +96,48 @@ func TestThinSlice(t *testing.T) {
 	}
 }
 
+func TestPackagedTemplateInventory(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeTree(t, projectRoot, map[string]string{
+		"go.mod": "module github.com/acme/widget\n\ngo 1.22\n",
+	})
+
+	plan, err := PlanPackagedTemplateInventory(projectRoot)
+	if err != nil {
+		t.Fatalf("plan packaged template inventory: %v", err)
+	}
+	expectedChanged := []string{".editorconfig", ".github/workflows/ci.yml", ".gitignore", ".golangci.yml"}
+	if !reflect.DeepEqual(plan.ChangedFiles, expectedChanged) {
+		t.Fatalf("unexpected planned template files: %#v", plan.ChangedFiles)
+	}
+	if got := plan.RecipePack.Name; got != "kettle-gomodder-packaged-template-inventory" {
+		t.Fatalf("unexpected recipe pack name: %s", got)
+	}
+
+	apply, err := ApplyPackagedTemplateInventory(projectRoot)
+	if err != nil {
+		t.Fatalf("apply packaged template inventory: %v", err)
+	}
+	if !reflect.DeepEqual(apply.ChangedFiles, expectedChanged) {
+		t.Fatalf("unexpected applied template files: %#v", apply.ChangedFiles)
+	}
+	ci := mustReadProjectFile(t, projectRoot, ".github/workflows/ci.yml")
+	if !strings.Contains(ci, "go-version: \"1.22\"") {
+		t.Fatalf("expected CI template to render go version, got:\n%s", ci)
+	}
+
+	second, err := ApplyPackagedTemplateInventory(projectRoot)
+	if err != nil {
+		t.Fatalf("reapply packaged template inventory: %v", err)
+	}
+	if len(second.ChangedFiles) != 0 {
+		t.Fatalf("expected packaged template reapply to be stable, changed: %#v", second.ChangedFiles)
+	}
+	if got := mustReadProjectFile(t, projectRoot, ".github/workflows/ci.yml"); got != ci {
+		t.Fatalf("expected CI template to remain stable on reapply")
+	}
+}
+
 func readJSONFixture[T any](t *testing.T, parts ...string) T {
 	t.Helper()
 	source, err := os.ReadFile(filepath.Join(parts...))
@@ -146,6 +188,15 @@ func readExpectedProjectFiles(t *testing.T, root string, expected map[string]str
 		files[relativePath] = string(source)
 	}
 	return files
+}
+
+func mustReadProjectFile(t *testing.T, root string, relativePath string) string {
+	t.Helper()
+	source, err := os.ReadFile(filepath.Join(root, relativePath))
+	if err != nil {
+		t.Fatalf("read project file %s: %v", relativePath, err)
+	}
+	return string(source)
 }
 
 func uniqueRequestKinds(reports []RecipeRunReport) []string {
