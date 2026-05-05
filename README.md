@@ -14,14 +14,27 @@ Project links:
 
 ## Workspace
 
-This is a Go module workspace for StructuredMerge packages.
+This is a Go module for StructuredMerge packages.
 
-Initial packages:
+Package directories:
 
-- `treehaver`
-- `astmerge`
-- `textmerge`
-- `jsonmerge`
+- [`astmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/astmerge)
+- [`asttemplate`](https://github.com/structuredmerge/structuredmerge-go/tree/main/asttemplate)
+- [`goccygoyamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goccygoyamlmerge)
+- [`goldmarkmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goldmarkmerge)
+- [`gomerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/gomerge)
+- [`goparsermerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goparsermerge)
+- [`jsonmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/jsonmerge)
+- [`kettlegomodder`](https://github.com/structuredmerge/structuredmerge-go/tree/main/kettlegomodder)
+- [`markdownmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/markdownmerge)
+- [`pigeontomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/pigeontomlmerge)
+- [`rubymerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rubymerge)
+- [`rustmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rustmerge)
+- [`textmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/textmerge)
+- [`tomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/tomlmerge)
+- [`treehaver`](https://github.com/structuredmerge/structuredmerge-go/tree/main/treehaver)
+- [`typescriptmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/typescriptmerge)
+- [`yamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/yamlmerge)
 
 ## Conformance
 
