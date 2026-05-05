@@ -64,6 +64,79 @@ type ProcessSpan struct {
 	EndCol    int
 }
 
+type ByteRange struct {
+	StartByte int
+	EndByte   int
+}
+
+func (byteRange ByteRange) Valid() bool {
+	return byteRange.StartByte >= 0 && byteRange.EndByte >= byteRange.StartByte
+}
+
+func (byteRange ByteRange) Length() int {
+	if !byteRange.Valid() {
+		return 0
+	}
+	return byteRange.EndByte - byteRange.StartByte
+}
+
+func (byteRange ByteRange) ContainsByte(offset int) bool {
+	return byteRange.Valid() && offset >= byteRange.StartByte && offset < byteRange.EndByte
+}
+
+func (byteRange ByteRange) ContainsRange(other ByteRange) bool {
+	return byteRange.Valid() && other.Valid() && other.StartByte >= byteRange.StartByte && other.EndByte <= byteRange.EndByte
+}
+
+func (byteRange ByteRange) Overlaps(other ByteRange) bool {
+	return byteRange.Valid() && other.Valid() && byteRange.StartByte < other.EndByte && other.StartByte < byteRange.EndByte
+}
+
+type SourcePoint struct {
+	Row    int
+	Column int
+}
+
+type SourceSpan struct {
+	Range      ByteRange
+	StartPoint SourcePoint
+	EndPoint   SourcePoint
+}
+
+func SliceByteRange(source string, byteRange ByteRange) (string, error) {
+	sourceBytes := []byte(source)
+	if !byteRange.Valid() || byteRange.EndByte > len(sourceBytes) {
+		return "", fmt.Errorf("invalid byte range [%d, %d) for source length %d", byteRange.StartByte, byteRange.EndByte, len(sourceBytes))
+	}
+
+	return string(sourceBytes[byteRange.StartByte:byteRange.EndByte]), nil
+}
+
+func ByteOffsetForPoint(source string, point SourcePoint) (int, error) {
+	if point.Row < 0 || point.Column < 0 {
+		return 0, fmt.Errorf("invalid source point (%d, %d)", point.Row, point.Column)
+	}
+
+	row := 0
+	column := 0
+	for offset, value := range []byte(source) {
+		if row == point.Row && column == point.Column {
+			return offset, nil
+		}
+		if value == '\n' {
+			row++
+			column = 0
+		} else {
+			column++
+		}
+	}
+	if row == point.Row && column == point.Column {
+		return len([]byte(source)), nil
+	}
+
+	return 0, fmt.Errorf("source point (%d, %d) is outside source", point.Row, point.Column)
+}
+
 type ProcessStructureItem struct {
 	Kind string
 	Name string

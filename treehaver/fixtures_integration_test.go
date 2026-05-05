@@ -257,6 +257,52 @@ func TestSharedFixtureKaitaiTreeHaverSubstrate(t *testing.T) {
 	}
 }
 
+func TestSharedFixturePortableByteLocationContract(t *testing.T) {
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "portable_byte_location_contract"))
+	rangeFixture := fixture["byte_range"].(map[string]any)
+	pointFixture := fixture["source_point"].(map[string]any)
+	expectedFixture := fixture["expected"].(map[string]any)
+	comparisonFixture := fixture["comparison_ranges"].(map[string]any)
+	source := fixture["source"].(string)
+
+	byteRange := ByteRange{
+		StartByte: int(rangeFixture["start_byte"].(float64)),
+		EndByte:   int(rangeFixture["end_byte"].(float64)),
+	}
+	point := SourcePoint{
+		Row:    int(pointFixture["row"].(float64)),
+		Column: int(pointFixture["column"].(float64)),
+	}
+	overlappingFixture := comparisonFixture["overlapping"].(map[string]any)
+	disjointFixture := comparisonFixture["disjoint"].(map[string]any)
+	overlappingRange := ByteRange{
+		StartByte: int(overlappingFixture["start_byte"].(float64)),
+		EndByte:   int(overlappingFixture["end_byte"].(float64)),
+	}
+	disjointRange := ByteRange{
+		StartByte: int(disjointFixture["start_byte"].(float64)),
+		EndByte:   int(disjointFixture["end_byte"].(float64)),
+	}
+
+	slice, err := SliceByteRange(source, byteRange)
+	if err != nil {
+		t.Fatalf("slice byte range: %v", err)
+	}
+	offset, err := ByteOffsetForPoint(source, point)
+	if err != nil {
+		t.Fatalf("byte offset for point: %v", err)
+	}
+	if byteRange.Length() != int(expectedFixture["length"].(float64)) ||
+		slice != expectedFixture["slice"].(string) ||
+		byteRange.ContainsByte(byteRange.StartByte) != expectedFixture["contains_start"].(bool) ||
+		byteRange.ContainsByte(byteRange.EndByte) != expectedFixture["contains_end"].(bool) ||
+		byteRange.Overlaps(overlappingRange) != expectedFixture["overlaps"].(bool) ||
+		byteRange.Overlaps(disjointRange) != expectedFixture["disjoint"].(bool) ||
+		offset != int(expectedFixture["line_column_offset"].(float64)) {
+		t.Fatalf("unexpected byte location behavior: range=%+v slice=%q offset=%d", byteRange, slice, offset)
+	}
+}
+
 func TestRuntimeBackendRegistration(t *testing.T) {
 	RegisterBackend(BackendReference{ID: "custom-toml", Family: "native"})
 
