@@ -1,0 +1,38 @@
+{
+  "case_id": "kettle-gomodder-vnext-readme-changelog-managed-block",
+  "ecosystem": "gomod",
+  "inputs": {
+    "files": {
+      "go.mod": "module github.com/example/gomodder\n\ngo 1.26\n",
+      "README.md": "# Old Module\n\nExisting Go module intro.\n",
+      "CHANGELOG.md": "# Changelog\n\n## [0.1.0] - 2026-01-01\n\n- Initial release.\n",
+      "internal/generated/packageinfo.go": "package generated\n\nconst LocalValue = true\n"
+    }
+  },
+  "expected": {
+    "facts": {
+      "package": {
+        "ecosystem": "gomod",
+        "name": "github.com/example/gomodder",
+        "slug": "gomodder",
+        "source_url": "https://github.com/example/gomodder",
+        "homepage_url": "https://github.com/example/gomodder"
+      },
+      "gomod": {
+        "go_mod_path": "go.mod",
+        "module_path": "github.com/example/gomodder",
+        "go_version": "1.26"
+      }
+    },
+    "changed_files": [
+      "CHANGELOG.md",
+      "README.md",
+      "internal/generated/packageinfo.go"
+    ],
+    "files": {
+      "README.md": "# github.com/example/gomodder\n\nExisting Go module intro.\n\n<!-- kettle-gomodder:metadata:start -->\n| Field | Value |\n|---|---|\n| Package | github.com/example/gomodder |\n| Homepage | https://github.com/example/gomodder |\n| Source | https://github.com/example/gomodder |\n<!-- kettle-gomodder:metadata:end -->\n",
+      "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n### Changed\n\n### Fixed\n\n## [0.1.0] - 2026-01-01\n\n- Initial release.\n",
+      "internal/generated/packageinfo.go": "package generated\n\nconst LocalValue = true\n// <<kettle-gomodder:generated>> do not edit below this line\nconst PackageName = \"github.com/example/gomodder\"\nconst PackageEcosystem = \"gomod\"\n// <</kettle-gomodder:generated>>\n"
+    }
+  }
+}
