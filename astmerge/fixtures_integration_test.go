@@ -8860,6 +8860,45 @@ func TestSharedFixtureSuppliedSourceSelectorDeletionAcceptance(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSuppliedYAMLSnippetSynchronizationAcceptance(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "supplied_yaml_snippet_synchronization_acceptance"))
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+
+		var reportEnvelope ContentRecipeExecutionReportEnvelope
+		if raw, err := json.Marshal(testCase["report_envelope"]); err != nil {
+			t.Fatalf("marshal supplied YAML snippet synchronization report envelope: %v", err)
+		} else if err := json.Unmarshal(raw, &reportEnvelope); err != nil {
+			t.Fatalf("unmarshal supplied YAML snippet synchronization report envelope: %v", err)
+		}
+
+		if testCase["label"] == "apply-supplied-sections-and-scalar-pins" {
+			finalContent := reportEnvelope.Report.FinalContent
+			if !strings.Contains(finalContent, "concurrency:") || !strings.Contains(finalContent, "permissions:") {
+				t.Fatalf("expected supplied YAML sections to be applied")
+			}
+			if !strings.Contains(finalContent, "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd") || !strings.Contains(finalContent, "ruby/setup-ruby@e65c17d16e57e481586a6a5a0282698790062f92") {
+				t.Fatalf("expected supplied YAML scalar pins to be applied")
+			}
+			if strings.Contains(finalContent, "actions/checkout@v3") || strings.Contains(finalContent, "ruby/setup-ruby@v1") {
+				t.Fatalf("expected old action pins to be replaced")
+			}
+			if !strings.Contains(finalContent, "gemfiles/current.gemfile") || !strings.Contains(finalContent, "ruby-version: ${{ matrix.ruby }}") {
+				t.Fatalf("expected unmatched workflow YAML to be preserved")
+			}
+			if reportEnvelope.Report.StepReports[0].Metadata["updated_sections"] != float64(2) {
+				t.Fatalf("expected two YAML sections to be updated")
+			}
+			if reportEnvelope.Report.StepReports[1].Metadata["updated_scalars"] != float64(2) {
+				t.Fatalf("expected two YAML scalars to be updated")
+			}
+		}
+		if testCase["label"] == "missing-yaml-updates-fails-closed" && reportEnvelope.Report.StepReports[0].Status != "failed" {
+			t.Fatalf("expected missing YAML updates to fail closed")
+		}
+	}
+}
+
 func TestSharedFixtureStructuredEditCallableDestinationRequest(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_callable_destination_request"))
 	for _, rawCase := range fixture["cases"].([]any) {
