@@ -206,6 +206,57 @@ func TestPigeonBackendReference(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureKaitaiTreeHaverSubstrate(t *testing.T) {
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "kaitai_tree_haver_substrate"))
+	backendFixture := fixture["backend"].(map[string]any)
+	infoFixture := fixture["adapter_info"].(map[string]any)
+	profileFixture := fixture["feature_profile"].(map[string]any)
+	nodeFixture := fixture["tree_node"].(map[string]any)
+
+	backend := BackendReferenceByID("kaitai-struct")
+	if backend == nil || backend.ID != backendFixture["id"].(string) || backend.Family != backendFixture["family"].(string) {
+		t.Fatalf("unexpected kaitai backend: %+v", backend)
+	}
+
+	info := KaitaiAdapterInfo()
+	if info.Backend != infoFixture["backend"].(string) || info.BackendRef == nil || info.BackendRef.ID != "kaitai-struct" {
+		t.Fatalf("unexpected kaitai adapter info: %+v", info)
+	}
+	profile := KaitaiFeatureProfile()
+	if profile.Backend != profileFixture["backend"].(string) || profile.BackendRef == nil || profile.BackendRef.Family != "kaitai" {
+		t.Fatalf("unexpected kaitai feature profile: %+v", profile)
+	}
+
+	spanFixture := nodeFixture["span"].(map[string]any)
+	childFixture := nodeFixture["children"].([]any)[0].(map[string]any)
+	childSpanFixture := childFixture["span"].(map[string]any)
+	node := KaitaiTreeNode{
+		Kind:       nodeFixture["kind"].(string),
+		SchemaPath: nodeFixture["schema_path"].(string),
+		Span: KaitaiByteSpan{
+			StartByte: int(spanFixture["start_byte"].(float64)),
+			EndByte:   int(spanFixture["end_byte"].(float64)),
+		},
+		Fields: nodeFixture["fields"].(map[string]any),
+		Children: []KaitaiTreeNode{
+			{
+				Kind:       childFixture["kind"].(string),
+				SchemaPath: childFixture["schema_path"].(string),
+				Span: KaitaiByteSpan{
+					StartByte: int(childSpanFixture["start_byte"].(float64)),
+					EndByte:   int(childSpanFixture["end_byte"].(float64)),
+				},
+				Fields:   childFixture["fields"].(map[string]any),
+				Children: []KaitaiTreeNode{},
+			},
+		},
+	}
+	analysis := KaitaiTreeAnalysis{Schema: "png.ksy", Root: node, BackendRef: *backend}
+	if analysis.Kind() != "kaitai-tree" || analysis.Root.SchemaPath != "/chunks/1" || analysis.Root.Children[0].Fields["value"] != "Template" {
+		t.Fatalf("unexpected kaitai analysis: %+v", analysis)
+	}
+}
+
 func TestRuntimeBackendRegistration(t *testing.T) {
 	RegisterBackend(BackendReference{ID: "custom-toml", Family: "native"})
 

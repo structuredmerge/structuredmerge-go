@@ -97,12 +97,35 @@ type LanguagePackProcessAnalysis struct {
 	BackendRef  BackendReference
 }
 
+type KaitaiByteSpan struct {
+	StartByte int
+	EndByte   int
+}
+
+type KaitaiTreeNode struct {
+	Kind       string
+	SchemaPath string
+	Span       KaitaiByteSpan
+	Fields     map[string]any
+	Children   []KaitaiTreeNode
+}
+
+type KaitaiTreeAnalysis struct {
+	Schema     string
+	Root       KaitaiTreeNode
+	BackendRef BackendReference
+}
+
 func (LanguagePackAnalysis) Kind() string {
 	return "tree-sitter"
 }
 
 func (LanguagePackProcessAnalysis) Kind() string {
 	return "tree-sitter-process"
+}
+
+func (KaitaiTreeAnalysis) Kind() string {
+	return "kaitai-tree"
 }
 
 var KreuzbergLanguagePackBackend = BackendReference{
@@ -115,11 +138,17 @@ var PigeonBackend = BackendReference{
 	Family: "peg",
 }
 
+var KaitaiStructBackend = BackendReference{
+	ID:     "kaitai-struct",
+	Family: "kaitai",
+}
+
 var (
 	backendRegistryMu sync.RWMutex
 	backendRegistry   = map[string]BackendReference{
 		KreuzbergLanguagePackBackend.ID: KreuzbergLanguagePackBackend,
 		PigeonBackend.ID:                PigeonBackend,
+		KaitaiStructBackend.ID:          KaitaiStructBackend,
 	}
 )
 
@@ -176,6 +205,22 @@ func PigeonFeatureProfile() FeatureProfile {
 	return FeatureProfile{
 		Backend:          PigeonBackend.ID,
 		BackendRef:       &PigeonBackend,
+		SupportsDialects: false,
+	}
+}
+
+func KaitaiAdapterInfo() AdapterInfo {
+	return AdapterInfo{
+		Backend:          KaitaiStructBackend.ID,
+		BackendRef:       &KaitaiStructBackend,
+		SupportsDialects: false,
+	}
+}
+
+func KaitaiFeatureProfile() FeatureProfile {
+	return FeatureProfile{
+		Backend:          KaitaiStructBackend.ID,
+		BackendRef:       &KaitaiStructBackend,
 		SupportsDialects: false,
 	}
 }
