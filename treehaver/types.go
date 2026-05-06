@@ -461,21 +461,8 @@ func KaitaiFeatureProfile() FeatureProfile {
 	}
 }
 
-var (
-	languagePackRegistryOnce sync.Once
-	languagePackRegistry     *tspack.Registry
-	languagePackRegistryErr  error
-)
-
-func languagePackRegistryInstance() (*tspack.Registry, error) {
-	languagePackRegistryOnce.Do(func() {
-		languagePackRegistry, languagePackRegistryErr = tspack.NewRegistry()
-	})
-	return languagePackRegistry, languagePackRegistryErr
-}
-
-func ensureLanguageAvailable(registry *tspack.Registry, language string) error {
-	if registry.HasLanguage(language) {
+func ensureLanguageAvailable(language string) error {
+	if boolValue(tspack.HasLanguage(language)) {
 		return nil
 	}
 
@@ -483,7 +470,7 @@ func ensureLanguageAvailable(registry *tspack.Registry, language string) error {
 		return err
 	}
 
-	if registry.HasLanguage(language) {
+	if boolValue(tspack.HasLanguage(language)) {
 		return nil
 	}
 
@@ -491,8 +478,7 @@ func ensureLanguageAvailable(registry *tspack.Registry, language string) error {
 }
 
 func ParseWithLanguagePack(request ParserRequest) ParseResult[LanguagePackAnalysis] {
-	registry, err := languagePackRegistryInstance()
-	if err != nil {
+	if err := ensureLanguageAvailable(request.Language); err != nil {
 		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
 			Diagnostics: []Diagnostic{
@@ -505,20 +491,10 @@ func ParseWithLanguagePack(request ParserRequest) ParseResult[LanguagePackAnalys
 		}
 	}
 
-	if err := ensureLanguageAvailable(registry, request.Language); err != nil {
-		return ParseResult[LanguagePackAnalysis]{
-			OK: false,
-			Diagnostics: []Diagnostic{
-				{
-					Severity: SeverityError,
-					Category: CategoryUnsupportedFeature,
-					Message:  err.Error(),
-				},
-			},
-		}
-	}
-
-	tree, err := registry.ParseString(request.Language, request.Source)
+	result, err := tspack.Process(request.Source, tspack.ProcessConfig{
+		Language:    request.Language,
+		Diagnostics: true,
+	})
 	if err != nil {
 		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
@@ -531,21 +507,8 @@ func ParseWithLanguagePack(request ParserRequest) ParseResult[LanguagePackAnalys
 			},
 		}
 	}
-	defer tree.Close()
 
-	hasError, err := tree.HasErrorNodes()
-	if err != nil {
-		return ParseResult[LanguagePackAnalysis]{
-			OK: false,
-			Diagnostics: []Diagnostic{
-				{
-					Severity: SeverityError,
-					Category: CategoryUnsupportedFeature,
-					Message:  err.Error(),
-				},
-			},
-		}
-	}
+	hasError := result.Metrics.ErrorCount > 0 || len(result.Diagnostics) > 0
 	if hasError {
 		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
@@ -559,24 +522,10 @@ func ParseWithLanguagePack(request ParserRequest) ParseResult[LanguagePackAnalys
 		}
 	}
 
-	rootType, err := tree.RootNodeType()
-	if err != nil {
-		return ParseResult[LanguagePackAnalysis]{
-			OK: false,
-			Diagnostics: []Diagnostic{
-				{
-					Severity: SeverityError,
-					Category: CategoryUnsupportedFeature,
-					Message:  err.Error(),
-				},
-			},
-		}
-	}
-
 	analysis := LanguagePackAnalysis{
 		Language:   request.Language,
 		Dialect:    request.Dialect,
-		RootType:   rootType,
+		RootType:   result.Language,
 		HasError:   false,
 		BackendRef: KreuzbergLanguagePackBackend,
 	}
@@ -588,8 +537,7 @@ func ParseWithLanguagePack(request ParserRequest) ParseResult[LanguagePackAnalys
 }
 
 func ProcessWithLanguagePack(request ProcessRequest) ParseResult[LanguagePackProcessAnalysis] {
-	registry, err := languagePackRegistryInstance()
-	if err != nil {
+	if err := ensureLanguageAvailable(request.Language); err != nil {
 		return ParseResult[LanguagePackProcessAnalysis]{
 			OK: false,
 			Diagnostics: []Diagnostic{
@@ -602,23 +550,10 @@ func ProcessWithLanguagePack(request ProcessRequest) ParseResult[LanguagePackPro
 		}
 	}
 
-	if err := ensureLanguageAvailable(registry, request.Language); err != nil {
-		return ParseResult[LanguagePackProcessAnalysis]{
-			OK: false,
-			Diagnostics: []Diagnostic{
-				{
-					Severity: SeverityError,
-					Category: CategoryUnsupportedFeature,
-					Message:  err.Error(),
-				},
-			},
-		}
-	}
-
-	result, err := registry.Process(request.Source, tspack.ProcessConfig{
+	result, err := tspack.Process(request.Source, tspack.ProcessConfig{
 		Language:    request.Language,
-		Structure:   true,
-		Imports:     true,
+		Structure:   boolPtr(true),
+		Imports:     boolPtr(true),
 		Diagnostics: true,
 	})
 	if err != nil {
@@ -643,16 +578,9 @@ func ProcessWithLanguagePack(request ProcessRequest) ParseResult[LanguagePackPro
 	}
 	for _, item := range result.Structure {
 		analysis.Structure = append(analysis.Structure, ProcessStructureItem{
-			Kind: strings.ToLower(derefString(item.Kind)),
+			Kind: strings.ToLower(string(item.Kind)),
 			Name: derefStringPtr(item.Name),
-			Span: ProcessSpan{
-				StartByte: item.Span.StartByte,
-				EndByte:   item.Span.EndByte,
-				StartRow:  item.Span.StartLine,
-				StartCol:  item.Span.StartColumn,
-				EndRow:    item.Span.EndLine,
-				EndCol:    item.Span.EndColumn,
-			},
+			Span: processSpanFromLanguagePack(item.Span),
 		})
 	}
 	for _, item := range result.Imports {
@@ -663,20 +591,13 @@ func ProcessWithLanguagePack(request ProcessRequest) ParseResult[LanguagePackPro
 		analysis.Imports = append(analysis.Imports, ProcessImportInfo{
 			Source: item.Source,
 			Items:  slices.Clone(item.Items),
-			Span: ProcessSpan{
-				StartByte: item.Span.StartByte,
-				EndByte:   item.Span.EndByte,
-				StartRow:  item.Span.StartLine,
-				StartCol:  item.Span.StartColumn,
-				EndRow:    item.Span.EndLine,
-				EndCol:    item.Span.EndColumn,
-			},
+			Span:   processSpanFromLanguagePack(item.Span),
 		})
 	}
 	for _, item := range result.Diagnostics {
 		analysis.Diagnostics = append(analysis.Diagnostics, ProcessDiagnostic{
 			Message:  item.Message,
-			Severity: item.Severity,
+			Severity: string(item.Severity),
 		})
 	}
 
@@ -687,8 +608,12 @@ func ProcessWithLanguagePack(request ProcessRequest) ParseResult[LanguagePackPro
 	}
 }
 
-func derefString(value string) string {
-	return value
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func boolValue(value *bool) bool {
+	return value != nil && *value
 }
 
 func derefStringPtr(value *string) string {
@@ -696,6 +621,17 @@ func derefStringPtr(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func processSpanFromLanguagePack(span tspack.Span) ProcessSpan {
+	return ProcessSpan{
+		StartByte: int(span.StartByte),
+		EndByte:   int(span.EndByte),
+		StartRow:  int(span.StartLine),
+		StartCol:  int(span.StartColumn),
+		EndRow:    int(span.EndLine),
+		EndCol:    int(span.EndColumn),
+	}
 }
 
 func normalizeTypeScriptImport(item tspack.ImportInfo) ProcessImportInfo {
@@ -724,13 +660,6 @@ func normalizeTypeScriptImport(item tspack.ImportInfo) ProcessImportInfo {
 	return ProcessImportInfo{
 		Source: source,
 		Items:  items,
-		Span: ProcessSpan{
-			StartByte: item.Span.StartByte,
-			EndByte:   item.Span.EndByte,
-			StartRow:  item.Span.StartLine,
-			StartCol:  item.Span.StartColumn,
-			EndRow:    item.Span.EndLine,
-			EndCol:    item.Span.EndColumn,
-		},
+		Span:   processSpanFromLanguagePack(item.Span),
 	}
 }
