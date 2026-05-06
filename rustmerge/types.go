@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
@@ -162,12 +163,12 @@ func normalizeRustImportPath(importSource string) string {
 func ParseRust(source string, _dialect RustDialect) astmerge.ParseResult[RustAnalysis] {
 	parsed := treehaver.ParseWithLanguagePack(parseRequest(source))
 	if !parsed.OK {
-		return astmerge.ParseResult[RustAnalysis]{OK: false, Diagnostics: parsed.Diagnostics}
+		return astmerge.ParseResult[RustAnalysis]{OK: false, Diagnostics: astbridge.DiagnosticsFromTreeHaver(parsed.Diagnostics)}
 	}
 
 	processed := treehaver.ProcessWithLanguagePack(processRequest(source))
 	if !processed.OK || processed.Analysis == nil {
-		return astmerge.ParseResult[RustAnalysis]{OK: false, Diagnostics: processed.Diagnostics}
+		return astmerge.ParseResult[RustAnalysis]{OK: false, Diagnostics: astbridge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
 	}
 
 	imports := make([]moduleImport, 0, len(processed.Analysis.Imports))

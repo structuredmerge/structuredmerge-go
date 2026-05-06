@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
@@ -274,7 +275,7 @@ func ParseMarkdownWithBackend(source string, dialect MarkdownDialect, backend Ma
 		if !result.OK {
 			return astmerge.ParseResult[MarkdownAnalysis]{
 				OK:          false,
-				Diagnostics: result.Diagnostics,
+				Diagnostics: astbridge.DiagnosticsFromTreeHaver(result.Diagnostics),
 			}
 		}
 	default:

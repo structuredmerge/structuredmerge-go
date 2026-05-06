@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 	"slices"
 	"strconv"
@@ -179,7 +180,7 @@ func ParseJSONWithLanguagePack(source string, dialect JSONDialect) astmerge.Pars
 	if !backendResult.OK {
 		return astmerge.ParseResult[JSONAnalysis]{
 			OK:          false,
-			Diagnostics: backendResult.Diagnostics,
+			Diagnostics: astbridge.DiagnosticsFromTreeHaver(backendResult.Diagnostics),
 		}
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
@@ -353,7 +354,7 @@ func RubyPlanContext() astmerge.ConformanceFamilyPlanContext {
 func ParseRuby(source string, _dialect RubyDialect) astmerge.ParseResult[RubyAnalysis] {
 	parsed := treehaver.ParseWithLanguagePack(rubyParseRequest(source))
 	if !parsed.OK {
-		return astmerge.ParseResult[RubyAnalysis]{OK: false, Diagnostics: parsed.Diagnostics}
+		return astmerge.ParseResult[RubyAnalysis]{OK: false, Diagnostics: astbridge.DiagnosticsFromTreeHaver(parsed.Diagnostics)}
 	}
 	analysis := analyzeRubyDocument(source)
 	return astmerge.ParseResult[RubyAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
