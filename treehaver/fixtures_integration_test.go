@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func readParserFixture(t *testing.T, parts ...string) map[string]any {
@@ -48,20 +46,29 @@ func diagnosticsFixturePath(t *testing.T, role string) string {
 	t.Helper()
 
 	manifestFixture := readParserFixture(t, "conformance", "slice-24-manifest", "family-feature-profiles.json")
-	manifestSource, err := json.Marshal(manifestFixture)
-	if err != nil {
-		t.Fatalf("marshal manifest: %v", err)
+	families, ok := manifestFixture["families"].(map[string]any)
+	if !ok {
+		t.Fatalf("manifest missing families")
 	}
-	var manifest astmerge.ConformanceManifest
-	if err := json.Unmarshal(manifestSource, &manifest); err != nil {
-		t.Fatalf("decode manifest: %v", err)
+	diagnosticsEntries, ok := families["diagnostics"].([]any)
+	if !ok {
+		t.Fatalf("manifest missing diagnostics family")
 	}
-	path := astmerge.ConformanceFixturePath(manifest, "diagnostics", role)
-	if path == nil {
-		t.Fatalf("missing diagnostics fixture entry for %s", role)
+	for _, rawEntry := range diagnosticsEntries {
+		entry := rawEntry.(map[string]any)
+		if entry["role"] != role {
+			continue
+		}
+		rawPath := entry["path"].([]any)
+		path := make([]string, 0, len(rawPath))
+		for _, part := range rawPath {
+			path = append(path, part.(string))
+		}
+		return filepath.Join(append([]string{"..", "..", "fixtures"}, path...)...)
 	}
 
-	return filepath.Join(append([]string{"..", "..", "fixtures"}, path...)...)
+	t.Fatalf("missing diagnostics fixture entry for %s", role)
+	return ""
 }
 
 func TestSharedFixtureParserRequest(t *testing.T) {

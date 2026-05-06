@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
-	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
@@ -196,12 +195,12 @@ func ParseGoWithBackend(source string, _dialect GoDialect, backend GoBackend) as
 
 	parsed := treehaver.ParseWithLanguagePack(parseRequest(source))
 	if !parsed.OK {
-		return astmerge.ParseResult[GoAnalysis]{OK: false, Diagnostics: astbridge.DiagnosticsFromTreeHaver(parsed.Diagnostics)}
+		return astmerge.ParseResult[GoAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(parsed.Diagnostics)}
 	}
 
 	processed := treehaver.ProcessWithLanguagePack(processRequest(source))
 	if !processed.OK || processed.Analysis == nil {
-		return astmerge.ParseResult[GoAnalysis]{OK: false, Diagnostics: astbridge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
+		return astmerge.ParseResult[GoAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
 	}
 
 	dedupedImports := make(map[string]moduleImport)

@@ -8,7 +8,6 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
-	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/tomlmerge/internal/pigeontoml"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
@@ -417,7 +416,7 @@ func ParseTOMLWithBackend(source string, dialect TOMLDialect, backend TOMLBacken
 	if !syntax.OK {
 		return astmerge.ParseResult[TOMLAnalysis]{
 			OK:          false,
-			Diagnostics: astbridge.DiagnosticsFromTreeHaver(syntax.Diagnostics),
+			Diagnostics: astmerge.DiagnosticsFromTreeHaver(syntax.Diagnostics),
 		}
 	}
 

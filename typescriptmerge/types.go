@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
-	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
@@ -171,12 +170,12 @@ func ParseTypeScriptWithBackend(source string, _dialect TypeScriptDialect, backe
 
 	parsed := treehaver.ParseWithLanguagePack(parseRequest(source))
 	if !parsed.OK {
-		return astmerge.ParseResult[TypeScriptAnalysis]{OK: false, Diagnostics: astbridge.DiagnosticsFromTreeHaver(parsed.Diagnostics)}
+		return astmerge.ParseResult[TypeScriptAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(parsed.Diagnostics)}
 	}
 
 	processed := treehaver.ProcessWithLanguagePack(processRequest(source))
 	if !processed.OK || processed.Analysis == nil {
-		return astmerge.ParseResult[TypeScriptAnalysis]{OK: false, Diagnostics: astbridge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
+		return astmerge.ParseResult[TypeScriptAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
 	}
 
 	imports := make([]moduleImport, 0, len(processed.Analysis.Imports))

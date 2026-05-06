@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 type DiagnosticSeverity string
@@ -147,6 +149,43 @@ const (
 type PolicyReference struct {
 	Surface PolicySurface `json:"surface"`
 	Name    string        `json:"name"`
+}
+
+func DiagnosticFromTreeHaver(diagnostic treehaver.Diagnostic) Diagnostic {
+	category := CategoryUnsupportedFeature
+	if diagnostic.Category == treehaver.CategoryParseError {
+		category = CategoryParseError
+	}
+
+	return Diagnostic{
+		Severity: DiagnosticSeverity(diagnostic.Severity),
+		Category: category,
+		Message:  diagnostic.Message,
+		Path:     diagnostic.Path,
+	}
+}
+
+func DiagnosticsFromTreeHaver(diagnostics []treehaver.Diagnostic) []Diagnostic {
+	converted := make([]Diagnostic, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		converted = append(converted, DiagnosticFromTreeHaver(diagnostic))
+	}
+	return converted
+}
+
+func PolicyReferenceFromTreeHaver(policy treehaver.PolicyReference) PolicyReference {
+	return PolicyReference{
+		Surface: PolicySurface(policy.Surface),
+		Name:    policy.Name,
+	}
+}
+
+func PolicyReferencesFromTreeHaver(policies []treehaver.PolicyReference) []PolicyReference {
+	converted := make([]PolicyReference, 0, len(policies))
+	for _, policy := range policies {
+		converted = append(converted, PolicyReferenceFromTreeHaver(policy))
+	}
+	return converted
 }
 
 type FamilyFeatureProfile struct {

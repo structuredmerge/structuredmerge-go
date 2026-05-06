@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
-	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
@@ -161,7 +160,7 @@ func TestCapabilityAwareSelectionForTreeSitterAdapterCases(t *testing.T) {
 	featureProfile := &astmerge.ConformanceFeatureProfileView{
 		Backend:           adapterInfo.Backend,
 		SupportsDialects:  adapterInfo.SupportsDialects,
-		SupportedPolicies: astbridge.PolicyReferencesFromTreeHaver(adapterInfo.SupportedPolicies),
+		SupportedPolicies: astmerge.PolicyReferencesFromTreeHaver(adapterInfo.SupportedPolicies),
 	}
 
 	selected := astmerge.SelectConformanceCase(

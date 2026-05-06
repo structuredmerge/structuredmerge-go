@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
-	"github.com/structuredmerge/structuredmerge-go/internal/astbridge"
 	"github.com/structuredmerge/structuredmerge-go/treehaver"
 	yamlv3 "gopkg.in/yaml.v3"
 )
@@ -486,7 +485,7 @@ func ParseYAMLWithBackend(source string, dialect YAMLDialect, backend YAMLBacken
 	if !backendResult.OK {
 		return astmerge.ParseResult[YAMLAnalysis]{
 			OK:          false,
-			Diagnostics: astbridge.DiagnosticsFromTreeHaver(backendResult.Diagnostics),
+			Diagnostics: astmerge.DiagnosticsFromTreeHaver(backendResult.Diagnostics),
 		}
 	}
 
