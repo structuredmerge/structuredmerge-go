@@ -103,6 +103,27 @@ type SourceSpan struct {
 	EndPoint   SourcePoint
 }
 
+type ByteEditSpan struct {
+	StartByte   int
+	OldEndByte  int
+	NewEndByte  int
+	StartPoint  SourcePoint
+	OldEndPoint SourcePoint
+	NewEndPoint SourcePoint
+}
+
+func (edit ByteEditSpan) OldRange() ByteRange {
+	return ByteRange{StartByte: edit.StartByte, EndByte: edit.OldEndByte}
+}
+
+func (edit ByteEditSpan) NewRange() ByteRange {
+	return ByteRange{StartByte: edit.StartByte, EndByte: edit.NewEndByte}
+}
+
+func (edit ByteEditSpan) ByteDelta() int {
+	return edit.NewEndByte - edit.OldEndByte
+}
+
 type BinaryScalarValue struct {
 	Kind        string
 	Value       any
@@ -135,6 +156,20 @@ type BinaryNestedDispatch struct {
 	Status     string
 }
 
+type BinaryPayloadRegion struct {
+	Kind        string
+	SchemaPath  string
+	ByteRange   ByteRange
+	ExpectedHex string
+}
+
+type BinaryRawPayload struct {
+	Encoding   string
+	Value      string
+	ByteLength int
+	Regions    []BinaryPayloadRegion
+}
+
 type BinaryMergeReport struct {
 	Format             string
 	Schema             string
@@ -144,6 +179,49 @@ type BinaryMergeReport struct {
 	ChecksumUpdates    []string
 	NestedDispatches   []BinaryNestedDispatch
 	Diagnostics        []BinaryDiagnostic
+}
+
+type ZipArchiveInfo struct {
+	Format                string
+	Schema                string
+	EntryCount            int
+	CentralDirectoryRange ByteRange
+}
+
+type ZipArchiveEntry struct {
+	Path                  string
+	NormalizedPath        string
+	Directory             bool
+	Compression           string
+	CompressedSize        int
+	UncompressedSize      int
+	CRC32                 string
+	LocalHeaderRange      ByteRange
+	DataRange             ByteRange
+	CentralDirectoryRange ByteRange
+}
+
+type ZipMemberDecision struct {
+	NormalizedPath string
+	Operation      string
+	Disposition    string
+	NestedFamily   string
+	Reason         string
+}
+
+type ZipUnsafeEntry struct {
+	Path           string
+	NormalizedPath string
+	Category       string
+	Reason         string
+}
+
+type ZipFamilyReport struct {
+	Archive         ZipArchiveInfo
+	Entries         []ZipArchiveEntry
+	MemberDecisions []ZipMemberDecision
+	UnsafeEntries   []ZipUnsafeEntry
+	MergeReport     BinaryMergeReport
 }
 
 func SliceByteRange(source string, byteRange ByteRange) (string, error) {
@@ -227,9 +305,11 @@ type KaitaiTreeNode struct {
 }
 
 type KaitaiTreeAnalysis struct {
-	Schema     string
-	Root       KaitaiTreeNode
-	BackendRef BackendReference
+	Schema           string
+	SourceByteLength int
+	Root             KaitaiTreeNode
+	BackendRef       BackendReference
+	Diagnostics      []BinaryDiagnostic
 }
 
 func (LanguagePackAnalysis) Kind() string {

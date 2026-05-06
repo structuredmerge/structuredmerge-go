@@ -1,6 +1,7 @@
 package treehaver
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -212,6 +213,7 @@ func TestSharedFixtureKaitaiTreeHaverSubstrate(t *testing.T) {
 	infoFixture := fixture["adapter_info"].(map[string]any)
 	profileFixture := fixture["feature_profile"].(map[string]any)
 	nodeFixture := fixture["tree_node"].(map[string]any)
+	analysisFixture := fixture["analysis"].(map[string]any)
 
 	backend := BackendReferenceByID("kaitai-struct")
 	if backend == nil || backend.ID != backendFixture["id"].(string) || backend.Family != backendFixture["family"].(string) {
@@ -251,8 +253,23 @@ func TestSharedFixtureKaitaiTreeHaverSubstrate(t *testing.T) {
 			},
 		},
 	}
-	analysis := KaitaiTreeAnalysis{Schema: "png.ksy", Root: node, BackendRef: *backend}
-	if analysis.Kind() != "kaitai-tree" || analysis.Root.SchemaPath != "/chunks/1" || analysis.Root.Children[0].Fields["value"] != "Template" {
+	diagnosticFixture := analysisFixture["diagnostics"].([]any)[0].(map[string]any)
+	analysis := KaitaiTreeAnalysis{
+		Schema:           analysisFixture["schema"].(string),
+		SourceByteLength: int(analysisFixture["source_byte_length"].(float64)),
+		Root:             node,
+		BackendRef:       *backend,
+		Diagnostics: []BinaryDiagnostic{
+			{
+				Severity:   diagnosticFixture["severity"].(string),
+				Category:   diagnosticFixture["category"].(string),
+				Message:    diagnosticFixture["message"].(string),
+				SchemaPath: diagnosticFixture["schema_path"].(string),
+				ByteRange:  byteRangePointer(diagnosticFixture["byte_range"]),
+			},
+		},
+	}
+	if analysis.Kind() != "kaitai-tree" || analysis.Root.SchemaPath != "/chunks/1" || analysis.Root.Children[0].Fields["value"] != "Template" || analysis.SourceByteLength != int(analysisFixture["source_byte_length"].(float64)) || analysis.Diagnostics[0].SchemaPath != diagnosticFixture["schema_path"].(string) {
 		t.Fatalf("unexpected kaitai analysis: %+v", analysis)
 	}
 }
@@ -261,6 +278,7 @@ func TestSharedFixturePortableByteLocationContract(t *testing.T) {
 	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "portable_byte_location_contract"))
 	rangeFixture := fixture["byte_range"].(map[string]any)
 	pointFixture := fixture["source_point"].(map[string]any)
+	editFixture := fixture["edit_span"].(map[string]any)
 	expectedFixture := fixture["expected"].(map[string]any)
 	comparisonFixture := fixture["comparison_ranges"].(map[string]any)
 	source := fixture["source"].(string)
@@ -272,6 +290,14 @@ func TestSharedFixturePortableByteLocationContract(t *testing.T) {
 	point := SourcePoint{
 		Row:    int(pointFixture["row"].(float64)),
 		Column: int(pointFixture["column"].(float64)),
+	}
+	editSpan := ByteEditSpan{
+		StartByte:   int(editFixture["start_byte"].(float64)),
+		OldEndByte:  int(editFixture["old_end_byte"].(float64)),
+		NewEndByte:  int(editFixture["new_end_byte"].(float64)),
+		StartPoint:  sourcePointFromFixture(editFixture["start_point"]),
+		OldEndPoint: sourcePointFromFixture(editFixture["old_end_point"]),
+		NewEndPoint: sourcePointFromFixture(editFixture["new_end_point"]),
 	}
 	overlappingFixture := comparisonFixture["overlapping"].(map[string]any)
 	disjointFixture := comparisonFixture["disjoint"].(map[string]any)
@@ -292,22 +318,65 @@ func TestSharedFixturePortableByteLocationContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("byte offset for point: %v", err)
 	}
+	oldEditSlice, err := SliceByteRange(source, editSpan.OldRange())
+	if err != nil {
+		t.Fatalf("slice edit old range: %v", err)
+	}
 	if byteRange.Length() != int(expectedFixture["length"].(float64)) ||
 		slice != expectedFixture["slice"].(string) ||
 		byteRange.ContainsByte(byteRange.StartByte) != expectedFixture["contains_start"].(bool) ||
 		byteRange.ContainsByte(byteRange.EndByte) != expectedFixture["contains_end"].(bool) ||
 		byteRange.Overlaps(overlappingRange) != expectedFixture["overlaps"].(bool) ||
 		byteRange.Overlaps(disjointRange) != expectedFixture["disjoint"].(bool) ||
-		offset != int(expectedFixture["line_column_offset"].(float64)) {
-		t.Fatalf("unexpected byte location behavior: range=%+v slice=%q offset=%d", byteRange, slice, offset)
+		offset != int(expectedFixture["line_column_offset"].(float64)) ||
+		editSpan.OldRange().Length() != int(expectedFixture["old_edit_length"].(float64)) ||
+		editSpan.NewRange().Length() != int(expectedFixture["new_edit_length"].(float64)) ||
+		editSpan.ByteDelta() != int(expectedFixture["edit_delta"].(float64)) ||
+		oldEditSlice != expectedFixture["old_edit_slice"].(string) {
+		t.Fatalf("unexpected byte location behavior: range=%+v slice=%q offset=%d edit=%+v", byteRange, slice, offset, editSpan)
+	}
+}
+
+func sourcePointFromFixture(value any) SourcePoint {
+	fixture := value.(map[string]any)
+	return SourcePoint{
+		Row:    int(fixture["row"].(float64)),
+		Column: int(fixture["column"].(float64)),
 	}
 }
 
 func TestSharedFixtureBinaryCoreContract(t *testing.T) {
 	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "binary_core_contract"))
 	scalars := fixture["scalar_values"].([]any)
+	payloadFixture := fixture["raw_payload"].(map[string]any)
 	policiesFixture := fixture["render_policies"].([]any)
 	reportFixture := fixture["merge_report"].(map[string]any)
+
+	payloadRegions := payloadFixture["regions"].([]any)
+	payload := BinaryRawPayload{
+		Encoding:   payloadFixture["encoding"].(string),
+		Value:      payloadFixture["value"].(string),
+		ByteLength: int(payloadFixture["byte_length"].(float64)),
+		Regions:    make([]BinaryPayloadRegion, 0, len(payloadRegions)),
+	}
+	for _, raw := range payloadRegions {
+		item := raw.(map[string]any)
+		payload.Regions = append(payload.Regions, BinaryPayloadRegion{
+			Kind:        item["kind"].(string),
+			SchemaPath:  item["schema_path"].(string),
+			ByteRange:   *byteRangePointer(item["byte_range"]),
+			ExpectedHex: item["expected_hex"].(string),
+		})
+	}
+	payloadBytes, err := hex.DecodeString(payload.Value)
+	if err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	checksumRegion := payload.Regions[3]
+	checksumHex := hex.EncodeToString(payloadBytes[checksumRegion.ByteRange.StartByte:checksumRegion.ByteRange.EndByte])
+	if payload.Encoding != "hex" || len(payloadBytes) != payload.ByteLength || payload.Regions[0].Kind != "header" || payload.Regions[0].ByteRange.Length() != 8 || checksumHex != checksumRegion.ExpectedHex {
+		t.Fatalf("unexpected binary raw payload: %+v", payload)
+	}
 
 	values := make([]BinaryScalarValue, 0, len(scalars))
 	for _, raw := range scalars {
@@ -367,6 +436,102 @@ func TestSharedFixtureBinaryCoreContract(t *testing.T) {
 	}
 	if report.Format != "png" || report.PreservedRanges[0].Length() != 25 || report.NestedDispatches[0].Family != "text" || report.Diagnostics[0].Category != "unsupported_checksum_rewrite" {
 		t.Fatalf("unexpected binary merge report: %+v", report)
+	}
+}
+
+func TestSharedFixtureZipFamilyContract(t *testing.T) {
+	fixture := readParserFixtureFromPath(t, diagnosticsFixturePath(t, "zip_family_contract"))
+	archiveFixture := fixture["archive"].(map[string]any)
+	entriesFixture := fixture["entries"].([]any)
+	decisionsFixture := fixture["member_decisions"].([]any)
+	unsafeEntriesFixture := fixture["unsafe_entries"].([]any)
+	reportFixture := fixture["merge_report"].(map[string]any)
+
+	report := ZipFamilyReport{
+		Archive: ZipArchiveInfo{
+			Format:                archiveFixture["format"].(string),
+			Schema:                archiveFixture["schema"].(string),
+			EntryCount:            int(archiveFixture["entry_count"].(float64)),
+			CentralDirectoryRange: *byteRangePointer(archiveFixture["central_directory_range"]),
+		},
+		Entries:         make([]ZipArchiveEntry, 0, len(entriesFixture)),
+		MemberDecisions: make([]ZipMemberDecision, 0, len(decisionsFixture)),
+		UnsafeEntries:   make([]ZipUnsafeEntry, 0, len(unsafeEntriesFixture)),
+		MergeReport: BinaryMergeReport{
+			Format:             reportFixture["format"].(string),
+			Schema:             reportFixture["schema"].(string),
+			MatchedSchemaPaths: stringSlice(reportFixture["matched_schema_paths"]),
+			PreservedRanges:    byteRangeSlice(reportFixture["preserved_ranges"]),
+			RewrittenNodes:     stringSlice(reportFixture["rewritten_nodes"]),
+			ChecksumUpdates:    stringSlice(reportFixture["checksum_updates"]),
+			NestedDispatches: []BinaryNestedDispatch{
+				{
+					SchemaPath: reportFixture["nested_dispatches"].([]any)[0].(map[string]any)["schema_path"].(string),
+					Family:     reportFixture["nested_dispatches"].([]any)[0].(map[string]any)["family"].(string),
+					Status:     reportFixture["nested_dispatches"].([]any)[0].(map[string]any)["status"].(string),
+				},
+				{
+					SchemaPath: reportFixture["nested_dispatches"].([]any)[1].(map[string]any)["schema_path"].(string),
+					Family:     reportFixture["nested_dispatches"].([]any)[1].(map[string]any)["family"].(string),
+					Status:     reportFixture["nested_dispatches"].([]any)[1].(map[string]any)["status"].(string),
+				},
+			},
+			Diagnostics: []BinaryDiagnostic{
+				{
+					Severity:   reportFixture["diagnostics"].([]any)[0].(map[string]any)["severity"].(string),
+					Category:   reportFixture["diagnostics"].([]any)[0].(map[string]any)["category"].(string),
+					Message:    reportFixture["diagnostics"].([]any)[0].(map[string]any)["message"].(string),
+					SchemaPath: reportFixture["diagnostics"].([]any)[0].(map[string]any)["schema_path"].(string),
+				},
+			},
+		},
+	}
+	for _, raw := range entriesFixture {
+		item := raw.(map[string]any)
+		report.Entries = append(report.Entries, ZipArchiveEntry{
+			Path:                  item["path"].(string),
+			NormalizedPath:        item["normalized_path"].(string),
+			Directory:             item["directory"].(bool),
+			Compression:           item["compression"].(string),
+			CompressedSize:        int(item["compressed_size"].(float64)),
+			UncompressedSize:      int(item["uncompressed_size"].(float64)),
+			CRC32:                 item["crc32"].(string),
+			LocalHeaderRange:      *byteRangePointer(item["local_header_range"]),
+			DataRange:             *byteRangePointer(item["data_range"]),
+			CentralDirectoryRange: *byteRangePointer(item["central_directory_range"]),
+		})
+	}
+	for _, raw := range decisionsFixture {
+		item := raw.(map[string]any)
+		report.MemberDecisions = append(report.MemberDecisions, ZipMemberDecision{
+			NormalizedPath: item["normalized_path"].(string),
+			Operation:      item["operation"].(string),
+			Disposition:    item["disposition"].(string),
+			NestedFamily:   stringValue(item["nested_family"]),
+			Reason:         item["reason"].(string),
+		})
+	}
+	for _, raw := range unsafeEntriesFixture {
+		item := raw.(map[string]any)
+		report.UnsafeEntries = append(report.UnsafeEntries, ZipUnsafeEntry{
+			Path:           item["path"].(string),
+			NormalizedPath: item["normalized_path"].(string),
+			Category:       item["category"].(string),
+			Reason:         item["reason"].(string),
+		})
+	}
+
+	if report.Archive.EntryCount != len(report.Entries) || report.Entries[1].NormalizedPath != "word/document.xml" {
+		t.Fatalf("unexpected zip archive report: %+v", report)
+	}
+	if report.MemberDecisions[1].Operation != "delegate" || report.MemberDecisions[1].NestedFamily != "xml" || report.MemberDecisions[3].Disposition != "unsafe" {
+		t.Fatalf("unexpected zip member decisions: %+v", report.MemberDecisions)
+	}
+	if report.UnsafeEntries[0].Category != "path_traversal" || report.UnsafeEntries[1].NormalizedPath != "config/settings.yml" || report.UnsafeEntries[2].Category != "encrypted_member" {
+		t.Fatalf("unexpected zip unsafe entries: %+v", report.UnsafeEntries)
+	}
+	if report.MergeReport.Format != "zip" || report.MergeReport.PreservedRanges[0].Length() != 76 || report.MergeReport.NestedDispatches[1].Family != "yaml" || report.MergeReport.Diagnostics[0].Category != "dangerous_executable_mutation" {
+		t.Fatalf("unexpected zip merge report: %+v", report.MergeReport)
 	}
 }
 
