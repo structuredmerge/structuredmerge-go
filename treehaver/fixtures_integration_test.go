@@ -78,7 +78,7 @@ func TestSharedFixtureParserRequest(t *testing.T) {
 		Backend:           infoFixture["backend"].(string),
 		BackendRef:        nil,
 		SupportsDialects:  infoFixture["supports_dialects"].(bool),
-		SupportedPolicies: []astmerge.PolicyReference{},
+		SupportedPolicies: []PolicyReference{},
 	}
 
 	if request.Source != requestFixture["source"].(string) ||
@@ -100,13 +100,13 @@ func TestSharedFixtureAdapterPolicySupport(t *testing.T) {
 		Backend:          infoFixture["backend"].(string),
 		BackendRef:       nil,
 		SupportsDialects: infoFixture["supports_dialects"].(bool),
-		SupportedPolicies: []astmerge.PolicyReference{
+		SupportedPolicies: []PolicyReference{
 			{
-				Surface: astmerge.PolicySurfaceArray,
+				Surface: PolicySurfaceArray,
 				Name:    "destination_wins_array",
 			},
 			{
-				Surface: astmerge.PolicySurfaceFallback,
+				Surface: PolicySurfaceFallback,
 				Name:    "trailing_comma_destination_fallback",
 			},
 		},
@@ -136,13 +136,13 @@ func TestSharedFixtureAdapterFeatureProfile(t *testing.T) {
 		Backend:          profileFixture["backend"].(string),
 		BackendRef:       nil,
 		SupportsDialects: profileFixture["supports_dialects"].(bool),
-		SupportedPolicies: []astmerge.PolicyReference{
+		SupportedPolicies: []PolicyReference{
 			{
-				Surface: astmerge.PolicySurfaceArray,
+				Surface: PolicySurfaceArray,
 				Name:    "destination_wins_array",
 			},
 			{
-				Surface: astmerge.PolicySurfaceFallback,
+				Surface: PolicySurfaceFallback,
 				Name:    "trailing_comma_destination_fallback",
 			},
 		},
@@ -175,7 +175,7 @@ func TestSharedFixtureBackendRegistry(t *testing.T) {
 		Backend:           "tree-sitter",
 		BackendRef:        &backends[1],
 		SupportsDialects:  true,
-		SupportedPolicies: []astmerge.PolicyReference{},
+		SupportedPolicies: []PolicyReference{},
 	}
 
 	expectedBackends := fixture["backends"].([]any)

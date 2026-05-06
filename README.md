@@ -20,6 +20,7 @@ Package directories:
 
 - [`astmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/astmerge)
 - [`asttemplate`](https://github.com/structuredmerge/structuredmerge-go/tree/main/asttemplate)
+- [`binarymerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/binarymerge)
 - [`goccygoyamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goccygoyamlmerge)
 - [`goldmarkmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goldmarkmerge)
 - [`gomerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/gomerge)
@@ -35,6 +36,7 @@ Package directories:
 - [`treehaver`](https://github.com/structuredmerge/structuredmerge-go/tree/main/treehaver)
 - [`typescriptmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/typescriptmerge)
 - [`yamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/yamlmerge)
+- [`zipmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/zipmerge)
 
 ## Conformance
 

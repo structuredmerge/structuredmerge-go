@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	tspack "github.com/kreuzberg-dev/tree-sitter-language-pack/packages/go"
-	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 type AnalysisHandle interface {
@@ -25,29 +24,70 @@ type BackendReference struct {
 	Family string
 }
 
+type DiagnosticSeverity string
+
+const (
+	SeverityInfo    DiagnosticSeverity = "info"
+	SeverityWarning DiagnosticSeverity = "warning"
+	SeverityError   DiagnosticSeverity = "error"
+)
+
+type DiagnosticCategory string
+
+const (
+	CategoryParseError         DiagnosticCategory = "parse_error"
+	CategoryUnsupportedFeature DiagnosticCategory = "unsupported_feature"
+)
+
+type Diagnostic struct {
+	Severity DiagnosticSeverity `json:"severity"`
+	Category DiagnosticCategory `json:"category"`
+	Message  string             `json:"message"`
+	Path     string             `json:"path,omitempty"`
+}
+
+type PolicySurface string
+
+const (
+	PolicySurfaceFallback PolicySurface = "fallback"
+	PolicySurfaceArray    PolicySurface = "array"
+)
+
+type PolicyReference struct {
+	Surface PolicySurface `json:"surface"`
+	Name    string        `json:"name"`
+}
+
+type ParseResult[T any] struct {
+	OK          bool
+	Diagnostics []Diagnostic
+	Analysis    *T
+	Policies    []PolicyReference
+}
+
 type AdapterInfo struct {
 	Backend           string
 	BackendRef        *BackendReference
 	SupportsDialects  bool
-	SupportedPolicies []astmerge.PolicyReference
+	SupportedPolicies []PolicyReference
 }
 
 type FeatureProfile struct {
 	Backend           string
 	BackendRef        *BackendReference
 	SupportsDialects  bool
-	SupportedPolicies []astmerge.PolicyReference
+	SupportedPolicies []PolicyReference
 }
 
 type ParserAdapter[T AnalysisHandle] interface {
 	Info() AdapterInfo
-	Parse(request ParserRequest) astmerge.ParseResult[T]
+	Parse(request ParserRequest) ParseResult[T]
 }
 
 type ParserDiagnostics struct {
 	Backend     string
 	BackendRef  *BackendReference
-	Diagnostics []astmerge.Diagnostic
+	Diagnostics []Diagnostic
 }
 
 type ProcessRequest struct {
@@ -450,15 +490,15 @@ func ensureLanguageAvailable(registry *tspack.Registry, language string) error {
 	return fmt.Errorf("tree-sitter-language-pack language %q is not available after download", language)
 }
 
-func ParseWithLanguagePack(request ParserRequest) astmerge.ParseResult[LanguagePackAnalysis] {
+func ParseWithLanguagePack(request ParserRequest) ParseResult[LanguagePackAnalysis] {
 	registry, err := languagePackRegistryInstance()
 	if err != nil {
-		return astmerge.ParseResult[LanguagePackAnalysis]{
+		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryUnsupportedFeature,
+					Severity: SeverityError,
+					Category: CategoryUnsupportedFeature,
 					Message:  err.Error(),
 				},
 			},
@@ -466,12 +506,12 @@ func ParseWithLanguagePack(request ParserRequest) astmerge.ParseResult[LanguageP
 	}
 
 	if err := ensureLanguageAvailable(registry, request.Language); err != nil {
-		return astmerge.ParseResult[LanguagePackAnalysis]{
+		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryUnsupportedFeature,
+					Severity: SeverityError,
+					Category: CategoryUnsupportedFeature,
 					Message:  err.Error(),
 				},
 			},
@@ -480,12 +520,12 @@ func ParseWithLanguagePack(request ParserRequest) astmerge.ParseResult[LanguageP
 
 	tree, err := registry.ParseString(request.Language, request.Source)
 	if err != nil {
-		return astmerge.ParseResult[LanguagePackAnalysis]{
+		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryParseError,
+					Severity: SeverityError,
+					Category: CategoryParseError,
 					Message:  err.Error(),
 				},
 			},
@@ -495,24 +535,24 @@ func ParseWithLanguagePack(request ParserRequest) astmerge.ParseResult[LanguageP
 
 	hasError, err := tree.HasErrorNodes()
 	if err != nil {
-		return astmerge.ParseResult[LanguagePackAnalysis]{
+		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryUnsupportedFeature,
+					Severity: SeverityError,
+					Category: CategoryUnsupportedFeature,
 					Message:  err.Error(),
 				},
 			},
 		}
 	}
 	if hasError {
-		return astmerge.ParseResult[LanguagePackAnalysis]{
+		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryParseError,
+					Severity: SeverityError,
+					Category: CategoryParseError,
 					Message:  "tree-sitter-language-pack reported syntax errors for " + request.Language + ".",
 				},
 			},
@@ -521,12 +561,12 @@ func ParseWithLanguagePack(request ParserRequest) astmerge.ParseResult[LanguageP
 
 	rootType, err := tree.RootNodeType()
 	if err != nil {
-		return astmerge.ParseResult[LanguagePackAnalysis]{
+		return ParseResult[LanguagePackAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryUnsupportedFeature,
+					Severity: SeverityError,
+					Category: CategoryUnsupportedFeature,
 					Message:  err.Error(),
 				},
 			},
@@ -540,22 +580,22 @@ func ParseWithLanguagePack(request ParserRequest) astmerge.ParseResult[LanguageP
 		HasError:   false,
 		BackendRef: KreuzbergLanguagePackBackend,
 	}
-	return astmerge.ParseResult[LanguagePackAnalysis]{
+	return ParseResult[LanguagePackAnalysis]{
 		OK:          true,
-		Diagnostics: []astmerge.Diagnostic{},
+		Diagnostics: []Diagnostic{},
 		Analysis:    &analysis,
 	}
 }
 
-func ProcessWithLanguagePack(request ProcessRequest) astmerge.ParseResult[LanguagePackProcessAnalysis] {
+func ProcessWithLanguagePack(request ProcessRequest) ParseResult[LanguagePackProcessAnalysis] {
 	registry, err := languagePackRegistryInstance()
 	if err != nil {
-		return astmerge.ParseResult[LanguagePackProcessAnalysis]{
+		return ParseResult[LanguagePackProcessAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryUnsupportedFeature,
+					Severity: SeverityError,
+					Category: CategoryUnsupportedFeature,
 					Message:  err.Error(),
 				},
 			},
@@ -563,12 +603,12 @@ func ProcessWithLanguagePack(request ProcessRequest) astmerge.ParseResult[Langua
 	}
 
 	if err := ensureLanguageAvailable(registry, request.Language); err != nil {
-		return astmerge.ParseResult[LanguagePackProcessAnalysis]{
+		return ParseResult[LanguagePackProcessAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryUnsupportedFeature,
+					Severity: SeverityError,
+					Category: CategoryUnsupportedFeature,
 					Message:  err.Error(),
 				},
 			},
@@ -582,12 +622,12 @@ func ProcessWithLanguagePack(request ProcessRequest) astmerge.ParseResult[Langua
 		Diagnostics: true,
 	})
 	if err != nil {
-		return astmerge.ParseResult[LanguagePackProcessAnalysis]{
+		return ParseResult[LanguagePackProcessAnalysis]{
 			OK: false,
-			Diagnostics: []astmerge.Diagnostic{
+			Diagnostics: []Diagnostic{
 				{
-					Severity: astmerge.SeverityError,
-					Category: astmerge.CategoryUnsupportedFeature,
+					Severity: SeverityError,
+					Category: CategoryUnsupportedFeature,
 					Message:  err.Error(),
 				},
 			},
@@ -640,9 +680,9 @@ func ProcessWithLanguagePack(request ProcessRequest) astmerge.ParseResult[Langua
 		})
 	}
 
-	return astmerge.ParseResult[LanguagePackProcessAnalysis]{
+	return ParseResult[LanguagePackProcessAnalysis]{
 		OK:          true,
-		Diagnostics: []astmerge.Diagnostic{},
+		Diagnostics: []Diagnostic{},
 		Analysis:    &analysis,
 	}
 }
