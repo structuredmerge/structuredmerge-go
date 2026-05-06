@@ -1,4 +1,4 @@
-package textmerge
+package plainmerge
 
 import (
 	"github.com/structuredmerge/structuredmerge-go/astmerge"

@@ -23,7 +23,7 @@ Initial focus:
 
 1. tree-sitter adapter package
 2. core merge model
-3. text merge MVP
+3. plain text merge MVP
 4. JSON and JSONC merge MVP
 5. shared-fixture conformance runner
 
@@ -40,7 +40,7 @@ Initial package/module candidates:
 
 - `tree-haver-go`
 - `ast-merge-go`
-- `text-merge-go`
+- `plain-merge-go`
 - `json-merge-go`
 
 Possible later modules:
@@ -104,7 +104,7 @@ Requirements:
 - matching/refinement interfaces
 - freeze region model
 
-### 3. `text-merge-go`
+### 3. `plain-merge-go`
 
 - normalized text segmentation
 - block matching
@@ -148,5 +148,5 @@ Requirements:
 1. define Go merge result and diagnostic types
 2. implement `tree-haver-go`
 3. implement fixture runner
-4. implement `text-merge-go`
+4. implement `plain-merge-go`
 5. implement `json-merge-go`

@@ -1,4 +1,4 @@
-package textmerge
+package plainmerge
 
 import "testing"
 

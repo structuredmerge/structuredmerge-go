@@ -31,7 +31,7 @@ Package directories:
 - [`pigeontomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/pigeontomlmerge)
 - [`rubymerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rubymerge)
 - [`rustmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rustmerge)
-- [`textmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/textmerge)
+- [`plainmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/plainmerge)
 - [`tomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/tomlmerge)
 - [`treehaver`](https://github.com/structuredmerge/structuredmerge-go/tree/main/treehaver)
 - [`typescriptmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/typescriptmerge)
