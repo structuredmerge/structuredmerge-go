@@ -139,6 +139,20 @@ type NormalizedParseResult struct {
 	Metadata                 map[string]map[string]string
 }
 
+type TreeHaverProfile struct {
+	ProfileID            string
+	Language             string
+	BackendRef           BackendReference
+	ProviderID           string
+	NodeRoles            []NodeRole
+	NormalizedNodeFields []string
+	OptionalNodeFeatures []string
+	UnsupportedDefaults  map[string]string
+	Capability           BackendCapability
+	FixtureSlices        []string
+	Diagnostics          []string
+}
+
 type ParserAdapter[T AnalysisHandle] interface {
 	Info() AdapterInfo
 	Parse(request ParserRequest) ParseResult[T]

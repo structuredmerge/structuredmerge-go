@@ -483,6 +483,39 @@ func TestSharedFixtureNativeParserAdapterContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureTreeHaverProfile(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-788-tree-haver-profile", "tree-haver-profile.json")
+	profileFixture := fixture["profile"].(map[string]any)
+	backendRefFixture := profileFixture["backend_ref"].(map[string]any)
+
+	profile := TreeHaverProfile{
+		ProfileID: profileFixture["profile_id"].(string),
+		Language:  profileFixture["language"].(string),
+		BackendRef: BackendReference{
+			ID:     backendRefFixture["id"].(string),
+			Family: backendRefFixture["family"].(string),
+		},
+		ProviderID:           profileFixture["provider_id"].(string),
+		NodeRoles:            nodeRoleSliceFromFixture(profileFixture["node_roles"]),
+		NormalizedNodeFields: stringSliceFromFixture(profileFixture["normalized_node_fields"]),
+		OptionalNodeFeatures: stringSliceFromFixture(profileFixture["optional_node_features"]),
+		UnsupportedDefaults:  stringMapFromFixture(profileFixture["unsupported_defaults"]),
+		Capability:           backendCapabilityFromFixture(profileFixture["capability"]),
+		FixtureSlices:        stringSliceFromFixture(profileFixture["fixture_slices"]),
+		Diagnostics:          stringSliceFromFixture(profileFixture["diagnostics"]),
+	}
+
+	if profile.ProfileID != "go-dst-normalized-tree-v1" ||
+		profile.BackendRef.ID != "go-dst" ||
+		profile.NodeRoles[0] != NodeRoleStructural ||
+		profile.NormalizedNodeFields[len(profile.NormalizedNodeFields)-1] != "metadata" ||
+		profile.UnsupportedDefaults["field_name"] != "null" ||
+		profile.Capability.ParserIdentity.Name != "github.com/dave/dst" ||
+		profile.FixtureSlices[0] != "slice-782-normalized-tree-node" {
+		t.Fatalf("unexpected tree-haver profile: %+v", profile)
+	}
+}
+
 func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
 	fixture := readParserFixture(t, "diagnostics", "slice-783-backend-capability-report", "backend-capability-report.json")
 	capabilityFixture := fixture["capability"].(map[string]any)
@@ -699,6 +732,24 @@ func stringSliceFromFixture(value any) []string {
 	items := make([]string, 0, len(fixture))
 	for _, item := range fixture {
 		items = append(items, item.(string))
+	}
+	return items
+}
+
+func nodeRoleSliceFromFixture(value any) []NodeRole {
+	items := stringSliceFromFixture(value)
+	roles := make([]NodeRole, 0, len(items))
+	for _, item := range items {
+		roles = append(roles, NodeRole(item))
+	}
+	return roles
+}
+
+func stringMapFromFixture(value any) map[string]string {
+	raw := value.(map[string]any)
+	items := make(map[string]string, len(raw))
+	for key, item := range raw {
+		items[key] = item.(string)
 	}
 	return items
 }
