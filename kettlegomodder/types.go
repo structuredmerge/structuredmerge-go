@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"gopkg.in/yaml.v3"
 )
 
 const PackageName = "kettle-gomodder"
@@ -83,6 +84,78 @@ type ProjectReport struct {
 	RecipeReports []RecipeRunReport     `json:"recipe_reports"`
 	ChangedFiles  []string              `json:"changed_files"`
 	Diagnostics   []astmerge.Diagnostic `json:"diagnostics"`
+}
+
+type ReadmeStyleReport struct {
+	ReadmePath           string   `json:"readme_path"`
+	Changed              bool     `json:"changed"`
+	Style                string   `json:"style"`
+	PreservedSections    []string `json:"preserved_sections"`
+	RenderedSections     []string `json:"rendered_sections"`
+	OmittedSections      []string `json:"omitted_sections"`
+	MissingIntegrations  []string `json:"missing_integrations"`
+	DisabledIntegrations []string `json:"disabled_integrations"`
+	UnresolvedLogoSlugs  []string `json:"unresolved_logo_slugs"`
+	LicenseFilesChanged  bool     `json:"license_files_changed"`
+	CopyrightAuthors     []string `json:"copyright_authors"`
+	FinalContent         string   `json:"final_content"`
+}
+
+type KettleConfig struct {
+	Readme ReadmeConfig `yaml:"readme"`
+}
+
+type ReadmeConfig struct {
+	Style            string                  `yaml:"style"`
+	ProjectEmoji     string                  `yaml:"project_emoji"`
+	Family           ReadmeFamilyConfig      `yaml:"family"`
+	LogoRow          ReadmeLogoRowConfig     `yaml:"logo_row"`
+	Badges           ReadmeBadgesConfig      `yaml:"badges"`
+	PreserveSections []string                `yaml:"preserve_sections"`
+	PreservePatterns []string                `yaml:"preserve_patterns"`
+	SectionAliases   map[string]string       `yaml:"section_aliases"`
+	Conditional      ReadmeConditionalConfig `yaml:"conditional_sections"`
+	Integrations     map[string]string       `yaml:"integrations"`
+	License          ReadmeLicenseConfig     `yaml:"license"`
+}
+
+type ReadmeFamilyConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	Name               string `yaml:"name"`
+	InjectFromSynopsis bool   `yaml:"inject_from_synopsis"`
+}
+
+type ReadmeLogoRowConfig struct {
+	Enabled  *bool        `yaml:"enabled"`
+	MaxCount int          `yaml:"max_count"`
+	Logos    []ReadmeLogo `yaml:"logos"`
+}
+
+type ReadmeLogo struct {
+	Type string `yaml:"type"`
+	Slug string `yaml:"slug"`
+	Alt  string `yaml:"alt"`
+	Href string `yaml:"href"`
+}
+
+type ReadmeBadgesConfig struct {
+	VisibleCore     []string `yaml:"visible_core"`
+	CollapsedGroups []string `yaml:"collapsed_groups"`
+	Disabled        []string `yaml:"disabled"`
+}
+
+type ReadmeConditionalConfig struct {
+	FlossFunding            string `yaml:"floss_funding"`
+	Security                string `yaml:"security"`
+	HostileRubyGemsTakeover string `yaml:"hostile_rubygems_takeover"`
+	SecureInstallation      string `yaml:"secure_installation"`
+}
+
+type ReadmeLicenseConfig struct {
+	SPDX                       []string `yaml:"spdx"`
+	GenerateLicenseFiles       bool     `yaml:"generate_license_files"`
+	IncludeGitBlameAuthors     bool     `yaml:"include_git_blame_authors"`
+	SyncReadmeCopyrightAuthors bool     `yaml:"sync_readme_copyright_authors"`
 }
 
 func DiscoverFacts(projectRoot string) (PackageFacts, error) {
@@ -252,6 +325,40 @@ func ApplyProject(projectRoot string) (ProjectReport, error) {
 		}
 	}
 
+	return report, nil
+}
+
+func PlanReadmeStyle(projectRoot string) (ReadmeStyleReport, error) {
+	facts, err := DiscoverFacts(projectRoot)
+	if err != nil {
+		return ReadmeStyleReport{}, err
+	}
+	config, err := readKettleConfig(projectRoot)
+	if err != nil {
+		return ReadmeStyleReport{}, err
+	}
+	readmePath := filepath.Join(projectRoot, "README.md")
+	original, err := os.ReadFile(readmePath)
+	if err != nil && !os.IsNotExist(err) {
+		return ReadmeStyleReport{}, fmt.Errorf("read README.md: %w", err)
+	}
+	hasSecurity := fileExists(filepath.Join(projectRoot, "SECURITY.md"))
+	report := renderReadmeStyle(string(original), facts, config.Readme, hasSecurity)
+	return report, nil
+}
+
+func ApplyReadmeStyle(projectRoot string) (ReadmeStyleReport, error) {
+	report, err := PlanReadmeStyle(projectRoot)
+	if err != nil {
+		return ReadmeStyleReport{}, err
+	}
+	if !report.Changed {
+		return report, nil
+	}
+	targetPath := filepath.Join(projectRoot, report.ReadmePath)
+	if err := os.WriteFile(targetPath, []byte(report.FinalContent), 0o644); err != nil {
+		return ReadmeStyleReport{}, fmt.Errorf("write README.md: %w", err)
+	}
 	return report, nil
 }
 
@@ -616,6 +723,295 @@ func sourceURLFromModulePath(modulePath string) string {
 		return "https://" + strings.Join(parts[:3], "/")
 	}
 	return ""
+}
+
+func readKettleConfig(projectRoot string) (KettleConfig, error) {
+	source, err := os.ReadFile(filepath.Join(projectRoot, "kettle.yml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return KettleConfig{}, nil
+		}
+		return KettleConfig{}, fmt.Errorf("read kettle.yml: %w", err)
+	}
+	var config KettleConfig
+	if err := yaml.Unmarshal(source, &config); err != nil {
+		return KettleConfig{}, fmt.Errorf("parse kettle.yml: %w", err)
+	}
+	return config, nil
+}
+
+func renderReadmeStyle(destination string, facts PackageFacts, config ReadmeConfig, hasSecurity bool) ReadmeStyleReport {
+	config = defaultReadmeConfig(config)
+	preserved := preservedReadmeSections(destination, config)
+	license := readmeLicense(config, facts)
+	logoRow, unresolvedLogos := readmeLogoRow(config)
+	badgeCloud, missingIntegrations, disabledIntegrations := readmeBadgeCloud(config, facts, license, hasSecurity)
+	renderedSections := []string{"Project Name", "Badges", "Synopsis", "Info you can shake a stick at", "Installation", "Configuration", "Basic Usage", "Versioning", "License", "A request for help"}
+	omittedSections := []string{"Hostile RubyGems Takeover", "Secure Installation"}
+	if logoRow != "" {
+		renderedSections = append([]string{"Logos"}, renderedSections...)
+	}
+	includeFunding := shouldIncludeFunding(config, license)
+	if includeFunding {
+		renderedSections = append(renderedSections, "FLOSS Funding")
+	} else {
+		omittedSections = append(omittedSections, "FLOSS Funding")
+	}
+	if hasSecurity {
+		renderedSections = append(renderedSections, "Security")
+	} else {
+		omittedSections = append(omittedSections, "Security")
+	}
+	renderedSections = append(renderedSections, "Contributing")
+
+	sections := []string{}
+	if logoRow != "" {
+		sections = append(sections, logoRow)
+	}
+	sections = append(sections, "# "+config.ProjectEmoji+" "+facts.Package.Name)
+	if badgeCloud != "" {
+		sections = append(sections, badgeCloud)
+	}
+	sections = append(sections,
+		"## 🌻 Synopsis\n\n"+preserved["synopsis"],
+		"## 💡 Info you can shake a stick at\n\nCompatible with Go "+emptyAsUnknown(facts.GoMod.GoVersion)+".\n\n<details markdown=\"1\">\n<summary>Compatibility, federated DVCS, and enterprise support</summary>\n\nAdditional compatibility and support details are generated from package metadata and shared fixtures.\n\n</details>",
+		"## ✨ Installation\n\n```console\ngo get "+facts.GoMod.ModulePath+"\n```",
+		"## ⚙️ Configuration\n\n"+preserved["configuration"],
+		"## 🔧 Basic Usage\n\n"+preserved["basic usage"],
+	)
+	if includeFunding {
+		sections = append(sections, "## 🦷 FLOSS Funding\n\nThis free software project accepts funding support when configured by the package maintainer.")
+	}
+	if hasSecurity {
+		sections = append(sections, "## 🔐 Security\n\nSee [SECURITY.md](SECURITY.md).")
+	}
+	sections = append(sections,
+		"## 🤝 Contributing\n\nContributions are welcome. Missing optional service integrations are reported by the generator instead of rendered as broken badges.",
+		"## 📌 Versioning\n\nThis project follows semantic versioning for its public API where practical.",
+		"## 📄 License\n\n"+licenseParagraph(license),
+		"## 🤑 A request for help\n\nPlease support the project by using it, reporting issues, and contributing improvements.",
+	)
+	finalContent := ensureTrailingNewline(strings.Join(sections, "\n\n"))
+	return ReadmeStyleReport{
+		ReadmePath:           "README.md",
+		Changed:              finalContent != destination,
+		Style:                config.Style,
+		PreservedSections:    []string{"Synopsis", "Configuration", "Basic Usage"},
+		RenderedSections:     renderedSections,
+		OmittedSections:      omittedSections,
+		MissingIntegrations:  missingIntegrations,
+		DisabledIntegrations: disabledIntegrations,
+		UnresolvedLogoSlugs:  unresolvedLogos,
+		LicenseFilesChanged:  false,
+		CopyrightAuthors:     []string{},
+		FinalContent:         finalContent,
+	}
+}
+
+func defaultReadmeConfig(config ReadmeConfig) ReadmeConfig {
+	if config.Style == "" {
+		config.Style = "thin"
+	}
+	if config.ProjectEmoji == "" {
+		config.ProjectEmoji = "💎"
+	}
+	if len(config.PreserveSections) == 0 {
+		config.PreserveSections = []string{"Synopsis", "Configuration", "Basic Usage"}
+	}
+	if config.SectionAliases == nil {
+		config.SectionAliases = map[string]string{}
+	}
+	defaultAliases := map[string]string{
+		"summary":               "synopsis",
+		"usage":                 "basic usage",
+		"configuration options": "configuration",
+		"setup":                 "basic usage",
+	}
+	for key, value := range defaultAliases {
+		if _, ok := config.SectionAliases[key]; !ok {
+			config.SectionAliases[key] = value
+		}
+	}
+	if config.LogoRow.MaxCount == 0 {
+		config.LogoRow.MaxCount = 3
+	}
+	return config
+}
+
+func preservedReadmeSections(content string, config ReadmeConfig) map[string]string {
+	sections := markdownSectionBodies(content)
+	result := map[string]string{}
+	for _, section := range config.PreserveSections {
+		key := normalizeReadmeHeading(section)
+		result[key] = strings.TrimSpace(sections[key])
+	}
+	for from, to := range normalizedAliases(config.SectionAliases) {
+		if result[to] == "" && sections[from] != "" {
+			result[to] = strings.TrimSpace(sections[from])
+		}
+	}
+	return result
+}
+
+func markdownSectionBodies(content string) map[string]string {
+	lines := strings.Split(content, "\n")
+	type heading struct {
+		index int
+		level int
+		key   string
+	}
+	headings := []heading{}
+	for index, line := range lines {
+		if !strings.HasPrefix(line, "#") {
+			continue
+		}
+		markerEnd := 0
+		for markerEnd < len(line) && line[markerEnd] == '#' {
+			markerEnd++
+		}
+		if markerEnd == 0 || markerEnd > 6 || markerEnd >= len(line) || line[markerEnd] != ' ' {
+			continue
+		}
+		headings = append(headings, heading{index: index, level: markerEnd, key: normalizeReadmeHeading(line[markerEnd+1:])})
+	}
+	result := map[string]string{}
+	for index, current := range headings {
+		end := len(lines)
+		for _, candidate := range headings[index+1:] {
+			if candidate.level <= current.level {
+				end = candidate.index
+				break
+			}
+		}
+		result[current.key] = strings.TrimSpace(strings.Join(lines[current.index+1:end], "\n"))
+	}
+	return result
+}
+
+func normalizedAliases(aliases map[string]string) map[string]string {
+	result := map[string]string{}
+	for key, value := range aliases {
+		result[normalizeReadmeHeading(key)] = normalizeReadmeHeading(value)
+	}
+	return result
+}
+
+func normalizeReadmeHeading(value string) string {
+	value = strings.TrimSpace(value)
+	fields := strings.Fields(value)
+	if len(fields) > 1 && !startsWithLetterOrDigit(fields[0]) {
+		value = strings.Join(fields[1:], " ")
+	}
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func startsWithLetterOrDigit(value string) bool {
+	if value == "" {
+		return false
+	}
+	first := []rune(value)[0]
+	return (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || (first >= '0' && first <= '9')
+}
+
+func readmeLicense(config ReadmeConfig, facts PackageFacts) string {
+	if len(config.License.SPDX) > 0 {
+		return strings.Join(config.License.SPDX, " OR ")
+	}
+	if facts.Package.LicenseExpression != "" {
+		return facts.Package.LicenseExpression
+	}
+	return "MIT"
+}
+
+func readmeLogoRow(config ReadmeConfig) (string, []string) {
+	if config.LogoRow.Enabled != nil && !*config.LogoRow.Enabled {
+		return "", []string{}
+	}
+	maxCount := config.LogoRow.MaxCount
+	if maxCount <= 0 || maxCount > 3 {
+		maxCount = 3
+	}
+	logos := config.LogoRow.Logos
+	if len(logos) > maxCount {
+		logos = logos[:maxCount]
+	}
+	parts := []string{}
+	unresolved := []string{}
+	for _, logo := range logos {
+		logoType := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(logo.Type)), "-", "_")
+		if !containsString([]string{"language", "org", "project", "affiliated_project"}, logoType) {
+			unresolved = append(unresolved, logo.Slug)
+			continue
+		}
+		if strings.TrimSpace(logo.Slug) == "" {
+			unresolved = append(unresolved, logo.Slug)
+			continue
+		}
+		slug := strings.TrimSpace(logo.Slug)
+		ref := strings.ReplaceAll(slug, "/", "-")
+		alt := strings.TrimSpace(logo.Alt)
+		if alt == "" {
+			alt = slug
+		}
+		href := strings.TrimSpace(logo.Href)
+		if href == "" {
+			href = "https://logos.galtzo.com/assets/images/" + slug + "/"
+		}
+		parts = append(parts, fmt.Sprintf("[![%s][🖼️%s-i]][🖼️%s]\n[🖼️%s-i]: https://logos.galtzo.com/assets/images/%s/avatar-192px.svg\n[🖼️%s]: %s", alt, ref, ref, ref, slug, ref, href))
+	}
+	return strings.Join(parts, "\n"), unresolved
+}
+
+func readmeBadgeCloud(config ReadmeConfig, facts PackageFacts, license string, hasSecurity bool) (string, []string, []string) {
+	disabled := append([]string{}, config.Badges.Disabled...)
+	missing := []string{}
+	for _, integration := range []string{"codecov", "coveralls", "qlty", "codeql"} {
+		if containsString(disabled, integration) {
+			continue
+		}
+		missing = append(missing, integration)
+	}
+	badges := []string{}
+	if facts.Package.SourceURL != "" {
+		badges = append(badges, "[![Source](https://img.shields.io/badge/source-github-238636.svg)]("+facts.Package.SourceURL+")")
+	}
+	if license != "" {
+		badges = append(badges, "![License](https://img.shields.io/badge/license-"+strings.ReplaceAll(license, " ", "%20")+"-259D6C.svg)")
+	}
+	if hasSecurity {
+		badges = append(badges, "[![Security](https://img.shields.io/badge/security-policy-259D6C.svg)](SECURITY.md)")
+	}
+	return strings.Join(badges, " "), missing, disabled
+}
+
+func shouldIncludeFunding(config ReadmeConfig, license string) bool {
+	policy := strings.ToLower(strings.TrimSpace(config.Conditional.FlossFunding))
+	if policy == "disabled" || policy == "false" || policy == "never" {
+		return false
+	}
+	if policy == "enabled" || policy == "true" || policy == "always" {
+		return true
+	}
+	return license == "MIT"
+}
+
+func licenseParagraph(license string) string {
+	if license == "MIT" {
+		return "This project is made available under the terms of the MIT License."
+	}
+	return "This project is made available under the following license expression: " + license + "."
+}
+
+func emptyAsUnknown(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "unknown"
+	}
+	return value
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func ensureTrailingNewline(text string) string {

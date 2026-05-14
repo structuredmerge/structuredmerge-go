@@ -138,6 +138,141 @@ func TestPackagedTemplateInventory(t *testing.T) {
 	}
 }
 
+func TestReadmeStyleProfileConformance(t *testing.T) {
+	styleFixture := readJSONFixture[map[string]any](t, "..", "..", "fixtures", "diagnostics", "slice-740-kettle-readme-style-profile", "kettle-readme-style-profile.json")
+	profile := styleFixture["profile"].(map[string]any)
+	if profile["name"] != "kettle-readme-style-profile" {
+		t.Fatalf("unexpected README style profile fixture: %#v", profile["name"])
+	}
+	projectRoot := t.TempDir()
+	writeTree(t, projectRoot, map[string]string{
+		"go.mod": "module github.com/acme/widget\n\ngo 1.22\n",
+		"kettle.yml": strings.Join([]string{
+			"readme:",
+			"  style: thin",
+			"  project_emoji: \"🧪\"",
+			"  logo_row:",
+			"    enabled: true",
+			"    max_count: 3",
+			"    logos:",
+			"      - type: language",
+			"        slug: go-lang",
+			"        alt: Go language logo",
+			"      - type: org",
+			"        slug: acme",
+			"        alt: Acme org logo",
+			"      - type: affiliated_project",
+			"        slug: tree-sitter/tree-sitter",
+			"        alt: Tree-sitter project logo",
+			"      - type: project",
+			"        slug: acme/ignored",
+			"        alt: Ignored fourth logo",
+			"  preserve_sections:",
+			"    - Synopsis",
+			"    - Configuration",
+			"    - Basic Usage",
+			"  section_aliases:",
+			"    Usage: Basic Usage",
+			"  conditional_sections:",
+			"    floss_funding: default_for_mit_opt_in_otherwise",
+			"    security: include_when_security_md_exists",
+			"  integrations:",
+			"    codecov: auto_detect_or_report_missing",
+			"    coveralls: auto_detect_or_report_missing",
+			"    qlty: auto_detect_or_report_missing",
+			"    codeql: auto_detect_or_report_missing",
+			"  badges:",
+			"    disabled:",
+			"      - coveralls",
+			"  license:",
+			"    spdx:",
+			"      - MIT",
+			"",
+		}, "\n"),
+		"SECURITY.md": "# Security\n",
+		"README.md": strings.Join([]string{
+			"# Old Widget",
+			"",
+			"## Summary",
+			"",
+			"Destination synopsis.",
+			"",
+			"## Configuration",
+			"",
+			"Destination configuration.",
+			"",
+			"## Usage",
+			"",
+			"Destination usage.",
+			"",
+		}, "\n"),
+	})
+
+	plan, err := PlanReadmeStyle(projectRoot)
+	if err != nil {
+		t.Fatalf("plan README style: %v", err)
+	}
+	if !plan.Changed {
+		t.Fatalf("expected README style plan to change the destination")
+	}
+	if plan.Style != "thin" {
+		t.Fatalf("unexpected README style: %s", plan.Style)
+	}
+	for _, section := range []string{"Synopsis", "Configuration", "Basic Usage"} {
+		if !containsString(plan.PreservedSections, section) {
+			t.Fatalf("expected preserved section %q in %#v", section, plan.PreservedSections)
+		}
+	}
+	for _, section := range []string{"Logos", "Project Name", "Badges", "Synopsis", "Installation", "Configuration", "Basic Usage", "FLOSS Funding", "Security", "Contributing", "Versioning", "License", "A request for help"} {
+		if !containsString(plan.RenderedSections, section) {
+			t.Fatalf("expected rendered section %q in %#v", section, plan.RenderedSections)
+		}
+	}
+	for _, section := range []string{"Hostile RubyGems Takeover", "Secure Installation"} {
+		if !containsString(plan.OmittedSections, section) {
+			t.Fatalf("expected omitted section %q in %#v", section, plan.OmittedSections)
+		}
+	}
+	if !containsString(plan.MissingIntegrations, "codecov") || !containsString(plan.MissingIntegrations, "qlty") || containsString(plan.MissingIntegrations, "coveralls") {
+		t.Fatalf("unexpected missing integrations: %#v", plan.MissingIntegrations)
+	}
+	if !containsString(plan.DisabledIntegrations, "coveralls") {
+		t.Fatalf("expected coveralls to be disabled: %#v", plan.DisabledIntegrations)
+	}
+	if strings.Contains(plan.FinalContent, "Ignored fourth logo") {
+		t.Fatalf("expected fourth logo to be omitted")
+	}
+	for _, snippet := range []string{
+		"# 🧪 github.com/acme/widget",
+		"## 🌻 Synopsis\n\nDestination synopsis.",
+		"## ⚙️ Configuration\n\nDestination configuration.",
+		"## 🔧 Basic Usage\n\nDestination usage.",
+		"## 🔐 Security\n\nSee [SECURITY.md](SECURITY.md).",
+		"## 🦷 FLOSS Funding",
+		"go get github.com/acme/widget",
+		"https://logos.galtzo.com/assets/images/tree-sitter/tree-sitter/avatar-192px.svg",
+	} {
+		if !strings.Contains(plan.FinalContent, snippet) {
+			t.Fatalf("expected README to include %q in:\n%s", snippet, plan.FinalContent)
+		}
+	}
+
+	apply, err := ApplyReadmeStyle(projectRoot)
+	if err != nil {
+		t.Fatalf("apply README style: %v", err)
+	}
+	if !apply.Changed {
+		t.Fatalf("expected first apply to change README")
+	}
+	second, err := ApplyReadmeStyle(projectRoot)
+	if err != nil {
+		t.Fatalf("reapply README style: %v", err)
+	}
+	if second.Changed {
+		t.Fatalf("expected README style reapply to converge")
+	}
+}
+
 func readJSONFixture[T any](t *testing.T, parts ...string) T {
 	t.Helper()
 	source, err := os.ReadFile(filepath.Join(parts...))
