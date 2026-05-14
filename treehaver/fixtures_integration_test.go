@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -516,6 +517,36 @@ func TestSharedFixtureTreeHaverProfile(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureOrderedTreePrimitives(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-789-ordered-tree-primitives", "ordered-tree-primitives.json")
+	orderedFixture := fixture["ordered_tree"].(map[string]any)
+
+	ordered := OrderedTreePrimitives{
+		RootID:       orderedFixture["root_id"].(string),
+		ChildOrder:   stringSliceMapFromFixture(orderedFixture["child_order"]),
+		SiblingEdges: orderedSiblingEdgesFromFixture(orderedFixture["sibling_edges"]),
+		Diagnostics:  stringSliceFromFixture(orderedFixture["diagnostics"]),
+	}
+
+	forbiddenTerms := stringSliceFromFixture(fixture["forbidden_merge_terms"])
+	for _, diagnostic := range ordered.Diagnostics {
+		for _, term := range forbiddenTerms {
+			if strings.Contains(strings.ToLower(diagnostic), strings.ToLower(term)) {
+				t.Fatalf("ordered-tree diagnostic should not contain merge term %q: %q", term, diagnostic)
+			}
+		}
+	}
+
+	if ordered.RootID != fixture["root_id"].(string) ||
+		ordered.ChildOrder["file"][0] != "imports" ||
+		ordered.ChildOrder["imports"][1] != "import-strings" ||
+		ordered.SiblingEdges[2].PreviousSiblingID != nil ||
+		ordered.SiblingEdges[2].NextSiblingID == nil ||
+		*ordered.SiblingEdges[2].NextSiblingID != "import-strings" {
+		t.Fatalf("unexpected ordered tree primitives: %+v", ordered)
+	}
+}
+
 func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
 	fixture := readParserFixture(t, "diagnostics", "slice-783-backend-capability-report", "backend-capability-report.json")
 	capabilityFixture := fixture["capability"].(map[string]any)
@@ -765,6 +796,38 @@ func metadataFromFixture(value any) map[string]map[string]string {
 		}
 	}
 	return metadata
+}
+
+func stringSliceMapFromFixture(value any) map[string][]string {
+	rawMap := value.(map[string]any)
+	result := make(map[string][]string, len(rawMap))
+	for key, rawValue := range rawMap {
+		result[key] = stringSliceFromFixture(rawValue)
+	}
+	return result
+}
+
+func orderedSiblingEdgesFromFixture(value any) []OrderedSiblingEdge {
+	rawEdges := value.([]any)
+	edges := make([]OrderedSiblingEdge, 0, len(rawEdges))
+	for _, rawEdge := range rawEdges {
+		edgeFixture := rawEdge.(map[string]any)
+		var previousSiblingID *string
+		if rawPrevious, ok := edgeFixture["previous_sibling_id"].(string); ok {
+			previousSiblingID = &rawPrevious
+		}
+		var nextSiblingID *string
+		if rawNext, ok := edgeFixture["next_sibling_id"].(string); ok {
+			nextSiblingID = &rawNext
+		}
+		edges = append(edges, OrderedSiblingEdge{
+			ParentID:          edgeFixture["parent_id"].(string),
+			NodeID:            edgeFixture["node_id"].(string),
+			PreviousSiblingID: previousSiblingID,
+			NextSiblingID:     nextSiblingID,
+		})
+	}
+	return edges
 }
 
 func stringFromOptionalFixture(value any) string {

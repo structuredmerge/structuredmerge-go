@@ -153,6 +153,20 @@ type TreeHaverProfile struct {
 	Diagnostics          []string
 }
 
+type OrderedSiblingEdge struct {
+	ParentID          string
+	NodeID            string
+	PreviousSiblingID *string
+	NextSiblingID     *string
+}
+
+type OrderedTreePrimitives struct {
+	RootID       string
+	ChildOrder   map[string][]string
+	SiblingEdges []OrderedSiblingEdge
+	Diagnostics  []string
+}
+
 type ParserAdapter[T AnalysisHandle] interface {
 	Info() AdapterInfo
 	Parse(request ParserRequest) ParseResult[T]
