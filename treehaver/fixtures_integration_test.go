@@ -393,6 +393,50 @@ func TestSharedFixtureNormalizedTreeNodeContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-783-backend-capability-report", "backend-capability-report.json")
+	capabilityFixture := fixture["capability"].(map[string]any)
+	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)
+	parserFixture := capabilityFixture["parser_identity"].(map[string]any)
+	languageVersionFixture := capabilityFixture["language_version"].(map[string]any)
+
+	capability := BackendCapability{
+		BackendRef: BackendReference{
+			ID:     backendRefFixture["id"].(string),
+			Family: backendRefFixture["family"].(string),
+		},
+		Language: capabilityFixture["language"].(string),
+		ParserIdentity: ParserIdentity{
+			Name:           parserFixture["name"].(string),
+			Version:        parserFixture["version"].(string),
+			Implementation: parserFixture["implementation"].(string),
+		},
+		LanguageVersion: LanguageVersion{
+			Version: languageVersionFixture["version"].(string),
+			Dialect: nil,
+		},
+		ParseErrorBehavior:    capabilityFixture["parse_error_behavior"].(string),
+		SourceSpanSupport:     capabilityFixture["source_span_support"].(string),
+		SourceFragmentSupport: capabilityFixture["source_fragment_support"].(string),
+		RenderStrategies:      stringSliceFromFixture(capabilityFixture["render_strategies"]),
+		SemanticRoleSupport:   capabilityFixture["semantic_role_support"].(string),
+		NormalizedTreeSupport: capabilityFixture["normalized_tree_support"].(bool),
+		NativeNodeAccess:      capabilityFixture["native_node_access"].(bool),
+		Diagnostics:           stringSliceFromFixture(capabilityFixture["diagnostics"]),
+	}
+
+	if capability.BackendRef.ID != "go-dst" ||
+		capability.BackendRef.Family != "native" ||
+		capability.Language != "go" ||
+		capability.ParserIdentity.Name != "github.com/dave/dst" ||
+		capability.ParseErrorBehavior != "diagnostic_and_partial_tree" ||
+		capability.RenderStrategies[0] != "source_fragment_reuse" ||
+		!capability.NormalizedTreeSupport ||
+		!capability.NativeNodeAccess {
+		t.Fatalf("unexpected backend capability: %+v", capability)
+	}
+}
+
 func sourceSpanFromFixture(value any) SourceSpan {
 	fixture := value.(map[string]any)
 	rangeFixture := fixture["range"].(map[string]any)

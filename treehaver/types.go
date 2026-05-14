@@ -77,6 +77,32 @@ type FeatureProfile struct {
 	SupportedPolicies []PolicyReference
 }
 
+type ParserIdentity struct {
+	Name           string
+	Version        string
+	Implementation string
+}
+
+type LanguageVersion struct {
+	Version string
+	Dialect *string
+}
+
+type BackendCapability struct {
+	BackendRef            BackendReference
+	Language              string
+	ParserIdentity        ParserIdentity
+	LanguageVersion       LanguageVersion
+	ParseErrorBehavior    string
+	SourceSpanSupport     string
+	SourceFragmentSupport string
+	RenderStrategies      []string
+	SemanticRoleSupport   string
+	NormalizedTreeSupport bool
+	NativeNodeAccess      bool
+	Diagnostics           []string
+}
+
 type ParserAdapter[T AnalysisHandle] interface {
 	Info() AdapterInfo
 	Parse(request ParserRequest) ParseResult[T]
