@@ -5,28 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"slices"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/markdownmerge"
+	"github.com/structuredmerge/structuredmerge-go/rubymerge"
+	"github.com/structuredmerge/structuredmerge-go/tomlmerge"
 )
-
-var fixtureMarkdownHeadingPattern = regexp.MustCompile(`^(#{1,6})\s+(.+?)\s*#*\s*$`)
-var fixtureMarkdownCodeFencePattern = regexp.MustCompile(`^\s*(` + "```" + `+|~~~+)`)
-var fixtureRubyTopLevelDefPattern = regexp.MustCompile(`(?ms)^def\s+([A-Za-z_][A-Za-z0-9_!?=]*)\b.*?^end\s*$`)
-
-type fixtureMarkdownSection struct {
-	Path string
-	Text string
-}
-
-type fixtureTomlEntry struct {
-	Key   string
-	Value string
-}
 
 func readManifest(t *testing.T) astmerge.ConformanceManifest {
 	t.Helper()
@@ -128,191 +114,26 @@ func mapsKeys[V any](input map[string]V) []string {
 	return keys
 }
 
-func fixtureMarkdownMerge(templateSource string, destinationSource string) astmerge.MergeResult[string] {
-	destinationSections := fixtureMarkdownSections(destinationSource)
-	templateSections := fixtureMarkdownSections(templateSource)
-	destinationPaths := map[string]struct{}{}
-	mergedSections := make([]string, 0, len(destinationSections)+len(templateSections))
-	for _, section := range destinationSections {
-		destinationPaths[section.Path] = struct{}{}
-		if section.Text != "" {
-			mergedSections = append(mergedSections, section.Text)
-		}
-	}
-	for _, section := range templateSections {
-		if _, ok := destinationPaths[section.Path]; ok || section.Text == "" {
-			continue
-		}
-		mergedSections = append(mergedSections, section.Text)
-	}
-	output := strings.TrimSpace(strings.Join(mergedSections, "\n\n")) + "\n"
-	return astmerge.MergeResult[string]{
-		OK:          true,
-		Diagnostics: []astmerge.Diagnostic{},
-		Output:      &output,
-		Policies:    []astmerge.PolicyReference{},
-	}
-}
-
-func fixtureMarkdownSections(source string) []fixtureMarkdownSection {
-	lines := strings.Split(strings.ReplaceAll(strings.ReplaceAll(source, "\r\n", "\n"), "\r", "\n"), "\n")
-	type ownerStart struct {
-		Path  string
-		Start int
-	}
-	owners := []ownerStart{}
-	headingIndex := 0
-	codeFenceIndex := 0
-	for index := 0; index < len(lines); index++ {
-		line := lines[index]
-		if fixtureMarkdownHeadingPattern.MatchString(line) {
-			owners = append(owners, ownerStart{
-				Path:  "/heading/" + strconv.Itoa(headingIndex),
-				Start: index,
-			})
-			headingIndex++
-			continue
-		}
-		fence := fixtureMarkdownCodeFencePattern.FindStringSubmatch(line)
-		if fence == nil {
-			continue
-		}
-		owners = append(owners, ownerStart{
-			Path:  "/code_fence/" + strconv.Itoa(codeFenceIndex),
-			Start: index,
-		})
-		codeFenceIndex++
-		marker := fence[1]
-		markerChar := marker[:1]
-		markerLength := len(marker)
-		for cursor := index + 1; cursor < len(lines); cursor++ {
-			trimmed := strings.TrimSpace(lines[cursor])
-			if len(trimmed) >= markerLength &&
-				strings.Trim(trimmed, markerChar) == "" &&
-				strings.HasPrefix(trimmed, strings.Repeat(markerChar, markerLength)) {
-				index = cursor
-				break
-			}
-			if cursor == len(lines)-1 {
-				index = cursor
-			}
-		}
-	}
-	slices.SortFunc(owners, func(left, right ownerStart) int { return left.Start - right.Start })
-	sections := make([]fixtureMarkdownSection, 0, len(owners))
-	for index, owner := range owners {
-		endExclusive := len(lines)
-		if index+1 < len(owners) {
-			endExclusive = owners[index+1].Start
-		}
-		text := strings.TrimSpace(strings.Join(lines[owner.Start:endExclusive], "\n"))
-		sections = append(sections, fixtureMarkdownSection{Path: owner.Path, Text: text})
-	}
-	return sections
-}
-
-func fixtureTOMLMerge(templateSource string, destinationSource string) astmerge.MergeResult[string] {
-	templateSections, templateOrder := fixtureTOMLSections(templateSource)
-	destinationSections, destinationOrder := fixtureTOMLSections(destinationSource)
-	sectionSeen := map[string]bool{}
-	sectionOrder := []string{}
-	for _, section := range append(templateOrder, destinationOrder...) {
-		if !sectionSeen[section] {
-			sectionSeen[section] = true
-			sectionOrder = append(sectionOrder, section)
-		}
-	}
-
-	blocks := []string{}
-	for _, section := range sectionOrder {
-		keys := map[string]bool{}
-		for _, entry := range append(templateSections[section], destinationSections[section]...) {
-			keys[entry.Key] = true
-		}
-		keyList := mapsKeys(keys)
-		slices.Sort(keyList)
-		lines := []string{}
-		if section != "" {
-			lines = append(lines, "["+section+"]")
-		}
-		for _, key := range keyList {
-			value, ok := fixtureTOMLValue(destinationSections[section], key)
-			if !ok {
-				value, _ = fixtureTOMLValue(templateSections[section], key)
-			}
-			lines = append(lines, key+" = "+value)
-		}
-		if len(lines) > 0 {
-			blocks = append(blocks, strings.Join(lines, "\n"))
-		}
-	}
-	output := strings.TrimSpace(strings.Join(blocks, "\n\n")) + "\n"
-	return astmerge.MergeResult[string]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Output: &output, Policies: []astmerge.PolicyReference{}}
-}
-
-func fixtureTOMLSections(source string) (map[string][]fixtureTomlEntry, []string) {
-	sections := map[string][]fixtureTomlEntry{}
-	order := []string{""}
-	seen := map[string]bool{"": true}
-	current := ""
-	for _, line := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(source, "\r\n", "\n"), "\r", "\n"), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-			current = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "["), "]"))
-			if !seen[current] {
-				seen[current] = true
-				order = append(order, current)
-			}
-			continue
-		}
-		parts := strings.SplitN(trimmed, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		sections[current] = append(sections[current], fixtureTomlEntry{
-			Key:   strings.TrimSpace(parts[0]),
-			Value: strings.TrimSpace(parts[1]),
-		})
-	}
-	return sections, order
-}
-
-func fixtureTOMLValue(entries []fixtureTomlEntry, key string) (string, bool) {
-	for _, entry := range entries {
-		if entry.Key == key {
-			return entry.Value, true
-		}
-	}
-	return "", false
-}
-
-func fixtureRubyMerge(templateSource string, destinationSource string) astmerge.MergeResult[string] {
-	output := strings.TrimSpace(destinationSource)
-	destinationDefs := map[string]bool{}
-	for _, match := range fixtureRubyTopLevelDefPattern.FindAllStringSubmatch(destinationSource, -1) {
-		destinationDefs[match[1]] = true
-	}
-	for _, match := range fixtureRubyTopLevelDefPattern.FindAllStringSubmatch(templateSource, -1) {
-		if destinationDefs[match[1]] {
-			continue
-		}
-		output += "\n\n" + strings.TrimSpace(match[0])
-	}
-	output += "\n"
-	return astmerge.MergeResult[string]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Output: &output, Policies: []astmerge.PolicyReference{}}
-}
-
 func multiFamilyMergeCallback(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
 	switch entry.Classification.Family {
 	case "markdown":
-		return fixtureMarkdownMerge(*entry.PreparedTemplateContent, *entry.DestinationContent)
+		return markdownmerge.MergeMarkdown(
+			*entry.PreparedTemplateContent,
+			*entry.DestinationContent,
+			markdownmerge.DialectMarkdown,
+		)
 	case "toml":
-		return fixtureTOMLMerge(*entry.PreparedTemplateContent, *entry.DestinationContent)
+		return tomlmerge.MergeTOML(
+			*entry.PreparedTemplateContent,
+			*entry.DestinationContent,
+			tomlmerge.DialectTOML,
+		)
 	case "ruby":
-		return fixtureRubyMerge(*entry.PreparedTemplateContent, *entry.DestinationContent)
+		return rubymerge.MergeRuby(
+			*entry.PreparedTemplateContent,
+			*entry.DestinationContent,
+			rubymerge.DialectRuby,
+		)
 	default:
 		return astmerge.MergeResult[string]{
 			OK: false,
@@ -364,7 +185,11 @@ func TestMiniTemplateTreeFamilyMergeCallbackFixture(t *testing.T) {
 		func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
 			switch entry.Classification.Family {
 			case "markdown":
-				return fixtureMarkdownMerge(*entry.PreparedTemplateContent, *entry.DestinationContent)
+				return markdownmerge.MergeMarkdown(
+					*entry.PreparedTemplateContent,
+					*entry.DestinationContent,
+					markdownmerge.DialectMarkdown,
+				)
 			default:
 				return astmerge.MergeResult[string]{
 					OK: false,
@@ -406,11 +231,23 @@ func TestMiniTemplateTreeMultiFamilyMergeCallbackFixture(t *testing.T) {
 		func(entry astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string] {
 			switch entry.Classification.Family {
 			case "markdown":
-				return fixtureMarkdownMerge(*entry.PreparedTemplateContent, *entry.DestinationContent)
+				return markdownmerge.MergeMarkdown(
+					*entry.PreparedTemplateContent,
+					*entry.DestinationContent,
+					markdownmerge.DialectMarkdown,
+				)
 			case "toml":
-				return fixtureTOMLMerge(*entry.PreparedTemplateContent, *entry.DestinationContent)
+				return tomlmerge.MergeTOML(
+					*entry.PreparedTemplateContent,
+					*entry.DestinationContent,
+					tomlmerge.DialectTOML,
+				)
 			case "ruby":
-				return fixtureRubyMerge(*entry.PreparedTemplateContent, *entry.DestinationContent)
+				return rubymerge.MergeRuby(
+					*entry.PreparedTemplateContent,
+					*entry.DestinationContent,
+					rubymerge.DialectRuby,
+				)
 			default:
 				return astmerge.MergeResult[string]{
 					OK: false,
