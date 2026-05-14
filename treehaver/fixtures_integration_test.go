@@ -344,12 +344,83 @@ func TestSharedFixturePortableByteLocationContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNormalizedTreeNodeContract(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-782-normalized-tree-node", "normalized-tree-node.json")
+	roleFixture := fixture["node_roles"].([]any)
+	roles := NodeRoles()
+	if len(roles) != len(roleFixture) {
+		t.Fatalf("unexpected node roles: %+v", roles)
+	}
+	for index, role := range roles {
+		if string(role) != roleFixture[index].(string) {
+			t.Fatalf("unexpected node role at %d: %s", index, role)
+		}
+	}
+
+	nodeFixture := fixture["node"].(map[string]any)
+	childFixture := fixture["child"].(map[string]any)
+	childParentID := childFixture["parent_id"].(string)
+	childFieldName := childFixture["field_name"].(string)
+	node := NormalizedTreeNode{
+		ID:             nodeFixture["id"].(string),
+		Kind:           nodeFixture["kind"].(string),
+		Role:           NodeRole(nodeFixture["role"].(string)),
+		ParentID:       nil,
+		ChildIDs:       stringSliceFromFixture(nodeFixture["child_ids"]),
+		Span:           sourceSpanFromFixture(nodeFixture["span"]),
+		FieldName:      nil,
+		Named:          nodeFixture["named"].(bool),
+		Anonymous:      nodeFixture["anonymous"].(bool),
+		HasSourceText:  nodeFixture["has_source_text"].(bool),
+		SourceFragment: nodeFixture["source_fragment"].(string),
+	}
+	child := NormalizedTreeNode{
+		ID:             childFixture["id"].(string),
+		Kind:           childFixture["kind"].(string),
+		Role:           NodeRole(childFixture["role"].(string)),
+		ParentID:       &childParentID,
+		ChildIDs:       stringSliceFromFixture(childFixture["child_ids"]),
+		Span:           sourceSpanFromFixture(childFixture["span"]),
+		FieldName:      &childFieldName,
+		Named:          childFixture["named"].(bool),
+		Anonymous:      childFixture["anonymous"].(bool),
+		HasSourceText:  childFixture["has_source_text"].(bool),
+		SourceFragment: childFixture["source_fragment"].(string),
+	}
+
+	if node.Role != NodeRoleStructural || node.ChildIDs[1] != child.ID || child.ParentID == nil || *child.ParentID != node.ID || child.FieldName == nil || *child.FieldName != "declaration" || !child.HasSourceText {
+		t.Fatalf("unexpected normalized tree nodes: node=%+v child=%+v", node, child)
+	}
+}
+
+func sourceSpanFromFixture(value any) SourceSpan {
+	fixture := value.(map[string]any)
+	rangeFixture := fixture["range"].(map[string]any)
+	return SourceSpan{
+		Range: ByteRange{
+			StartByte: int(rangeFixture["start_byte"].(float64)),
+			EndByte:   int(rangeFixture["end_byte"].(float64)),
+		},
+		StartPoint: sourcePointFromFixture(fixture["start_point"]),
+		EndPoint:   sourcePointFromFixture(fixture["end_point"]),
+	}
+}
+
 func sourcePointFromFixture(value any) SourcePoint {
 	fixture := value.(map[string]any)
 	return SourcePoint{
 		Row:    int(fixture["row"].(float64)),
 		Column: int(fixture["column"].(float64)),
 	}
+}
+
+func stringSliceFromFixture(value any) []string {
+	fixture := value.([]any)
+	items := make([]string, 0, len(fixture))
+	for _, item := range fixture {
+		items = append(items, item.(string))
+	}
+	return items
 }
 
 func TestSharedFixtureBinaryCoreContract(t *testing.T) {

@@ -141,6 +141,48 @@ type SourceSpan struct {
 	EndPoint   SourcePoint
 }
 
+type NodeRole string
+
+const (
+	NodeRoleStructural NodeRole = "structural"
+	NodeRoleToken      NodeRole = "token"
+	NodeRoleTrivia     NodeRole = "trivia"
+	NodeRoleComment    NodeRole = "comment"
+	NodeRoleDelimiter  NodeRole = "delimiter"
+	NodeRoleSeparator  NodeRole = "separator"
+	NodeRoleVirtual    NodeRole = "virtual"
+	NodeRoleError      NodeRole = "error"
+	NodeRoleOpaque     NodeRole = "opaque"
+)
+
+type NormalizedTreeNode struct {
+	ID             string
+	Kind           string
+	Role           NodeRole
+	ParentID       *string
+	ChildIDs       []string
+	Span           SourceSpan
+	FieldName      *string
+	Named          bool
+	Anonymous      bool
+	HasSourceText  bool
+	SourceFragment string
+}
+
+func NodeRoles() []NodeRole {
+	return []NodeRole{
+		NodeRoleStructural,
+		NodeRoleToken,
+		NodeRoleTrivia,
+		NodeRoleComment,
+		NodeRoleDelimiter,
+		NodeRoleSeparator,
+		NodeRoleVirtual,
+		NodeRoleError,
+		NodeRoleOpaque,
+	}
+}
+
 type ByteEditSpan struct {
 	StartByte   int
 	OldEndByte  int
