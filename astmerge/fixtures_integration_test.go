@@ -233,6 +233,25 @@ func TestSharedFixtureInconsistencyDetection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMergeIRComparison(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-796-merge-ir-comparison", "merge-ir-comparison.json"))
+	report := decodeFixtureValue[MergeIRComparisonReport](t, fixture["comparison"])
+	expected := fixture["expected"].(map[string]any)
+
+	families := make([]string, 0, len(report.Cases))
+	for _, testCase := range report.Cases {
+		families = append(families, testCase.Family)
+	}
+
+	if len(report.Cases) != int(expected["case_count"].(float64)) ||
+		!reflect.DeepEqual(families, decodeFixtureValue[[]string](t, expected["families"])) ||
+		report.Summary.MergeIRWins != int(expected["merge_ir_wins"].(float64)) ||
+		report.Summary.Recommendation != expected["recommendation"].(string) ||
+		report.Cases[4].MergeIRAdvantage != "defer" {
+		t.Fatalf("unexpected merge IR comparison report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

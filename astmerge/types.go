@@ -285,6 +285,32 @@ type InconsistencyReport struct {
 	Diagnostics     []string             `json:"diagnostics"`
 }
 
+type MergeIRComparisonCase struct {
+	CaseID           string   `json:"case_id"`
+	Family           string   `json:"family"`
+	Scenario         string   `json:"scenario"`
+	OwnerPathOutcome string   `json:"owner_path_outcome"`
+	MergeIROutcome   string   `json:"merge_ir_outcome"`
+	MergeIRAdvantage string   `json:"merge_ir_advantage"`
+	Diagnostics      []string `json:"diagnostics"`
+}
+
+type MergeIRComparisonSummary struct {
+	OwnerPathWins  int    `json:"owner_path_wins"`
+	MergeIRWins    int    `json:"merge_ir_wins"`
+	Neutral        int    `json:"neutral"`
+	Defer          int    `json:"defer"`
+	Recommendation string `json:"recommendation"`
+}
+
+type MergeIRComparisonReport struct {
+	ComparisonID string                   `json:"comparison_id"`
+	Baseline     string                   `json:"baseline"`
+	Prototype    string                   `json:"prototype"`
+	Cases        []MergeIRComparisonCase  `json:"cases"`
+	Summary      MergeIRComparisonSummary `json:"summary"`
+}
+
 type PolicySurface string
 
 const (
