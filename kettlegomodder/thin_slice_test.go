@@ -260,6 +260,8 @@ func TestReadmeStyleProfileConformance(t *testing.T) {
 		"## 🦷 FLOSS Funding",
 		"go get github.com/acme/widget",
 		"https://logos.galtzo.com/assets/images/tree-sitter/tree-sitter/avatar-192px.svg",
+		"StructuredMerge packages provide fixture-backed merge behavior",
+		"| tree-sitter-language-pack | Go, Ruby, Rust, TypeScript | markdown, toml, yaml, source |",
 	} {
 		if !strings.Contains(plan.FinalContent, snippet) {
 			t.Fatalf("expected README to include %q in:\n%s", snippet, plan.FinalContent)

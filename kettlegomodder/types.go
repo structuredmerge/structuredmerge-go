@@ -777,7 +777,7 @@ func renderReadmeStyle(destination string, facts PackageFacts, config ReadmeConf
 	}
 	sections = append(sections,
 		"## 🌻 Synopsis\n\n"+preserved["synopsis"],
-		"## 💡 Info you can shake a stick at\n\nCompatible with Go "+emptyAsUnknown(facts.GoMod.GoVersion)+".\n\n<details markdown=\"1\">\n<summary>Compatibility, federated DVCS, and enterprise support</summary>\n\nAdditional compatibility and support details are generated from package metadata and shared fixtures.\n\n</details>",
+		"## 💡 Info you can shake a stick at\n\nCompatible with Go "+emptyAsUnknown(facts.GoMod.GoVersion)+".\n\n"+readmeFamilyIntroAndBackendMatrix(),
 		"## ✨ Installation\n\n```console\ngo get "+facts.GoMod.ModulePath+"\n```",
 		"## ⚙️ Configuration\n\n"+preserved["configuration"],
 		"## 🔧 Basic Usage\n\n"+preserved["basic usage"],
@@ -809,6 +809,36 @@ func renderReadmeStyle(destination string, facts PackageFacts, config ReadmeConf
 		CopyrightAuthors:     []string{},
 		FinalContent:         finalContent,
 	}
+}
+
+func readmeFamilyIntroAndBackendMatrix() string {
+	return strings.Join([]string{
+		"<details markdown=\"1\">",
+		"<summary>StructuredMerge package family and backend compatibility</summary>",
+		"",
+		"StructuredMerge packages provide fixture-backed merge behavior for document, configuration, source, archive, and binary formats. Shared contracts live in fixtures, while Go, Ruby, Rust, and TypeScript packages expose language-native APIs over the same behavior.",
+		"",
+		"| Package | Layer | Families | Status | README role |",
+		"|---|---|---|---|---|",
+		"| ast-template | workflow | template, readme | active | applies shared templates, package README sections, and package-directory sync workflows |",
+		"| ast-merge | core | template, review, structured-edit | active | documents provider-neutral contracts, token resolution, review state, and execution reports |",
+		"| tree-haver | backend substrate | parser, backend | active | documents backend selection, language-pack integration, position data, and capability reporting |",
+		"| markdown-merge | family | markdown | active | documents Markdown heading, fenced-code, nested-family, and provider behavior |",
+		"| json-merge | family | json, jsonc | active | documents JSON and JSONC merge behavior; old jsonc-merge is superseded |",
+		"| toml-merge | family | toml | active | documents TOML table, value, parser, and backend behavior |",
+		"| yaml-merge | family | yaml | active | documents YAML mapping, sequence, scalar, and backend behavior |",
+		"| ruby-merge | family | ruby-source | active | documents Ruby source merge behavior; old prism-merge is backend/provider prior art |",
+		"| zip-merge | family | zip, archive | active | documents ZIP member planning and raw-preservation behavior |",
+		"| binary-merge | family | binary | active | documents binary preservation and diagnostics behavior |",
+		"",
+		"| Backend | Languages | Families | Note |",
+		"|---|---|---|---|",
+		"| tree-sitter-language-pack | Go, Ruby, Rust, TypeScript | markdown, toml, yaml, source | Preferred cross-language parser substrate where a family has language-pack support. |",
+		"| native ecosystem parser | Ruby | ruby, yaml, markdown, toml | Backend-specific Ruby packages are provider prior art or adapters, not the source schema. |",
+		"| plain structured text | Go, Ruby, Rust, TypeScript | plain, binary, zip | Families without parser requirements document preservation, byte ranges, archive members, and diagnostics. |",
+		"",
+		"</details>",
+	}, "\n")
 }
 
 func defaultReadmeConfig(config ReadmeConfig) ReadmeConfig {
