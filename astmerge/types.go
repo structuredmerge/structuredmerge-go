@@ -213,16 +213,21 @@ var (
 var compactRulesetRequiredDirectives = []string{"format", "owners", "match", "read", "attach"}
 
 var compactRulesetSingletonDirectives = map[string]bool{
-	"format":        true,
-	"owners":        true,
-	"match":         true,
-	"read":          true,
-	"attach":        true,
-	"comment_style": true,
-	"render":        true,
+	"format":          true,
+	"owners":          true,
+	"match":           true,
+	"read":            true,
+	"attach":          true,
+	"comment_style":   true,
+	"render":          true,
+	"render_strategy": true,
 }
 
 var compactRulesetRepeatableKeyedDirectives = map[string]bool{
+	"backend":       true,
+	"node_role":     true,
+	"atomic":        true,
+	"child_group":   true,
 	"capability":    true,
 	"logical_owner": true,
 	"repair":        true,
@@ -291,7 +296,7 @@ func ParseCompactRuleset(source string) ParseResult[CompactRuleset] {
 			}
 		}
 		if compactRulesetRepeatableKeyedDirectives[name] {
-			key := name + "\x00" + args[0]
+			key := compactRulesetRepeatableKey(name, args)
 			if seenRepeatableKeys[key] {
 				diagnostics = append(diagnostics, compactRulesetDiagnostic("repeated "+strconv.Quote(name)+" key "+strconv.Quote(args[0]), path))
 			}
@@ -324,6 +329,13 @@ func ParseCompactRuleset(source string) ParseResult[CompactRuleset] {
 
 func compactRulesetKnownDirective(name string) bool {
 	return compactRulesetSingletonDirectives[name] || compactRulesetRepeatableKeyedDirectives[name]
+}
+
+func compactRulesetRepeatableKey(name string, args []string) string {
+	if name == "child_group" && len(args) > 1 {
+		return name + "\x00" + args[0] + "\x00" + args[1]
+	}
+	return name + "\x00" + args[0]
 }
 
 func compactRulesetDiagnostic(message string, path string) Diagnostic {
