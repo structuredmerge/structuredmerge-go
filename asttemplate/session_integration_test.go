@@ -112,6 +112,28 @@ func TestReadmeFamilySectionTemplateContractFixture(t *testing.T) {
 	if actualRendered != fixture["expected_rendered_partial"].(string) {
 		t.Fatalf("unexpected rendered README family section")
 	}
+
+	packageMetadata := metadataCase["package"].(map[string]any)
+	for _, rawCase := range fixture["readme_application_cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		var destinationContent *string
+		if rawDestination, ok := testCase["destination_content"].(string); ok {
+			destinationContent = &rawDestination
+		}
+		actualContent, actualChanged := asttemplate.ApplyReadmeFamilySection(
+			fixture["template_partial"].(string),
+			packageMetadata,
+			family,
+			destinationContent,
+			nil,
+		)
+		if actualContent != testCase["expected_content"].(string) {
+			t.Fatalf("unexpected README application content for %s\nexpected:\n%q\nactual:\n%q", testCase["label"], testCase["expected_content"].(string), actualContent)
+		}
+		if actualChanged != testCase["changed"].(bool) {
+			t.Fatalf("unexpected README application changed flag for %s", testCase["label"])
+		}
+	}
 }
 
 func TestTemplateDirectoryAdapterRegistryReportFixture(t *testing.T) {

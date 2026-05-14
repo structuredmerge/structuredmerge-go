@@ -105,6 +105,102 @@ func RenderReadmeFamilySection(templatePartial string, family map[string]any, co
 	return astmerge.ResolveTemplateTokens(templatePartial, replacements, config)
 }
 
+func ApplyReadmeFamilySection(templatePartial string, packageMetadata map[string]any, family map[string]any, destinationContent *string, config *astmerge.TemplateTokenConfig) (string, bool) {
+	renderedSection := strings.TrimRight(RenderReadmeFamilySection(templatePartial, family, config), "\n")
+	baseContent := ""
+	if destinationContent == nil {
+		baseContent = "# " + stringValue(packageMetadata["name"]) + "\n\n" + stringValue(packageMetadata["summary"]) + "\n"
+	} else {
+		baseContent = *destinationContent
+	}
+
+	output := replaceOrInsertMarkdownHeadingSection(
+		baseContent,
+		stringValue(family["section_heading"]),
+		2,
+		renderedSection,
+	)
+	return output, output != baseContent
+}
+
+func replaceOrInsertMarkdownHeadingSection(content string, headingText string, headingLevel int, replacement string) string {
+	normalized := strings.TrimRight(content, "\n")
+	if normalized == "" {
+		return replacement + "\n"
+	}
+
+	lines := strings.Split(normalized, "\n")
+	headingPrefix := strings.Repeat("#", headingLevel) + " "
+	for index, line := range lines {
+		if strings.TrimSpace(line) != headingPrefix+headingText {
+			continue
+		}
+		end := len(lines)
+		for next := index + 1; next < len(lines); next++ {
+			if markdownHeadingLevel(lines[next]) > 0 && markdownHeadingLevel(lines[next]) <= headingLevel {
+				end = next
+				break
+			}
+		}
+		replacementLines := strings.Split(replacement, "\n")
+		outputLines := append([]string{}, lines[:index]...)
+		outputLines = append(outputLines, replacementLines...)
+		if end < len(lines) && lines[end] != "" {
+			outputLines = append(outputLines, "")
+		}
+		outputLines = append(outputLines, lines[end:]...)
+		return strings.Join(outputLines, "\n") + "\n"
+	}
+
+	insertAt := readmeFamilySectionInsertIndex(lines)
+	replacementLines := strings.Split(replacement, "\n")
+	outputLines := append([]string{}, lines[:insertAt]...)
+	if len(outputLines) > 0 && outputLines[len(outputLines)-1] != "" {
+		outputLines = append(outputLines, "")
+	}
+	outputLines = append(outputLines, replacementLines...)
+	if insertAt < len(lines) && lines[insertAt] != "" {
+		outputLines = append(outputLines, "")
+	}
+	outputLines = append(outputLines, lines[insertAt:]...)
+	return strings.Join(outputLines, "\n") + "\n"
+}
+
+func markdownHeadingLevel(line string) int {
+	trimmed := strings.TrimSpace(line)
+	level := 0
+	for level < len(trimmed) && trimmed[level] == '#' {
+		level++
+	}
+	if level == 0 || level > 6 || level >= len(trimmed) || trimmed[level] != ' ' {
+		return 0
+	}
+	return level
+}
+
+func readmeFamilySectionInsertIndex(lines []string) int {
+	if len(lines) == 0 {
+		return 0
+	}
+	index := 0
+	if markdownHeadingLevel(lines[0]) == 1 {
+		index = 1
+		for index < len(lines) && lines[index] == "" {
+			index++
+		}
+	}
+	for index < len(lines) {
+		if lines[index] == "" {
+			for index < len(lines) && lines[index] == "" {
+				index++
+			}
+			return index
+		}
+		index++
+	}
+	return len(lines)
+}
+
 func readmeFamilyLabel(language string) string {
 	if label, ok := readmeFamilyLanguageLabels[language]; ok {
 		return label
