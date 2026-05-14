@@ -456,6 +456,39 @@ func TestSharedFixtureSourceFragmentExtraction(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureParseErrorTolerance(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-785-parse-error-tolerance", "parse-error-tolerance.json")
+	toleranceFixture := fixture["parse_error_tolerance"].(map[string]any)
+	backendRefFixture := toleranceFixture["backend_ref"].(map[string]any)
+	errorNodeFixture := toleranceFixture["error_nodes"].([]any)[0].(map[string]any)
+
+	tolerance := ParseErrorTolerance{
+		BackendRef: BackendReference{
+			ID:     backendRefFixture["id"].(string),
+			Family: backendRefFixture["family"].(string),
+		},
+		Language:        toleranceFixture["language"].(string),
+		Behavior:        toleranceFixture["behavior"].(string),
+		ToleratesErrors: toleranceFixture["tolerates_errors"].(bool),
+		ErrorNodes: []ParseErrorNode{
+			{
+				Kind:    errorNodeFixture["kind"].(string),
+				Span:    sourceSpanFromFixture(errorNodeFixture["span"]),
+				Message: errorNodeFixture["message"].(string),
+			},
+		},
+		Diagnostics: stringSliceFromFixture(toleranceFixture["diagnostics"]),
+	}
+
+	if tolerance.BackendRef.ID != "tree-sitter-go" ||
+		tolerance.Behavior != "diagnostic_and_partial_tree" ||
+		!tolerance.ToleratesErrors ||
+		tolerance.ErrorNodes[0].Span.Range.StartByte != 27 ||
+		tolerance.Diagnostics[0] != "partial tree contains parser error nodes" {
+		t.Fatalf("unexpected parse error tolerance: %+v", tolerance)
+	}
+}
+
 func sourceSpanFromFixture(value any) SourceSpan {
 	fixture := value.(map[string]any)
 	rangeFixture := fixture["range"].(map[string]any)

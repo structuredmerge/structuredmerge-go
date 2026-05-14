@@ -103,6 +103,21 @@ type BackendCapability struct {
 	Diagnostics           []string
 }
 
+type ParseErrorNode struct {
+	Kind    string
+	Span    SourceSpan
+	Message string
+}
+
+type ParseErrorTolerance struct {
+	BackendRef      BackendReference
+	Language        string
+	Behavior        string
+	ToleratesErrors bool
+	ErrorNodes      []ParseErrorNode
+	Diagnostics     []string
+}
+
 type ParserAdapter[T AnalysisHandle] interface {
 	Info() AdapterInfo
 	Parse(request ParserRequest) ParseResult[T]
