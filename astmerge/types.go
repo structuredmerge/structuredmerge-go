@@ -194,6 +194,29 @@ type PairwiseMatching struct {
 	UnmatchedTo   []string            `json:"unmatched_to"`
 }
 
+type ClassMappingNodeClass struct {
+	ClassID     string            `json:"class_id"`
+	Signature   string            `json:"signature"`
+	NodeIDs     map[string]string `json:"node_ids"`
+	MatchingIDs []string          `json:"matching_ids"`
+	Diagnostics []string          `json:"diagnostics"`
+}
+
+type ClassMappingDiagnostic struct {
+	Severity    string   `json:"severity"`
+	Category    string   `json:"category"`
+	ClassID     string   `json:"class_id"`
+	Message     string   `json:"message"`
+	MatchingIDs []string `json:"matching_ids"`
+}
+
+type ClassMappingReport struct {
+	MappingID         string                   `json:"mapping_id"`
+	SourceMatchingIDs []string                 `json:"source_matching_ids"`
+	NodeClasses       []ClassMappingNodeClass  `json:"node_classes"`
+	Diagnostics       []ClassMappingDiagnostic `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

@@ -139,6 +139,27 @@ func TestSharedFixturePairwiseMatchings(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureClassMapping(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-792-class-mapping", "class-mapping.json"))
+	report := decodeFixtureValue[ClassMappingReport](t, fixture["class_mapping"])
+	expected := fixture["expected"].(map[string]any)
+
+	categories := make([]string, 0, len(report.Diagnostics))
+	classIDs := make([]string, 0, len(report.Diagnostics))
+	for _, diagnostic := range report.Diagnostics {
+		categories = append(categories, diagnostic.Category)
+		classIDs = append(classIDs, diagnostic.ClassID)
+	}
+
+	if len(report.NodeClasses) != int(expected["class_count"].(float64)) ||
+		!reflect.DeepEqual(categories, decodeFixtureValue[[]string](t, expected["diagnostic_categories"])) ||
+		!reflect.DeepEqual(classIDs, decodeFixtureValue[[]string](t, expected["conflicted_class_ids"])) ||
+		report.NodeClasses[2].NodeIDs["right"] != "" ||
+		report.Diagnostics[1].Category != "delete_edit_disagreement" {
+		t.Fatalf("unexpected class mapping report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
