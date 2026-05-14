@@ -263,6 +263,7 @@ func TestReadmeStyleProfileConformance(t *testing.T) {
 		"StructuredMerge packages provide fixture-backed merge behavior",
 		"| tree-sitter-language-pack | Go, Ruby, Rust, TypeScript | markdown, toml, yaml, source |",
 		"| bash-merge, dotenv-merge, rbs-merge | Excluded from generated support tables until explicit scope decisions exist |",
+		"| Freeze tokens | Show how destination-owned regions are preserved without filling project-specific usage sections |",
 	} {
 		if !strings.Contains(plan.FinalContent, snippet) {
 			t.Fatalf("expected README to include %q in:\n%s", snippet, plan.FinalContent)
