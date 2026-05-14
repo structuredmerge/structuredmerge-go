@@ -3,6 +3,8 @@ package asttemplate
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -38,6 +40,27 @@ type DirectorySessionReport struct {
 type FamilyMergeAdapter func(astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string]
 
 type FamilyMergeAdapterRegistry map[string]FamilyMergeAdapter
+
+type ReadmeFamilyPackage struct {
+	ID         string
+	ReadmePath string
+	Package    map[string]any
+	Family     map[string]any
+}
+
+type ReadmeFamilyPackageReportEntry struct {
+	ID         string `json:"id"`
+	ReadmePath string `json:"readme_path"`
+	Changed    bool   `json:"changed"`
+	Created    bool   `json:"created"`
+}
+
+type ReadmeFamilyPackageReport struct {
+	PackageCount int                              `json:"package_count"`
+	ChangedCount int                              `json:"changed_count"`
+	CreatedCount int                              `json:"created_count"`
+	Entries      []ReadmeFamilyPackageReportEntry `json:"entries"`
+}
 
 func ReadmeFamilyLanguageAliases(selfLanguage string, languageOrder []string) map[string]string {
 	order := languageOrder
@@ -121,6 +144,53 @@ func ApplyReadmeFamilySection(templatePartial string, packageMetadata map[string
 		renderedSection,
 	)
 	return output, output != baseContent
+}
+
+func ApplyReadmeFamilySectionsToPackageDirectories(root string, templatePartial string, packages []ReadmeFamilyPackage, config *astmerge.TemplateTokenConfig) (ReadmeFamilyPackageReport, error) {
+	report := ReadmeFamilyPackageReport{
+		PackageCount: len(packages),
+		Entries:      make([]ReadmeFamilyPackageReportEntry, 0, len(packages)),
+	}
+	for _, packageEntry := range packages {
+		readmePath := filepath.Join(root, filepath.FromSlash(packageEntry.ReadmePath))
+		var destinationContent *string
+		created := false
+		if data, err := os.ReadFile(readmePath); err == nil {
+			content := string(data)
+			destinationContent = &content
+		} else if os.IsNotExist(err) {
+			created = true
+		} else {
+			return report, err
+		}
+
+		content, changed := ApplyReadmeFamilySection(
+			templatePartial,
+			packageEntry.Package,
+			packageEntry.Family,
+			destinationContent,
+			config,
+		)
+		if changed {
+			if err := os.MkdirAll(filepath.Dir(readmePath), 0o755); err != nil {
+				return report, err
+			}
+			if err := os.WriteFile(readmePath, []byte(content), 0o644); err != nil {
+				return report, err
+			}
+			report.ChangedCount++
+		}
+		if created && changed {
+			report.CreatedCount++
+		}
+		report.Entries = append(report.Entries, ReadmeFamilyPackageReportEntry{
+			ID:         packageEntry.ID,
+			ReadmePath: packageEntry.ReadmePath,
+			Changed:    changed,
+			Created:    created && changed,
+		})
+	}
+	return report, nil
 }
 
 func replaceOrInsertMarkdownHeadingSection(content string, headingText string, headingLevel int, replacement string) string {

@@ -134,6 +134,52 @@ func TestReadmeFamilySectionTemplateContractFixture(t *testing.T) {
 			t.Fatalf("unexpected README application changed flag for %s", testCase["label"])
 		}
 	}
+
+	packageDirectoryCase := fixture["package_directory_case"].(map[string]any)
+	tempRoot := filepath.Join(repoRoot(t), "go", "asttemplate", "tmp", t.Name(), "readme-family-packages")
+	_ = os.RemoveAll(tempRoot)
+	t.Cleanup(func() { _ = os.RemoveAll(tempRoot) })
+	packages := make([]asttemplate.ReadmeFamilyPackage, 0)
+	for _, rawPackage := range packageDirectoryCase["packages"].([]any) {
+		packageCase := rawPackage.(map[string]any)
+		readmePath := packageCase["readme_path"].(string)
+		if initialContent, ok := packageCase["initial_content"].(string); ok {
+			fullPath := filepath.Join(tempRoot, filepath.FromSlash(readmePath))
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+				t.Fatalf("create README parent: %v", err)
+			}
+			if err := os.WriteFile(fullPath, []byte(initialContent), 0o644); err != nil {
+				t.Fatalf("write initial README: %v", err)
+			}
+		}
+		packages = append(packages, asttemplate.ReadmeFamilyPackage{
+			ID:         packageCase["id"].(string),
+			ReadmePath: readmePath,
+			Package:    packageCase["package"].(map[string]any),
+			Family:     packageCase["family"].(map[string]any),
+		})
+	}
+	report, err := asttemplate.ApplyReadmeFamilySectionsToPackageDirectories(
+		tempRoot,
+		fixture["template_partial"].(string),
+		packages,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("apply README family sections to package directories: %v", err)
+	}
+	assertJSONEqual(t, packageDirectoryCase["expected_report"], report)
+	for _, rawPackage := range packageDirectoryCase["packages"].([]any) {
+		packageCase := rawPackage.(map[string]any)
+		readmePath := filepath.Join(tempRoot, filepath.FromSlash(packageCase["readme_path"].(string)))
+		actual, err := os.ReadFile(readmePath)
+		if err != nil {
+			t.Fatalf("read synced README: %v", err)
+		}
+		if string(actual) != packageCase["expected_content"].(string) {
+			t.Fatalf("unexpected synced README content for %s", packageCase["id"])
+		}
+	}
 }
 
 func TestTemplateDirectoryAdapterRegistryReportFixture(t *testing.T) {
