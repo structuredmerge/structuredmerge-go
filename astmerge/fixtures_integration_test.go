@@ -211,6 +211,28 @@ func TestSharedFixtureRawMergeChangeSetUnion(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureInconsistencyDetection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-795-inconsistency-detection", "inconsistency-detection.json"))
+	report := decodeFixtureValue[InconsistencyReport](t, fixture["inconsistency_report"])
+	expected := fixture["expected"].(map[string]any)
+
+	categories := make([]string, 0, len(report.Inconsistencies))
+	blockingCount := 0
+	for _, inconsistency := range report.Inconsistencies {
+		categories = append(categories, inconsistency.Category)
+		if inconsistency.Severity == "error" {
+			blockingCount++
+		}
+	}
+
+	if len(report.Inconsistencies) != int(expected["inconsistency_count"].(float64)) ||
+		!reflect.DeepEqual(categories, decodeFixtureValue[[]string](t, expected["categories"])) ||
+		blockingCount != int(expected["blocking_count"].(float64)) ||
+		report.Inconsistencies[1].ChangeIDs[1] != "right-delete-greet" {
+		t.Fatalf("unexpected inconsistency report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

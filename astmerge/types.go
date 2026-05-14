@@ -269,6 +269,22 @@ type RawMerge struct {
 	Diagnostics       []string         `json:"diagnostics"`
 }
 
+type MergeInconsistency struct {
+	InconsistencyID string   `json:"inconsistency_id"`
+	Category        string   `json:"category"`
+	Severity        string   `json:"severity"`
+	ClassIDs        []string `json:"class_ids"`
+	ChangeIDs       []string `json:"change_ids"`
+	Message         string   `json:"message"`
+}
+
+type InconsistencyReport struct {
+	ReportID        string               `json:"report_id"`
+	RawMergeID      string               `json:"raw_merge_id"`
+	Inconsistencies []MergeInconsistency `json:"inconsistencies"`
+	Diagnostics     []string             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
