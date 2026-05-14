@@ -447,6 +447,42 @@ func TestSharedFixtureProgressiveNodeMetadata(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNativeParserAdapterContract(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-787-native-parser-adapter-contract", "native-parser-adapter-contract.json")
+	providerFixture := fixture["provider"].(map[string]any)
+	resultFixture := fixture["parse_result"].(map[string]any)
+
+	provider := NativeParserProvider{
+		ID:                   providerFixture["id"].(string),
+		Family:               providerFixture["family"].(string),
+		Language:             providerFixture["language"].(string),
+		Operations:           stringSliceFromFixture(providerFixture["operations"]),
+		RetainsNativeTree:    providerFixture["retains_native_tree"].(bool),
+		NativeTreeVisibility: providerFixture["native_tree_visibility"].(string),
+		MetadataPolicy:       providerFixture["metadata_policy"].(string),
+	}
+	result := NormalizedParseResult{
+		OK:                       resultFixture["ok"].(bool),
+		BackendCapability:        backendCapabilityFromFixture(resultFixture["backend_capability"]),
+		RootID:                   resultFixture["root_id"].(string),
+		Nodes:                    normalizedNodesFromFixture(resultFixture["nodes"]),
+		ParseErrorTolerance:      parseErrorToleranceFromFixture(resultFixture["parse_error_tolerance"]),
+		SourceFragmentsAvailable: resultFixture["source_fragments_available"].(bool),
+		Diagnostics:              stringSliceFromFixture(resultFixture["diagnostics"]),
+		Metadata:                 metadataFromFixture(resultFixture["metadata"]),
+	}
+
+	if provider.ID != "go-dst" ||
+		!provider.RetainsNativeTree ||
+		provider.NativeTreeVisibility != "provider_internal" ||
+		result.RootID != result.Nodes[0].ID ||
+		result.Nodes[1].SemanticRoles[1] != "function" ||
+		result.Metadata["go_dst"]["native_tree_visibility"] != "provider_internal" ||
+		!result.SourceFragmentsAvailable {
+		t.Fatalf("unexpected native parser adapter contract: provider=%+v result=%+v", provider, result)
+	}
+}
+
 func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
 	fixture := readParserFixture(t, "diagnostics", "slice-783-backend-capability-report", "backend-capability-report.json")
 	capabilityFixture := fixture["capability"].(map[string]any)
@@ -488,6 +524,37 @@ func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
 		!capability.NormalizedTreeSupport ||
 		!capability.NativeNodeAccess {
 		t.Fatalf("unexpected backend capability: %+v", capability)
+	}
+}
+
+func backendCapabilityFromFixture(value any) BackendCapability {
+	capabilityFixture := value.(map[string]any)
+	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)
+	parserFixture := capabilityFixture["parser_identity"].(map[string]any)
+	languageVersionFixture := capabilityFixture["language_version"].(map[string]any)
+	return BackendCapability{
+		BackendRef: BackendReference{
+			ID:     backendRefFixture["id"].(string),
+			Family: backendRefFixture["family"].(string),
+		},
+		Language: capabilityFixture["language"].(string),
+		ParserIdentity: ParserIdentity{
+			Name:           parserFixture["name"].(string),
+			Version:        parserFixture["version"].(string),
+			Implementation: parserFixture["implementation"].(string),
+		},
+		LanguageVersion: LanguageVersion{
+			Version: languageVersionFixture["version"].(string),
+			Dialect: nil,
+		},
+		ParseErrorBehavior:    capabilityFixture["parse_error_behavior"].(string),
+		SourceSpanSupport:     capabilityFixture["source_span_support"].(string),
+		SourceFragmentSupport: capabilityFixture["source_fragment_support"].(string),
+		RenderStrategies:      stringSliceFromFixture(capabilityFixture["render_strategies"]),
+		SemanticRoleSupport:   capabilityFixture["semantic_role_support"].(string),
+		NormalizedTreeSupport: capabilityFixture["normalized_tree_support"].(bool),
+		NativeNodeAccess:      capabilityFixture["native_node_access"].(bool),
+		Diagnostics:           stringSliceFromFixture(capabilityFixture["diagnostics"]),
 	}
 }
 
@@ -556,6 +623,69 @@ func sourceSpanFromFixture(value any) SourceSpan {
 	}
 }
 
+func normalizedNodesFromFixture(value any) []NormalizedTreeNode {
+	rawNodes := value.([]any)
+	nodes := make([]NormalizedTreeNode, 0, len(rawNodes))
+	for _, rawNode := range rawNodes {
+		nodes = append(nodes, normalizedTreeNodeFromFixture(rawNode.(map[string]any)))
+	}
+	return nodes
+}
+
+func normalizedTreeNodeFromFixture(fixture map[string]any) NormalizedTreeNode {
+	var parentID *string
+	if rawParentID, ok := fixture["parent_id"].(string); ok {
+		parentID = &rawParentID
+	}
+	var fieldName *string
+	if rawFieldName, ok := fixture["field_name"].(string); ok {
+		fieldName = &rawFieldName
+	}
+	return NormalizedTreeNode{
+		ID:                  fixture["id"].(string),
+		Kind:                fixture["kind"].(string),
+		Role:                NodeRole(fixture["role"].(string)),
+		ParentID:            parentID,
+		ChildIDs:            stringSliceFromFixture(fixture["child_ids"]),
+		Span:                sourceSpanFromFixture(fixture["span"]),
+		FieldName:           fieldName,
+		Named:               fixture["named"].(bool),
+		Anonymous:           fixture["anonymous"].(bool),
+		HasSourceText:       fixture["has_source_text"].(bool),
+		SourceFragment:      fixture["source_fragment"].(string),
+		BackendKind:         stringFromOptionalFixture(fixture["backend_kind"]),
+		SemanticRoles:       stringSliceFromFixture(fixture["semantic_roles"]),
+		BackendRoles:        stringSliceFromFixture(fixture["backend_roles"]),
+		UnsupportedFeatures: stringSliceFromFixture(fixture["unsupported_features"]),
+		Metadata:            metadataFromFixture(fixture["metadata"]),
+	}
+}
+
+func parseErrorToleranceFromFixture(value any) ParseErrorTolerance {
+	toleranceFixture := value.(map[string]any)
+	backendRefFixture := toleranceFixture["backend_ref"].(map[string]any)
+	errorNodes := []ParseErrorNode{}
+	for _, rawErrorNode := range toleranceFixture["error_nodes"].([]any) {
+		errorNodeFixture := rawErrorNode.(map[string]any)
+		errorNodes = append(errorNodes, ParseErrorNode{
+			Kind:    errorNodeFixture["kind"].(string),
+			Span:    sourceSpanFromFixture(errorNodeFixture["span"]),
+			Message: errorNodeFixture["message"].(string),
+		})
+	}
+	return ParseErrorTolerance{
+		BackendRef: BackendReference{
+			ID:     backendRefFixture["id"].(string),
+			Family: backendRefFixture["family"].(string),
+		},
+		Language:        toleranceFixture["language"].(string),
+		Behavior:        toleranceFixture["behavior"].(string),
+		ToleratesErrors: toleranceFixture["tolerates_errors"].(bool),
+		ErrorNodes:      errorNodes,
+		Diagnostics:     stringSliceFromFixture(toleranceFixture["diagnostics"]),
+	}
+}
+
 func sourcePointFromFixture(value any) SourcePoint {
 	fixture := value.(map[string]any)
 	return SourcePoint{
@@ -584,6 +714,13 @@ func metadataFromFixture(value any) map[string]map[string]string {
 		}
 	}
 	return metadata
+}
+
+func stringFromOptionalFixture(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
 }
 
 func TestSharedFixtureBinaryCoreContract(t *testing.T) {

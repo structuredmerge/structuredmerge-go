@@ -118,6 +118,27 @@ type ParseErrorTolerance struct {
 	Diagnostics     []string
 }
 
+type NativeParserProvider struct {
+	ID                   string
+	Family               string
+	Language             string
+	Operations           []string
+	RetainsNativeTree    bool
+	NativeTreeVisibility string
+	MetadataPolicy       string
+}
+
+type NormalizedParseResult struct {
+	OK                       bool
+	BackendCapability        BackendCapability
+	RootID                   string
+	Nodes                    []NormalizedTreeNode
+	ParseErrorTolerance      ParseErrorTolerance
+	SourceFragmentsAvailable bool
+	Diagnostics              []string
+	Metadata                 map[string]map[string]string
+}
+
 type ParserAdapter[T AnalysisHandle] interface {
 	Info() AdapterInfo
 	Parse(request ParserRequest) ParseResult[T]
