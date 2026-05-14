@@ -106,7 +106,7 @@ func TestPackagedTemplateInventory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plan packaged template inventory: %v", err)
 	}
-	expectedChanged := []string{".editorconfig", ".github/workflows/ci.yml", ".gitignore", ".golangci.yml"}
+	expectedChanged := []string{".editorconfig", ".github/workflows/ci.yml", ".gitignore", ".golangci.yml", "README.md"}
 	if !reflect.DeepEqual(plan.ChangedFiles, expectedChanged) {
 		t.Fatalf("unexpected planned template files: %#v", plan.ChangedFiles)
 	}
@@ -125,6 +125,12 @@ func TestPackagedTemplateInventory(t *testing.T) {
 	if !strings.Contains(ci, "go-version: \"1.22\"") {
 		t.Fatalf("expected CI template to render go version, got:\n%s", ci)
 	}
+	readme := mustReadProjectFile(t, projectRoot, "README.md")
+	for _, snippet := range []string{"# github.com/acme/widget", "## Synopsis", "## Installation", "go get github.com/acme/widget", "## Configuration", "## Basic Usage"} {
+		if !strings.Contains(readme, snippet) {
+			t.Fatalf("expected README template to include %q, got:\n%s", snippet, readme)
+		}
+	}
 
 	second, err := ApplyPackagedTemplateInventory(projectRoot)
 	if err != nil {
@@ -135,6 +141,9 @@ func TestPackagedTemplateInventory(t *testing.T) {
 	}
 	if got := mustReadProjectFile(t, projectRoot, ".github/workflows/ci.yml"); got != ci {
 		t.Fatalf("expected CI template to remain stable on reapply")
+	}
+	if got := mustReadProjectFile(t, projectRoot, "README.md"); got != readme {
+		t.Fatalf("expected README template to remain stable on reapply")
 	}
 }
 

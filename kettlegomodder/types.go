@@ -227,6 +227,7 @@ func PackagedTemplateInventoryPack() RecipePack {
 			templateRecipe(".github/workflows/ci.yml"),
 			templateRecipe(".gitignore"),
 			templateRecipe(".golangci.yml"),
+			templateRecipe("README.md"),
 		},
 	}
 }
@@ -480,6 +481,8 @@ func packagedTemplateContent(targetPath string) string {
 		return "bin/\ncoverage/\ndist/\n"
 	case ".golangci.yml":
 		return "run:\n  timeout: 5m\nlinters:\n  enable:\n    - gofmt\n    - govet\n"
+	case "README.md":
+		return "# {{PACKAGE_NAME}}\n\n## Synopsis\n\n## Installation\n\n```sh\ngo get {{PACKAGE_NAME}}\n```\n\n## Configuration\n\n## Basic Usage\n"
 	default:
 		return ""
 	}
