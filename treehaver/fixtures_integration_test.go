@@ -437,6 +437,25 @@ func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSourceFragmentExtraction(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-784-source-fragment-extraction", "source-fragment-extraction.json")
+	expected := fixture["fragment"].(map[string]any)
+
+	fragment := ExtractSourceFragment(
+		fixture["source"].(string),
+		sourceSpanFromFixture(fixture["span"]),
+		fixture["strategy"].(string),
+	)
+
+	if fragment.Text != expected["text"].(string) ||
+		fragment.Available != expected["available"].(bool) ||
+		fragment.Strategy != expected["strategy"].(string) ||
+		fragment.ByteLength != int(expected["byte_length"].(float64)) ||
+		len(fragment.Diagnostics) != len(expected["diagnostics"].([]any)) {
+		t.Fatalf("unexpected source fragment: %+v", fragment)
+	}
+}
+
 func sourceSpanFromFixture(value any) SourceSpan {
 	fixture := value.(map[string]any)
 	rangeFixture := fixture["range"].(map[string]any)

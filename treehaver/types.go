@@ -195,6 +195,15 @@ type NormalizedTreeNode struct {
 	SourceFragment string
 }
 
+type SourceFragment struct {
+	Text        string
+	Span        SourceSpan
+	Available   bool
+	Strategy    string
+	ByteLength  int
+	Diagnostics []string
+}
+
 func NodeRoles() []NodeRole {
 	return []NodeRole{
 		NodeRoleStructural,
@@ -337,6 +346,27 @@ func SliceByteRange(source string, byteRange ByteRange) (string, error) {
 	}
 
 	return string(sourceBytes[byteRange.StartByte:byteRange.EndByte]), nil
+}
+
+func ExtractSourceFragment(source string, span SourceSpan, strategy string) SourceFragment {
+	text, err := SliceByteRange(source, span.Range)
+	if err != nil {
+		return SourceFragment{
+			Span:        span,
+			Available:   false,
+			Strategy:    strategy,
+			Diagnostics: []string{err.Error()},
+		}
+	}
+
+	return SourceFragment{
+		Text:        text,
+		Span:        span,
+		Available:   true,
+		Strategy:    strategy,
+		ByteLength:  len([]byte(text)),
+		Diagnostics: []string{},
+	}
 }
 
 func ByteOffsetForPoint(source string, point SourcePoint) (int, error) {
