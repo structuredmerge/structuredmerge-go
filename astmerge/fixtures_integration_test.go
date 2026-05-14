@@ -160,6 +160,32 @@ func TestSharedFixtureClassMapping(t *testing.T) {
 	}
 }
 
+func TestSharedFixturePCSChangeSetGeneration(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-793-pcs-change-set-generation", "pcs-change-set-generation.json"))
+	pcs := decodeFixtureValue[PCS](t, fixture["pcs"])
+	changeSets := decodeFixtureValue[[]ChangeSet](t, fixture["change_sets"])
+	expected := fixture["expected"].(map[string]any)
+
+	changeKinds := make([]string, 0)
+	diagnosticCount := 0
+	for _, changeSet := range changeSets {
+		diagnosticCount += len(changeSet.Diagnostics)
+		for _, change := range changeSet.Changes {
+			changeKinds = append(changeKinds, change.Kind)
+		}
+	}
+
+	if len(pcs.Constraints) != int(expected["pcs_constraint_count"].(float64)) ||
+		len(changeSets) != int(expected["change_set_count"].(float64)) ||
+		!reflect.DeepEqual(changeKinds, decodeFixtureValue[[]string](t, expected["change_kinds"])) ||
+		diagnosticCount != int(expected["diagnostic_count"].(float64)) ||
+		pcs.Constraints[2].PredecessorClassID == nil ||
+		*pcs.Constraints[2].PredecessorClassID != "class-import-strings" ||
+		changeSets[1].Changes[1].Kind != "delete" {
+		t.Fatalf("unexpected PCS/change-set generation: pcs=%+v changeSets=%+v", pcs, changeSets)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

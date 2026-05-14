@@ -217,6 +217,39 @@ type ClassMappingReport struct {
 	Diagnostics       []ClassMappingDiagnostic `json:"diagnostics"`
 }
 
+type PCSConstraint struct {
+	ConstraintID       string  `json:"constraint_id"`
+	Revision           string  `json:"revision"`
+	ParentClassID      string  `json:"parent_class_id"`
+	PredecessorClassID *string `json:"predecessor_class_id"`
+	SuccessorClassID   *string `json:"successor_class_id"`
+	Relation           string  `json:"relation"`
+}
+
+type PCS struct {
+	PCSID        string          `json:"pcs_id"`
+	TreeID       string          `json:"tree_id"`
+	BaseRevision string          `json:"base_revision"`
+	Constraints  []PCSConstraint `json:"constraints"`
+}
+
+type ChangeSetChange struct {
+	ChangeID           string  `json:"change_id"`
+	Kind               string  `json:"kind"`
+	ClassID            string  `json:"class_id"`
+	ParentClassID      string  `json:"parent_class_id"`
+	PredecessorClassID *string `json:"predecessor_class_id"`
+	SuccessorClassID   *string `json:"successor_class_id"`
+	ContentHash        string  `json:"content_hash"`
+}
+
+type ChangeSet struct {
+	ChangeSetID string            `json:"change_set_id"`
+	Side        string            `json:"side"`
+	Changes     []ChangeSetChange `json:"changes"`
+	Diagnostics []string          `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
