@@ -97,6 +97,27 @@ func decodeFixtureValueUntyped[T any](raw any) T {
 	return decoded
 }
 
+func TestSharedFixtureGenericMergeIR(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-790-generic-merge-ir", "generic-merge-ir.json"))
+	mergeIR := decodeFixtureValue[MergeIR](t, fixture["merge_ir"])
+	expected := fixture["expected"].(map[string]any)
+
+	changeKinds := make([]string, 0, len(mergeIR.Changes))
+	for _, change := range mergeIR.Changes {
+		changeKinds = append(changeKinds, change.Kind)
+	}
+
+	if mergeIR.Version != expected["version"].(string) ||
+		len(mergeIR.NodeClasses) != int(expected["node_class_count"].(float64)) ||
+		len(mergeIR.OrderedNodes) != int(expected["ordered_node_count"].(float64)) ||
+		!reflect.DeepEqual(changeKinds, decodeFixtureValue[[]string](t, expected["change_kinds"])) ||
+		mergeIR.NodeClasses[0].NodeIDs["left"] != "left-import-fmt" ||
+		mergeIR.Changes[1].ClassID == nil ||
+		*mergeIR.Changes[1].ClassID != "class-import-strings" {
+		t.Fatalf("unexpected generic merge IR: %+v", mergeIR)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

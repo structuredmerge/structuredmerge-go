@@ -139,6 +139,43 @@ type MergeResult[T any] struct {
 	Policies    []PolicyReference
 }
 
+type MergeIRNodeClass struct {
+	ClassID   string            `json:"class_id"`
+	Signature string            `json:"signature"`
+	NodeIDs   map[string]string `json:"node_ids"`
+	Roles     []string          `json:"roles"`
+}
+
+type MergeIROrderedNode struct {
+	NodeID            string   `json:"node_id"`
+	ParentID          string   `json:"parent_id"`
+	ChildIDs          []string `json:"child_ids"`
+	PreviousSiblingID *string  `json:"previous_sibling_id"`
+	NextSiblingID     *string  `json:"next_sibling_id"`
+}
+
+type MergeIRChange struct {
+	ChangeID          string  `json:"change_id"`
+	Side              string  `json:"side"`
+	Kind              string  `json:"kind"`
+	NodeID            string  `json:"node_id"`
+	ClassID           *string `json:"class_id"`
+	ParentID          string  `json:"parent_id"`
+	PreviousSiblingID *string `json:"previous_sibling_id"`
+	NextSiblingID     *string `json:"next_sibling_id"`
+	ContentHash       string  `json:"content_hash"`
+}
+
+type MergeIR struct {
+	Version      string               `json:"version"`
+	TreeID       string               `json:"tree_id"`
+	Source       string               `json:"source"`
+	NodeClasses  []MergeIRNodeClass   `json:"node_classes"`
+	OrderedNodes []MergeIROrderedNode `json:"ordered_nodes"`
+	Changes      []MergeIRChange      `json:"changes"`
+	Diagnostics  []string             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
