@@ -75,5 +75,5 @@ Common checks:
 
 The current tree-sitter backend path uses the sibling
 `../tree-sitter-language-pack` checkout through a local `replace` in `go.mod`.
-Repo tasks build its `ts-pack-ffi` crate first and compile with the
+Repo tasks build its `ts-pack-core-ffi` crate first and compile with the
 `tspack_dev` build tag while the upstream packaging fix is pending.

@@ -1,4 +1,4 @@
-//go:build tspack
+//go:build tspack || tspack_dev
 
 package treehaver
 

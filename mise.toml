@@ -3,9 +3,10 @@ go = "1.26"
 
 [env]
 GOFLAGS = "-tags=tspack_dev"
+LD_LIBRARY_PATH = "{{ config_root }}/../tree-sitter-language-pack/target/release"
 
 [tasks.prepare-language-pack]
-run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml"
+run = "cargo build -p ts-pack-core-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml"
 
 [tasks.format]
 run = "gofmt -w $(find . -name '*.go' -type f)"
@@ -14,13 +15,13 @@ run = "gofmt -w $(find . -name '*.go' -type f)"
 run = "test -z \"$(gofmt -l $(find . -name '*.go' -type f))\""
 
 [tasks.lint]
-run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 run ./..."
+run = "cargo build -p ts-pack-core-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 run ./..."
 
 [tasks.typecheck]
-run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go test ./... -run '^$'"
+run = "cargo build -p ts-pack-core-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go test ./... -run '^$'"
 
 [tasks.test]
-run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go test ./..."
+run = "cargo build -p ts-pack-core-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && go test ./..."
 
 [tasks.check]
-run = "cargo build -p ts-pack-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && test -z \"$(gofmt -l $(find . -name '*.go' -type f))\" && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 run ./... && go test ./..."
+run = "cargo build -p ts-pack-core-ffi --release --manifest-path ../tree-sitter-language-pack/Cargo.toml && test -z \"$(gofmt -l $(find . -name '*.go' -type f))\" && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 run ./... && go test ./..."
