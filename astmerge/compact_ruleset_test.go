@@ -1,8 +1,10 @@
 package astmerge
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -55,5 +57,33 @@ func TestParseCompactRulesetEdges(t *testing.T) {
 				t.Fatalf("expected %s to produce diagnostics", name)
 			}
 		})
+	}
+}
+
+func TestCompactRulesetFeatureProfileFixture(t *testing.T) {
+	fixtureSource, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "diagnostics", "slice-781-compact-ruleset-profile", "module-profile.json"))
+	if err != nil {
+		t.Fatalf("read profile fixture: %v", err)
+	}
+	var fixture struct {
+		RulesetPath []string              `json:"ruleset_path"`
+		Profile     CompactRulesetProfile `json:"profile"`
+	}
+	if err := json.Unmarshal(fixtureSource, &fixture); err != nil {
+		t.Fatalf("parse profile fixture: %v", err)
+	}
+
+	rulesetSource, err := os.ReadFile(filepath.Join(append([]string{"..", "..", "fixtures"}, fixture.RulesetPath...)...))
+	if err != nil {
+		t.Fatalf("read ruleset fixture: %v", err)
+	}
+	result := ParseCompactRuleset(string(rulesetSource))
+	if !result.OK || result.Analysis == nil {
+		t.Fatalf("expected profile ruleset to parse: %#v", result.Diagnostics)
+	}
+
+	actual := CompactRulesetFeatureProfile(*result.Analysis)
+	if !reflect.DeepEqual(actual, fixture.Profile) {
+		t.Fatalf("unexpected compact ruleset profile:\nactual:   %#v\nexpected: %#v", actual, fixture.Profile)
 	}
 }

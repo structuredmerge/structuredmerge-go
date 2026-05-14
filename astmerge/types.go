@@ -205,6 +205,62 @@ type CompactRuleset struct {
 	Comments   []string                  `json:"comments"`
 }
 
+type CompactRulesetBackendDeclaration struct {
+	Backend string `json:"backend"`
+	Support string `json:"support"`
+}
+
+type CompactRulesetNodeRole struct {
+	Selector string `json:"selector"`
+	Role     string `json:"role"`
+}
+
+type CompactRulesetAtomicNode struct {
+	Selector string `json:"selector"`
+	Atomic   bool   `json:"atomic"`
+}
+
+type CompactRulesetChildGroup struct {
+	ParentSelector string `json:"parent_selector"`
+	Name           string `json:"name"`
+	Policy         string `json:"policy"`
+}
+
+type CompactRulesetNamedValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type CompactRulesetSurfaceDeclaration struct {
+	Name     string `json:"name"`
+	Selector string `json:"selector"`
+}
+
+type CompactRulesetDelegateDeclaration struct {
+	Surface string `json:"surface"`
+	Policy  string `json:"policy"`
+}
+
+type CompactRulesetProfile struct {
+	Format         string                              `json:"format"`
+	Owners         string                              `json:"owners"`
+	Match          string                              `json:"match"`
+	Read           string                              `json:"read"`
+	Attach         string                              `json:"attach"`
+	CommentStyle   string                              `json:"comment_style,omitempty"`
+	Render         string                              `json:"render,omitempty"`
+	RenderStrategy string                              `json:"render_strategy,omitempty"`
+	Backends       []CompactRulesetBackendDeclaration  `json:"backends,omitempty"`
+	NodeRoles      []CompactRulesetNodeRole            `json:"node_roles,omitempty"`
+	AtomicNodes    []CompactRulesetAtomicNode          `json:"atomic_nodes,omitempty"`
+	ChildGroups    []CompactRulesetChildGroup          `json:"child_groups,omitempty"`
+	Capabilities   []CompactRulesetNamedValue          `json:"capabilities,omitempty"`
+	LogicalOwners  []CompactRulesetNamedValue          `json:"logical_owners,omitempty"`
+	Repairs        []CompactRulesetNamedValue          `json:"repairs,omitempty"`
+	Surfaces       []CompactRulesetSurfaceDeclaration  `json:"surfaces,omitempty"`
+	Delegates      []CompactRulesetDelegateDeclaration `json:"delegates,omitempty"`
+}
+
 var (
 	compactRulesetIdentifierPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]*$`)
 	compactRulesetTokenPattern      = regexp.MustCompile(`^[\x21\x24-\x7e]+$`)
@@ -325,6 +381,84 @@ func ParseCompactRuleset(source string) ParseResult[CompactRuleset] {
 		analysis = &ruleset
 	}
 	return ParseResult[CompactRuleset]{OK: ok, Diagnostics: diagnostics, Analysis: analysis, Policies: []PolicyReference{}}
+}
+
+func CompactRulesetFeatureProfile(ruleset CompactRuleset) CompactRulesetProfile {
+	profile := CompactRulesetProfile{
+		Backends:      []CompactRulesetBackendDeclaration{},
+		NodeRoles:     []CompactRulesetNodeRole{},
+		AtomicNodes:   []CompactRulesetAtomicNode{},
+		ChildGroups:   []CompactRulesetChildGroup{},
+		Capabilities:  []CompactRulesetNamedValue{},
+		LogicalOwners: []CompactRulesetNamedValue{},
+		Repairs:       []CompactRulesetNamedValue{},
+		Surfaces:      []CompactRulesetSurfaceDeclaration{},
+		Delegates:     []CompactRulesetDelegateDeclaration{},
+	}
+
+	for _, directive := range ruleset.Directives {
+		args := directive.Arguments
+		if len(args) == 0 {
+			continue
+		}
+
+		switch directive.Name {
+		case "format":
+			profile.Format = args[0]
+		case "owners":
+			profile.Owners = args[0]
+		case "match":
+			profile.Match = args[0]
+		case "read":
+			profile.Read = args[0]
+		case "attach":
+			profile.Attach = args[0]
+		case "comment_style":
+			profile.CommentStyle = args[0]
+		case "render":
+			profile.Render = args[0]
+		case "render_strategy":
+			profile.RenderStrategy = args[0]
+		case "backend":
+			if len(args) > 1 {
+				profile.Backends = append(profile.Backends, CompactRulesetBackendDeclaration{Backend: args[0], Support: args[1]})
+			}
+		case "node_role":
+			if len(args) > 1 {
+				profile.NodeRoles = append(profile.NodeRoles, CompactRulesetNodeRole{Selector: args[0], Role: args[1]})
+			}
+		case "atomic":
+			if len(args) > 1 {
+				profile.AtomicNodes = append(profile.AtomicNodes, CompactRulesetAtomicNode{Selector: args[0], Atomic: args[1] == "true"})
+			}
+		case "child_group":
+			if len(args) > 2 {
+				profile.ChildGroups = append(profile.ChildGroups, CompactRulesetChildGroup{ParentSelector: args[0], Name: args[1], Policy: args[2]})
+			}
+		case "capability":
+			if len(args) > 1 {
+				profile.Capabilities = append(profile.Capabilities, CompactRulesetNamedValue{Name: args[0], Value: args[1]})
+			}
+		case "logical_owner":
+			if len(args) > 1 {
+				profile.LogicalOwners = append(profile.LogicalOwners, CompactRulesetNamedValue{Name: args[0], Value: args[1]})
+			}
+		case "repair":
+			if len(args) > 1 {
+				profile.Repairs = append(profile.Repairs, CompactRulesetNamedValue{Name: args[0], Value: args[1]})
+			}
+		case "surface":
+			if len(args) > 1 {
+				profile.Surfaces = append(profile.Surfaces, CompactRulesetSurfaceDeclaration{Name: args[0], Selector: args[1]})
+			}
+		case "delegate":
+			if len(args) > 1 {
+				profile.Delegates = append(profile.Delegates, CompactRulesetDelegateDeclaration{Surface: args[0], Policy: args[1]})
+			}
+		}
+	}
+
+	return profile
 }
 
 func compactRulesetKnownDirective(name string) bool {
