@@ -393,6 +393,60 @@ func TestSharedFixtureNormalizedTreeNodeContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProgressiveNodeMetadata(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-786-progressive-node-metadata", "progressive-node-metadata.json")
+	enhancedFixture := fixture["enhanced_node"].(map[string]any)
+	limitedFixture := fixture["limited_node"].(map[string]any)
+
+	enhancedParentID := enhancedFixture["parent_id"].(string)
+	enhancedFieldName := enhancedFixture["field_name"].(string)
+	enhanced := NormalizedTreeNode{
+		ID:                  enhancedFixture["id"].(string),
+		Kind:                enhancedFixture["kind"].(string),
+		Role:                NodeRole(enhancedFixture["role"].(string)),
+		ParentID:            &enhancedParentID,
+		ChildIDs:            stringSliceFromFixture(enhancedFixture["child_ids"]),
+		Span:                sourceSpanFromFixture(enhancedFixture["span"]),
+		FieldName:           &enhancedFieldName,
+		Named:               enhancedFixture["named"].(bool),
+		Anonymous:           enhancedFixture["anonymous"].(bool),
+		HasSourceText:       enhancedFixture["has_source_text"].(bool),
+		SourceFragment:      enhancedFixture["source_fragment"].(string),
+		BackendKind:         enhancedFixture["backend_kind"].(string),
+		SemanticRoles:       stringSliceFromFixture(enhancedFixture["semantic_roles"]),
+		BackendRoles:        stringSliceFromFixture(enhancedFixture["backend_roles"]),
+		UnsupportedFeatures: stringSliceFromFixture(enhancedFixture["unsupported_features"]),
+		Metadata:            metadataFromFixture(enhancedFixture["metadata"]),
+	}
+	limited := NormalizedTreeNode{
+		ID:                  limitedFixture["id"].(string),
+		Kind:                limitedFixture["kind"].(string),
+		Role:                NodeRole(limitedFixture["role"].(string)),
+		ParentID:            nil,
+		ChildIDs:            stringSliceFromFixture(limitedFixture["child_ids"]),
+		Span:                sourceSpanFromFixture(limitedFixture["span"]),
+		FieldName:           nil,
+		Named:               limitedFixture["named"].(bool),
+		Anonymous:           limitedFixture["anonymous"].(bool),
+		HasSourceText:       limitedFixture["has_source_text"].(bool),
+		SourceFragment:      limitedFixture["source_fragment"].(string),
+		BackendKind:         limitedFixture["backend_kind"].(string),
+		SemanticRoles:       stringSliceFromFixture(limitedFixture["semantic_roles"]),
+		BackendRoles:        stringSliceFromFixture(limitedFixture["backend_roles"]),
+		UnsupportedFeatures: stringSliceFromFixture(limitedFixture["unsupported_features"]),
+		Metadata:            metadataFromFixture(limitedFixture["metadata"]),
+	}
+
+	if enhanced.BackendKind != "FuncDecl" ||
+		enhanced.SemanticRoles[0] != "declaration" ||
+		enhanced.Metadata["go_dst"]["node_path"] != "decls[0]" ||
+		limited.HasSourceText ||
+		limited.UnsupportedFeatures[1] != "source_fragment" ||
+		limited.Metadata["psych"]["location_support"] != "line_column_only" {
+		t.Fatalf("unexpected progressive node metadata: enhanced=%+v limited=%+v", enhanced, limited)
+	}
+}
+
 func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
 	fixture := readParserFixture(t, "diagnostics", "slice-783-backend-capability-report", "backend-capability-report.json")
 	capabilityFixture := fixture["capability"].(map[string]any)
@@ -517,6 +571,19 @@ func stringSliceFromFixture(value any) []string {
 		items = append(items, item.(string))
 	}
 	return items
+}
+
+func metadataFromFixture(value any) map[string]map[string]string {
+	raw := value.(map[string]any)
+	metadata := make(map[string]map[string]string, len(raw))
+	for namespace, values := range raw {
+		rawValues := values.(map[string]any)
+		metadata[namespace] = make(map[string]string, len(rawValues))
+		for key, item := range rawValues {
+			metadata[namespace][key] = item.(string)
+		}
+	}
+	return metadata
 }
 
 func TestSharedFixtureBinaryCoreContract(t *testing.T) {

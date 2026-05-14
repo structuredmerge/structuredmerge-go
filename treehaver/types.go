@@ -197,17 +197,22 @@ const (
 )
 
 type NormalizedTreeNode struct {
-	ID             string
-	Kind           string
-	Role           NodeRole
-	ParentID       *string
-	ChildIDs       []string
-	Span           SourceSpan
-	FieldName      *string
-	Named          bool
-	Anonymous      bool
-	HasSourceText  bool
-	SourceFragment string
+	ID                  string
+	Kind                string
+	Role                NodeRole
+	ParentID            *string
+	ChildIDs            []string
+	Span                SourceSpan
+	FieldName           *string
+	Named               bool
+	Anonymous           bool
+	HasSourceText       bool
+	SourceFragment      string
+	BackendKind         string
+	SemanticRoles       []string
+	BackendRoles        []string
+	UnsupportedFeatures []string
+	Metadata            map[string]map[string]string
 }
 
 type SourceFragment struct {
