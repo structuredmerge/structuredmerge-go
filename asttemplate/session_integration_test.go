@@ -169,6 +169,22 @@ func TestReadmeFamilySectionTemplateContractFixture(t *testing.T) {
 		t.Fatalf("apply README family sections to package directories: %v", err)
 	}
 	assertJSONEqual(t, packageDirectoryCase["expected_report"], report)
+	planReport, err := asttemplate.RunReadmeFamilySectionCommand(asttemplate.ReadmeFamilySectionCommand{
+		ProfileName:     "update-readme-family-section",
+		Mode:            asttemplate.DirectorySessionModePlan,
+		Root:            tempRoot,
+		TemplatePartial: fixture["template_partial"].(string),
+		Packages:        packages,
+	}, nil)
+	if err != nil {
+		t.Fatalf("plan README family section command: %v", err)
+	}
+	if planReport.ProfileName != "update-readme-family-section" || planReport.Mode != asttemplate.DirectorySessionModePlan {
+		t.Fatalf("unexpected command report: %+v", planReport)
+	}
+	if planReport.Runner.ChangedCount != 0 {
+		t.Fatalf("expected command plan to converge after apply: %+v", planReport.Runner)
+	}
 	for _, rawPackage := range packageDirectoryCase["packages"].([]any) {
 		packageCase := rawPackage.(map[string]any)
 		readmePath := filepath.Join(tempRoot, filepath.FromSlash(packageCase["readme_path"].(string)))

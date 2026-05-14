@@ -62,6 +62,20 @@ type ReadmeFamilyPackageReport struct {
 	Entries      []ReadmeFamilyPackageReportEntry `json:"entries"`
 }
 
+type ReadmeFamilySectionCommand struct {
+	ProfileName     string
+	Mode            DirectorySessionMode
+	Root            string
+	TemplatePartial string
+	Packages        []ReadmeFamilyPackage
+}
+
+type ReadmeFamilySectionCommandReport struct {
+	ProfileName string                    `json:"profile_name"`
+	Mode        DirectorySessionMode      `json:"mode"`
+	Runner      ReadmeFamilyPackageReport `json:"runner"`
+}
+
 func ReadmeFamilyLanguageAliases(selfLanguage string, languageOrder []string) map[string]string {
 	order := languageOrder
 	if len(order) == 0 {
@@ -147,6 +161,37 @@ func ApplyReadmeFamilySection(templatePartial string, packageMetadata map[string
 }
 
 func ApplyReadmeFamilySectionsToPackageDirectories(root string, templatePartial string, packages []ReadmeFamilyPackage, config *astmerge.TemplateTokenConfig) (ReadmeFamilyPackageReport, error) {
+	return runReadmeFamilySectionsForPackageDirectories(root, templatePartial, packages, true, config)
+}
+
+func PlanReadmeFamilySectionsForPackageDirectories(root string, templatePartial string, packages []ReadmeFamilyPackage, config *astmerge.TemplateTokenConfig) (ReadmeFamilyPackageReport, error) {
+	return runReadmeFamilySectionsForPackageDirectories(root, templatePartial, packages, false, config)
+}
+
+func RunReadmeFamilySectionCommand(command ReadmeFamilySectionCommand, config *astmerge.TemplateTokenConfig) (ReadmeFamilySectionCommandReport, error) {
+	mode := command.Mode
+	if mode == "" {
+		mode = DirectorySessionModePlan
+	}
+	apply := mode == DirectorySessionModeApply || mode == DirectorySessionModeReapply
+	report, err := runReadmeFamilySectionsForPackageDirectories(
+		command.Root,
+		command.TemplatePartial,
+		command.Packages,
+		apply,
+		config,
+	)
+	if err != nil {
+		return ReadmeFamilySectionCommandReport{}, err
+	}
+	return ReadmeFamilySectionCommandReport{
+		ProfileName: command.ProfileName,
+		Mode:        mode,
+		Runner:      report,
+	}, nil
+}
+
+func runReadmeFamilySectionsForPackageDirectories(root string, templatePartial string, packages []ReadmeFamilyPackage, writeChanges bool, config *astmerge.TemplateTokenConfig) (ReadmeFamilyPackageReport, error) {
 	report := ReadmeFamilyPackageReport{
 		PackageCount: len(packages),
 		Entries:      make([]ReadmeFamilyPackageReportEntry, 0, len(packages)),
@@ -172,11 +217,13 @@ func ApplyReadmeFamilySectionsToPackageDirectories(root string, templatePartial 
 			config,
 		)
 		if changed {
-			if err := os.MkdirAll(filepath.Dir(readmePath), 0o755); err != nil {
-				return report, err
-			}
-			if err := os.WriteFile(readmePath, []byte(content), 0o644); err != nil {
-				return report, err
+			if writeChanges {
+				if err := os.MkdirAll(filepath.Dir(readmePath), 0o755); err != nil {
+					return report, err
+				}
+				if err := os.WriteFile(readmePath, []byte(content), 0o644); err != nil {
+					return report, err
+				}
 			}
 			report.ChangedCount++
 		}
