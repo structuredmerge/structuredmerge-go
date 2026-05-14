@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -20,6 +21,15 @@ const (
 	DirectorySessionModeReapply DirectorySessionMode = "reapply"
 )
 
+var ReadmeFamilyLanguageOrder = []string{"go", "ruby", "rust", "typescript"}
+
+var readmeFamilyLanguageLabels = map[string]string{
+	"go":         "Go",
+	"ruby":       "Ruby",
+	"rust":       "Rust",
+	"typescript": "TypeScript",
+}
+
 type DirectorySessionReport struct {
 	Mode         DirectorySessionMode                   `json:"mode"`
 	RunnerReport astmerge.TemplateDirectoryRunnerReport `json:"runner_report"`
@@ -28,6 +38,96 @@ type DirectorySessionReport struct {
 type FamilyMergeAdapter func(astmerge.TemplateExecutionPlanEntry) astmerge.MergeResult[string]
 
 type FamilyMergeAdapterRegistry map[string]FamilyMergeAdapter
+
+func ReadmeFamilyLanguageAliases(selfLanguage string, languageOrder []string) map[string]string {
+	order := languageOrder
+	if len(order) == 0 {
+		order = ReadmeFamilyLanguageOrder
+	}
+
+	aliases := map[string]string{
+		"SELF_LANG":    readmeFamilyLabel(selfLanguage),
+		"SELF_LANG_ID": selfLanguage,
+	}
+	aliasIndex := 1
+	for _, language := range order {
+		if language == selfLanguage {
+			continue
+		}
+		prefix := "IMP_LANG" + strconv.Itoa(aliasIndex)
+		aliases[prefix] = readmeFamilyLabel(language)
+		aliases[prefix+"_ID"] = language
+		aliasIndex++
+	}
+
+	return aliases
+}
+
+func ReadmeFamilyTokenValues(family map[string]any) map[string]string {
+	selfEntry := mapValue(family["self"])
+	selfID := stringValue(selfEntry["id"])
+	implementations := map[string]map[string]any{}
+	if rawImplementations, ok := family["implementations"].([]any); ok {
+		for _, raw := range rawImplementations {
+			entry := mapValue(raw)
+			implementations[stringValue(entry["id"])] = entry
+		}
+	}
+
+	tokens := ReadmeFamilyLanguageAliases(selfID, ReadmeFamilyLanguageOrder)
+	tokens["FAMILY_SECTION_HEADING"] = stringValue(family["section_heading"])
+	tokens["FAMILY_DESCRIPTION"] = stringValue(family["description"])
+	tokens["SELF_PACKAGE_ROOT"] = stringValue(selfEntry["package_root"])
+	tokens["SELF_PACKAGE_MANAGER"] = stringValue(selfEntry["package_manager"])
+
+	aliasIndex := 1
+	for _, language := range ReadmeFamilyLanguageOrder {
+		if language == selfID {
+			continue
+		}
+		entry := implementations[language]
+		prefix := "IMP_LANG" + strconv.Itoa(aliasIndex)
+		tokens[prefix+"_PACKAGE_ROOT"] = stringValue(entry["package_root"])
+		tokens[prefix+"_PACKAGE_MANAGER"] = stringValue(entry["package_manager"])
+		aliasIndex++
+	}
+
+	return tokens
+}
+
+func RenderReadmeFamilySection(templatePartial string, family map[string]any, config *astmerge.TemplateTokenConfig) string {
+	tokenValues := ReadmeFamilyTokenValues(family)
+	replacements := make(map[string]string, len(tokenValues))
+	for key, value := range tokenValues {
+		replacements["SM|"+key] = value
+	}
+
+	return astmerge.ResolveTemplateTokens(templatePartial, replacements, config)
+}
+
+func readmeFamilyLabel(language string) string {
+	if label, ok := readmeFamilyLanguageLabels[language]; ok {
+		return label
+	}
+	return language
+}
+
+func mapValue(value any) map[string]any {
+	if typed, ok := value.(map[string]any); ok {
+		return typed
+	}
+	return map[string]any{}
+}
+
+func stringValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	if typed, ok := value.(string); ok {
+		return typed
+	}
+	return ""
+}
 
 type DirectoryRegistrySessionReport struct {
 	Mode            DirectorySessionMode                   `json:"mode"`

@@ -78,6 +78,42 @@ func TestTemplateDirectorySessionReportFixture(t *testing.T) {
 	assertJSONEqual(t, reapplyRun["expected"], reapplyReport)
 }
 
+func TestReadmeFamilySectionTemplateContractFixture(t *testing.T) {
+	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-738-readme-family-section-template-contract", "readme-family-section-template-contract.json")
+	fixture := readJSONFixture(t, fixturePath)
+	languageOrder := decodeFixtureValue[[]string](t, fixture["canonical_language_order"])
+
+	for _, rawCase := range fixture["alias_derivation_cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		aliases := asttemplate.ReadmeFamilyLanguageAliases(testCase["self"].(string), languageOrder)
+		expectedAliases := decodeFixtureValue[map[string]string](t, testCase["expected_aliases"])
+		for key, expected := range expectedAliases {
+			if aliases[key] != expected {
+				t.Fatalf("unexpected alias %s: %q", key, aliases[key])
+			}
+		}
+		expectedAlternativeIDs := decodeFixtureValue[[]string](t, testCase["expected_alternative_ids"])
+		actualAlternativeIDs := []string{aliases["IMP_LANG1_ID"], aliases["IMP_LANG2_ID"], aliases["IMP_LANG3_ID"]}
+		if !reflect.DeepEqual(actualAlternativeIDs, expectedAlternativeIDs) {
+			t.Fatalf("unexpected alternative IDs: %+v", actualAlternativeIDs)
+		}
+	}
+
+	metadataCase := fixture["metadata_case"].(map[string]any)
+	family := metadataCase["family"].(map[string]any)
+	tokenValues := asttemplate.ReadmeFamilyTokenValues(family)
+	expectedTokenValues := decodeFixtureValue[map[string]string](t, metadataCase["expected_token_values"])
+	for key, expected := range expectedTokenValues {
+		if tokenValues[key] != expected {
+			t.Fatalf("unexpected token %s: %q", key, tokenValues[key])
+		}
+	}
+	actualRendered := asttemplate.RenderReadmeFamilySection(fixture["template_partial"].(string), family, nil)
+	if actualRendered != fixture["expected_rendered_partial"].(string) {
+		t.Fatalf("unexpected rendered README family section")
+	}
+}
+
 func TestTemplateDirectoryAdapterRegistryReportFixture(t *testing.T) {
 	fixturePath := filepath.Join(repoRoot(t), "fixtures", "diagnostics", "slice-354-template-directory-adapter-registry-report", "template-directory-adapter-registry-report.json")
 	fixture := readJSONFixture(t, fixturePath)
@@ -2051,6 +2087,19 @@ func readJSONFixture(t *testing.T, path string) map[string]any {
 		t.Fatalf("decode fixture: %v", err)
 	}
 	return fixture
+}
+
+func decodeFixtureValue[T any](t *testing.T, raw any) T {
+	t.Helper()
+	data, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("encode fixture value: %v", err)
+	}
+	var decoded T
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("decode fixture value: %v", err)
+	}
+	return decoded
 }
 
 func decodeSessionOutcomeFromFixture(t *testing.T, raw any, _fixtureRoot string) asttemplate.SessionOutcomeReport {
