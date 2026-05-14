@@ -118,6 +118,27 @@ func TestSharedFixtureGenericMergeIR(t *testing.T) {
 	}
 }
 
+func TestSharedFixturePairwiseMatchings(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-791-pairwise-matchings", "pairwise-matchings.json"))
+	matchings := decodeFixtureValue[[]PairwiseMatching](t, fixture["pairwise_matchings"])
+	expected := fixture["expected"].(map[string]any)
+
+	matchingIDs := make([]string, 0, len(matchings))
+	totalMatchCount := 0
+	for _, matching := range matchings {
+		matchingIDs = append(matchingIDs, matching.MatchingID)
+		totalMatchCount += len(matching.Matches)
+	}
+
+	if !reflect.DeepEqual(matchingIDs, decodeFixtureValue[[]string](t, expected["matching_ids"])) ||
+		totalMatchCount != int(expected["total_match_count"].(float64)) ||
+		matchings[0].UnmatchedTo[0] != "left-import-os" ||
+		matchings[1].UnmatchedFrom[0] != "base-decl-greet" ||
+		matchings[2].Matches[1].Diagnostics[0] != "sibling position changed" {
+		t.Fatalf("unexpected pairwise matchings: %+v", matchings)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

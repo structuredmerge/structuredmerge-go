@@ -176,6 +176,24 @@ type MergeIR struct {
 	Diagnostics  []string             `json:"diagnostics"`
 }
 
+type PairwiseNodeMatch struct {
+	FromNodeID  string   `json:"from_node_id"`
+	ToNodeID    string   `json:"to_node_id"`
+	ClassID     string   `json:"class_id"`
+	Strategy    string   `json:"strategy"`
+	Confidence  float64  `json:"confidence"`
+	Diagnostics []string `json:"diagnostics"`
+}
+
+type PairwiseMatching struct {
+	MatchingID    string              `json:"matching_id"`
+	FromRevision  string              `json:"from_revision"`
+	ToRevision    string              `json:"to_revision"`
+	Matches       []PairwiseNodeMatch `json:"matches"`
+	UnmatchedFrom []string            `json:"unmatched_from"`
+	UnmatchedTo   []string            `json:"unmatched_to"`
+}
+
 type PolicySurface string
 
 const (
