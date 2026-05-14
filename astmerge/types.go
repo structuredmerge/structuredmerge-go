@@ -250,6 +250,25 @@ type ChangeSet struct {
 	Diagnostics []string          `json:"diagnostics"`
 }
 
+type RawMergeChange struct {
+	ChangeID           string  `json:"change_id"`
+	SourceChangeSetID  string  `json:"source_change_set_id"`
+	Side               string  `json:"side"`
+	Kind               string  `json:"kind"`
+	ClassID            string  `json:"class_id"`
+	ParentClassID      string  `json:"parent_class_id"`
+	PredecessorClassID *string `json:"predecessor_class_id"`
+	SuccessorClassID   *string `json:"successor_class_id"`
+	ContentHash        string  `json:"content_hash"`
+}
+
+type RawMerge struct {
+	RawMergeID        string           `json:"raw_merge_id"`
+	InputChangeSetIDs []string         `json:"input_change_set_ids"`
+	Changes           []RawMergeChange `json:"changes"`
+	Diagnostics       []string         `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

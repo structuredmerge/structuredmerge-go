@@ -186,6 +186,31 @@ func TestSharedFixturePCSChangeSetGeneration(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRawMergeChangeSetUnion(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-794-raw-merge-change-set-union", "raw-merge-change-set-union.json"))
+	rawMerge := decodeFixtureValue[RawMerge](t, fixture["raw_merge"])
+	expected := fixture["expected"].(map[string]any)
+
+	sides := []string{}
+	seenSides := map[string]bool{}
+	classChangeCount := map[string]int{}
+	for _, change := range rawMerge.Changes {
+		if !seenSides[change.Side] {
+			seenSides[change.Side] = true
+			sides = append(sides, change.Side)
+		}
+		classChangeCount[change.ClassID]++
+	}
+
+	if len(rawMerge.Changes) != int(expected["raw_change_count"].(float64)) ||
+		len(rawMerge.InputChangeSetIDs) != int(expected["input_change_set_count"].(float64)) ||
+		!reflect.DeepEqual(sides, decodeFixtureValue[[]string](t, expected["sides"])) ||
+		classChangeCount["class-decl-greet"] != 2 ||
+		rawMerge.Diagnostics[0] != "raw merge intentionally preserves both sides before inconsistency detection" {
+		t.Fatalf("unexpected raw merge union: %+v", rawMerge)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
