@@ -119,6 +119,42 @@ func TestMergeDriverUsesSmorgLanguageAttribute(t *testing.T) {
 	}
 }
 
+func TestMergeDriverCheckOnlyExitCodeReportsPendingChangeWithoutWriting(t *testing.T) {
+	dir := t.TempDir()
+	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"structuredmerge"}`)
+	current := writeTestFile(t, dir, "current.json", `{"name":"structuredmerge","current":true}`)
+	other := writeTestFile(t, dir, "other.json", `{"name":"structuredmerge","other":true}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", "--check-only", "--exit-code", ancestor, current, other, "package.json"}, &stdout, &stderr)
+	if exitCode != exitUnresolvedConflict {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+
+	currentSource, err := os.ReadFile(current)
+	if err != nil {
+		t.Fatalf("read current file: %v", err)
+	}
+	if strings.Contains(string(currentSource), `"other":true`) {
+		t.Fatalf("check-only wrote to current file: %s", string(currentSource))
+	}
+}
+
+func TestMergeDriverCheckOnlyExitCodeReportsNoChange(t *testing.T) {
+	dir := t.TempDir()
+	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"structuredmerge"}`)
+	current := writeTestFile(t, dir, "current.json", `{"name":"structuredmerge","same":true}`)
+	other := writeTestFile(t, dir, "other.json", `{"name":"structuredmerge","same":true}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", "--check-only", "--exit-code", ancestor, current, other, "package.json"}, &stdout, &stderr)
+	if exitCode != exitSuccess {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+}
+
 func TestPathSettingsUseLinguistLanguageAndConflictMarkerSize(t *testing.T) {
 	settings := pathSettings{conflictMarkerSize: 7}
 	applyAttributes(&settings, "fixtures/package.data", strings.Join([]string{

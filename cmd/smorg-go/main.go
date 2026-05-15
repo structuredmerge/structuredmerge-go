@@ -132,6 +132,9 @@ func runMergeDriver(args []string, _ io.Writer, stderr io.Writer) int {
 	}
 
 	if options.checkOnly {
+		if options.exitCode && *result.Output != string(currentSource) {
+			return exitUnresolvedConflict
+		}
 		return exitSuccess
 	}
 
