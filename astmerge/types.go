@@ -1339,6 +1339,141 @@ type LanguageBackendProfile struct {
 	Rules             LanguageBackendProfileRules `json:"rules"`
 }
 
+type ProfileValidationDiagnostic struct {
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+}
+
+type ProfileValidationResult struct {
+	OK          bool                          `json:"ok"`
+	Errors      []ProfileValidationDiagnostic `json:"errors"`
+	Warnings    []ProfileValidationDiagnostic `json:"warnings"`
+	Diagnostics []ProfileValidationDiagnostic `json:"diagnostics"`
+}
+
+func ValidateLanguageBackendProfile(profile LanguageBackendProfile, capability *treehaver.BackendCapability) ProfileValidationResult {
+	result := ProfileValidationResult{OK: true}
+	addError := func(message string) {
+		diagnostic := ProfileValidationDiagnostic{Severity: "error", Message: message}
+		result.Errors = append(result.Errors, diagnostic)
+		result.Diagnostics = append(result.Diagnostics, diagnostic)
+		result.OK = false
+	}
+	addWarning := func(message string) {
+		diagnostic := ProfileValidationDiagnostic{Severity: "warning", Message: message}
+		result.Warnings = append(result.Warnings, diagnostic)
+		result.Diagnostics = append(result.Diagnostics, diagnostic)
+	}
+
+	validRoles := map[string]bool{
+		"structural": true, "token": true, "trivia": true, "comment": true, "delimiter": true,
+		"separator": true, "virtual": true, "error": true, "opaque": true,
+	}
+	for _, role := range profile.Rules.NodeRoles {
+		if !validRoles[role] {
+			addError("invalid node role " + role)
+		}
+	}
+
+	signatureNames := map[string]bool{}
+	for _, signature := range profile.Rules.Signatures {
+		if signature.Name == "" {
+			addError("signature name is required")
+		} else if signatureNames[signature.Name] {
+			addError("duplicate signature name " + signature.Name)
+		}
+		signatureNames[signature.Name] = true
+		if signature.Selector == "" {
+			addError("signature selector is required")
+		}
+		if !validExtractor(signature.Extractor) {
+			addError("unsupported signature extractor " + signature.Extractor)
+		}
+	}
+
+	childGroups := map[string]bool{}
+	for _, group := range profile.Rules.ChildGroups {
+		if group.Name == "" {
+			addError("child group name is required")
+		} else if childGroups[group.Name] {
+			addError("duplicate child group name " + group.Name)
+		}
+		childGroups[group.Name] = true
+	}
+	for _, parent := range profile.Rules.CommutativeParents {
+		if parent.Selector == "" {
+			addError("commutative parent selector is required")
+		}
+		if !childGroups[parent.ChildGroup] {
+			addError("commutative parent " + parent.Selector + " references unknown child group " + parent.ChildGroup)
+		}
+	}
+	for _, atomic := range profile.Rules.AtomicNodes {
+		if atomic.Selector == "" {
+			addError("atomic node selector is required")
+		}
+	}
+	for _, attachment := range profile.Rules.CommentAttachment {
+		if attachment.Selector == "" {
+			addError("comment attachment selector is required")
+		}
+		if attachment.Strategy == "" {
+			addError("comment attachment strategy is required")
+		}
+	}
+
+	if capability != nil {
+		validateBackendInventory(profile, *capability, addError, addWarning)
+	}
+
+	return result
+}
+
+func validExtractor(extractor string) bool {
+	return extractor == "text" ||
+		strings.HasPrefix(extractor, "field:") ||
+		strings.HasPrefix(extractor, "kind:") ||
+		strings.HasPrefix(extractor, "custom:")
+}
+
+func validateBackendInventory(profile LanguageBackendProfile, capability treehaver.BackendCapability, addError func(string), addWarning func(string)) {
+	if capability.GrammarInventory == "" {
+		return
+	}
+	nodeKinds := map[string]bool{}
+	for _, kind := range capability.KnownNodeKinds {
+		nodeKinds[kind] = true
+	}
+	fields := map[string]bool{}
+	for _, field := range capability.KnownFields {
+		fields[field] = true
+	}
+	report := addWarning
+	if capability.GrammarInventory == "exhaustive" {
+		report = addError
+	}
+	checkSelector := func(prefix string, selector string) {
+		if selector != "" && len(nodeKinds) > 0 && !nodeKinds[selector] {
+			report(prefix + " " + selector)
+		}
+	}
+	for _, atomic := range profile.Rules.AtomicNodes {
+		checkSelector("unknown atomic node selector", atomic.Selector)
+	}
+	for _, signature := range profile.Rules.Signatures {
+		checkSelector("unknown signature selector", signature.Selector)
+		if field, ok := strings.CutPrefix(signature.Extractor, "field:"); ok && len(fields) > 0 && !fields[field] {
+			report("unknown signature field " + field)
+		}
+	}
+	for _, parent := range profile.Rules.CommutativeParents {
+		checkSelector("unknown commutative parent selector", parent.Selector)
+	}
+	for _, attachment := range profile.Rules.CommentAttachment {
+		checkSelector("unknown comment attachment selector", attachment.Selector)
+	}
+}
+
 type CompactRulesetDirective struct {
 	Name      string   `json:"name"`
 	Arguments []string `json:"arguments"`

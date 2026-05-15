@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/treehaver"
 )
 
 // parity anchors:
@@ -1213,6 +1215,53 @@ func TestSharedFixtureLanguageBackendProfileSchema(t *testing.T) {
 		profile.Rules.CommutativeParents[0].Selector != expected["first_commutative_parent"].(string) {
 		t.Fatalf("unexpected language backend profile: %+v", profile)
 	}
+}
+
+func TestSharedFixtureProfileValidation(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-909-profile-validation", "profile-validation.json"))
+	expected := fixture["expected"].(map[string]any)
+
+	structuralProfile := decodeFixtureValue[LanguageBackendProfile](t, fixture["structural_profile"])
+	structural := ValidateLanguageBackendProfile(structuralProfile, nil)
+	if !reflect.DeepEqual(sortedStrings(validationMessages(structural.Errors)), sortedStrings(stringSliceFromFixture(expected["structural_errors"]))) {
+		t.Fatalf("unexpected structural validation errors: %+v", structural.Errors)
+	}
+
+	unknownSelectorProfile := decodeFixtureValue[LanguageBackendProfile](t, fixture["unknown_selector_profile"])
+	exhaustiveCapability := decodeFixtureValue[treehaver.BackendCapability](t, fixture["backend_metadata"])
+	exhaustive := ValidateLanguageBackendProfile(unknownSelectorProfile, &exhaustiveCapability)
+	if !reflect.DeepEqual(sortedStrings(validationMessages(exhaustive.Errors)), sortedStrings(stringSliceFromFixture(expected["exhaustive_backend_errors"]))) {
+		t.Fatalf("unexpected exhaustive backend validation errors: %+v", exhaustive.Errors)
+	}
+
+	partialCapability := decodeFixtureValue[treehaver.BackendCapability](t, fixture["partial_backend_metadata"])
+	partial := ValidateLanguageBackendProfile(unknownSelectorProfile, &partialCapability)
+	if len(partial.Errors) != 0 || !reflect.DeepEqual(sortedStrings(validationMessages(partial.Warnings)), sortedStrings(stringSliceFromFixture(expected["partial_backend_warnings"]))) {
+		t.Fatalf("unexpected partial backend validation result: %+v", partial)
+	}
+}
+
+func validationMessages(diagnostics []ProfileValidationDiagnostic) []string {
+	messages := make([]string, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		messages = append(messages, diagnostic.Message)
+	}
+	return messages
+}
+
+func stringSliceFromFixture(value any) []string {
+	items := value.([]any)
+	strings := make([]string, 0, len(items))
+	for _, item := range items {
+		strings = append(strings, item.(string))
+	}
+	return strings
+}
+
+func sortedStrings(values []string) []string {
+	sorted := append([]string{}, values...)
+	slices.Sort(sorted)
+	return sorted
 }
 
 func TestTemplateTokenKeysFixture(t *testing.T) {

@@ -89,18 +89,21 @@ type LanguageVersion struct {
 }
 
 type BackendCapability struct {
-	BackendRef            BackendReference
-	Language              string
-	ParserIdentity        ParserIdentity
-	LanguageVersion       LanguageVersion
-	ParseErrorBehavior    string
-	SourceSpanSupport     string
-	SourceFragmentSupport string
-	RenderStrategies      []string
-	SemanticRoleSupport   string
-	NormalizedTreeSupport bool
-	NativeNodeAccess      bool
-	Diagnostics           []string
+	BackendRef            BackendReference `json:"backend_ref"`
+	Language              string           `json:"language"`
+	ParserIdentity        ParserIdentity   `json:"parser_identity"`
+	LanguageVersion       LanguageVersion  `json:"language_version"`
+	ParseErrorBehavior    string           `json:"parse_error_behavior"`
+	SourceSpanSupport     string           `json:"source_span_support"`
+	SourceFragmentSupport string           `json:"source_fragment_support"`
+	RenderStrategies      []string         `json:"render_strategies"`
+	SemanticRoleSupport   string           `json:"semantic_role_support"`
+	NormalizedTreeSupport bool             `json:"normalized_tree_support"`
+	NativeNodeAccess      bool             `json:"native_node_access"`
+	KnownNodeKinds        []string         `json:"known_node_kinds,omitempty"`
+	KnownFields           []string         `json:"known_fields,omitempty"`
+	GrammarInventory      string           `json:"grammar_inventory,omitempty"`
+	Diagnostics           []string         `json:"diagnostics"`
 }
 
 type ParseErrorNode struct {
