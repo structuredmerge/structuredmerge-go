@@ -159,7 +159,7 @@ func ApplyEditProjection(request treehaver.EditProjectionExecutionRequest) treeh
 	}
 
 	operation := request.Operations[0]
-	if operation.Operation != "replace_node" {
+	if operation.Operation != "replace_node" && operation.Operation != "insert_child" {
 		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
 			Severity: "error",
 			Category: "unsupported_feature",
@@ -170,7 +170,7 @@ func ApplyEditProjection(request treehaver.EditProjectionExecutionRequest) treeh
 		}})
 	}
 
-	output, err := replaceGoDSTNode(request.Source, operation.TargetNodePath, operation.ReplacementSource)
+	output, err := applyGoDSTNodeOperation(request.Source, operation)
 	if err != nil {
 		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
 			Severity: "error",
@@ -275,8 +275,8 @@ func parseGoDST(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
 }
 
-func replaceGoDSTNode(source string, targetNodePath string, replacementSource string) (string, error) {
-	index, err := declIndex(targetNodePath)
+func applyGoDSTNodeOperation(source string, operation treehaver.EditProjectionOperationRequest) (string, error) {
+	index, err := declIndex(operation.TargetNodePath)
 	if err != nil {
 		return "", err
 	}
@@ -286,18 +286,28 @@ func replaceGoDSTNode(source string, targetNodePath string, replacementSource st
 	if err != nil {
 		return "", err
 	}
-	if index < 0 || index >= len(file.Decls) {
-		return "", fmt.Errorf("target node path %s is outside declaration bounds", targetNodePath)
-	}
 
-	replacementFile, err := decorator.ParseFile(token.NewFileSet(), "replacement.go", "package replacement\n\n"+replacementSource, goparser.ParseComments)
+	replacementFile, err := decorator.ParseFile(token.NewFileSet(), "replacement.go", "package replacement\n\n"+operation.ReplacementSource, goparser.ParseComments)
 	if err != nil {
 		return "", err
 	}
 	if len(replacementFile.Decls) != 1 {
 		return "", fmt.Errorf("replacement source must contain exactly one declaration")
 	}
-	file.Decls[index] = replacementFile.Decls[0]
+	switch operation.Operation {
+	case "replace_node":
+		if index < 0 || index >= len(file.Decls) {
+			return "", fmt.Errorf("target node path %s is outside declaration bounds", operation.TargetNodePath)
+		}
+		file.Decls[index] = replacementFile.Decls[0]
+	case "insert_child":
+		if index < 0 || index > len(file.Decls) {
+			return "", fmt.Errorf("target node path %s is outside declaration insertion bounds", operation.TargetNodePath)
+		}
+		file.Decls = slices.Insert(file.Decls, index, replacementFile.Decls[0])
+	default:
+		return "", fmt.Errorf("unsupported edit projection operation %s", operation.Operation)
+	}
 
 	var buffer bytes.Buffer
 	if err := decorator.Fprint(&buffer, file); err != nil {
