@@ -1296,6 +1296,14 @@ const (
 	ProfilePromotionScopeSourceSubprofile ProfilePromotionScope = "source_subprofile"
 )
 
+const (
+	PromotionProfileJSONKeyedObject                   = "json.keyed-object"
+	PromotionProfileGoImportDeclarations              = "go.import-declarations"
+	PromotionProfileRustUseDeclarations               = "rust.use-declarations"
+	PromotionProfileTypeScriptImportDeclarations      = "typescript.import-declarations"
+	PromotionProfileRubyGemspecDependencyDeclarations = "ruby.gemspec-dependency-declarations"
+)
+
 type ProfileRecommendationGate struct {
 	RequiredFixtureCount              int     `json:"required_fixture_count"`
 	FormattingThreshold               float64 `json:"formatting_threshold"`

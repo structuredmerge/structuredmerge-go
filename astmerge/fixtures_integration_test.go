@@ -1309,10 +1309,10 @@ func TestSharedFixtureProfilePromotionPolicy(t *testing.T) {
 		if entry.Scope == ProfilePromotionScopeSourceSubprofile {
 			sourceSubprofiles++
 		}
-		if entry.ProfileID == "json.keyed-object" {
+		if entry.ProfileID == PromotionProfileJSONKeyedObject {
 			jsonPolicy = entry
 		}
-		if entry.ProfileID == "ruby.gemspec-dependency-declarations" {
+		if entry.ProfileID == PromotionProfileRubyGemspecDependencyDeclarations {
 			rubyPolicy = entry
 		}
 	}
