@@ -710,6 +710,18 @@ func TestSharedFixtureBackendAvailability(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProviderDiagnostics(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-927-tree-haver-provider-diagnostics", "provider-diagnostics.json")
+
+	for _, name := range []string{"clean_report", "warning_report", "blocked_report"} {
+		expected := providerDiagnosticsReportFromFixture(fixture[name])
+		result := BuildProviderDiagnosticsReport(expected.ProviderID, expected.BackendRef, expected.Language, expected.Diagnostics)
+		if !reflect.DeepEqual(result, expected) {
+			t.Fatalf("unexpected provider diagnostics report for %s: %+v", name, result)
+		}
+	}
+}
+
 func backendCapabilityFromFixture(value any) BackendCapability {
 	capabilityFixture := value.(map[string]any)
 	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)
@@ -919,6 +931,29 @@ func backendRefFromFixture(value any) BackendReference {
 	return BackendReference{
 		ID:     fixture["id"].(string),
 		Family: fixture["family"].(string),
+	}
+}
+
+func providerDiagnosticsReportFromFixture(value any) ProviderDiagnosticsReport {
+	fixture := value.(map[string]any)
+	diagnostics := []ProviderDiagnostic{}
+	for _, rawDiagnostic := range fixture["diagnostics"].([]any) {
+		diagnosticFixture := rawDiagnostic.(map[string]any)
+		diagnostics = append(diagnostics, ProviderDiagnostic{
+			Severity: diagnosticFixture["severity"].(string),
+			Category: diagnosticFixture["category"].(string),
+			Code:     diagnosticFixture["code"].(string),
+			Message:  diagnosticFixture["message"].(string),
+			Path:     diagnosticFixture["path"].(string),
+			Blocking: diagnosticFixture["blocking"].(bool),
+		})
+	}
+	return ProviderDiagnosticsReport{
+		ProviderID:  fixture["provider_id"].(string),
+		BackendRef:  backendRefFromFixture(fixture["backend_ref"]),
+		Language:    fixture["language"].(string),
+		Status:      fixture["status"].(string),
+		Diagnostics: diagnostics,
 	}
 }
 

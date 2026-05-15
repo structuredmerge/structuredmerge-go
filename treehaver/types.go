@@ -218,6 +218,23 @@ type BackendAvailabilityReport struct {
 	Diagnostics []string
 }
 
+type ProviderDiagnostic struct {
+	Severity string
+	Category string
+	Code     string
+	Message  string
+	Path     string
+	Blocking bool
+}
+
+type ProviderDiagnosticsReport struct {
+	ProviderID  string
+	BackendRef  BackendReference
+	Language    string
+	Status      string
+	Diagnostics []ProviderDiagnostic
+}
+
 type OrderedSiblingEdge struct {
 	ParentID          string
 	NodeID            string
@@ -746,6 +763,26 @@ func BuildBackendAvailabilityReport(backendRef BackendReference, checks []Backen
 		}
 	}
 	return BackendAvailabilityReport{BackendRef: backendRef, Status: status, Checks: checks, Diagnostics: diagnostics}
+}
+
+func BuildProviderDiagnosticsReport(providerID string, backendRef BackendReference, language string, diagnostics []ProviderDiagnostic) ProviderDiagnosticsReport {
+	status := "clean"
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Blocking {
+			status = "blocked"
+			break
+		}
+		if diagnostic.Severity == "warning" {
+			status = "warning"
+		}
+	}
+	return ProviderDiagnosticsReport{
+		ProviderID:  providerID,
+		BackendRef:  backendRef,
+		Language:    language,
+		Status:      status,
+		Diagnostics: diagnostics,
+	}
 }
 
 func windowsAbsolutePath(libraryPath string) bool {
