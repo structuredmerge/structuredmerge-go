@@ -652,6 +652,19 @@ func TestSharedFixtureSecondaryFormattingMetrics(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureTokenSpanPreservationMetrics(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-819-token-span-preservation-metrics", "token-span-preservation-metrics.json"))
+	report := decodeFixtureValue[TokenSpanPreservationMetricsReport](t, fixture["token_span_metrics"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.SourceSpansAvailable != expected["source_spans_available"].(bool) ||
+		report.TokenPreservation != expected["token_preservation"].(float64) ||
+		report.SpanPreservation != expected["span_preservation"].(float64) ||
+		report.Weighted != expected["weighted"].(bool) {
+		t.Fatalf("unexpected token/span preservation metrics report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

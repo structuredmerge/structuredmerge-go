@@ -799,6 +799,16 @@ type SecondaryFormattingMetricsReport struct {
 	Diagnostics             []string `json:"diagnostics"`
 }
 
+type TokenSpanPreservationMetricsReport struct {
+	ReportID             string   `json:"report_id"`
+	Version              string   `json:"version"`
+	SourceSpansAvailable bool     `json:"source_spans_available"`
+	TokenPreservation    float64  `json:"token_preservation"`
+	SpanPreservation     float64  `json:"span_preservation"`
+	Weighted             bool     `json:"weighted"`
+	Diagnostics          []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
