@@ -593,6 +593,19 @@ type LocalLineFallbackReport struct {
 	Diagnostics      []string `json:"diagnostics"`
 }
 
+type ConflictMarkerRenderingReport struct {
+	RenderID    string   `json:"render_id"`
+	Strategy    string   `json:"strategy"`
+	MarkerSize  int      `json:"marker_size"`
+	PathLabel   string   `json:"path_label"`
+	LeftLabel   string   `json:"left_label"`
+	BaseLabel   string   `json:"base_label"`
+	RightLabel  string   `json:"right_label"`
+	IncludeBase bool     `json:"include_base"`
+	Output      string   `json:"output"`
+	Diagnostics []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

@@ -448,6 +448,22 @@ func TestSharedFixtureLocalLineBasedFallback(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureConflictMarkerRendering(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-808-conflict-marker-rendering", "conflict-marker-rendering.json"))
+	report := decodeFixtureValue[ConflictMarkerRenderingReport](t, fixture["rendering"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Strategy != expected["strategy"].(string) ||
+		report.MarkerSize != int(expected["marker_size"].(float64)) ||
+		report.PathLabel != expected["path_label"].(string) ||
+		report.IncludeBase != expected["include_base"].(bool) ||
+		!strings.HasPrefix(report.Output, expected["starts_with"].(string)) ||
+		!strings.Contains(report.Output, expected["contains_base_marker"].(string)) ||
+		!strings.HasSuffix(report.Output, expected["ends_with"].(string)) {
+		t.Fatalf("unexpected conflict marker rendering report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
