@@ -832,6 +832,25 @@ type RenderSafetyReport struct {
 	Diagnostics      []string `json:"diagnostics"`
 }
 
+type NativeProviderMetadataReport struct {
+	ProviderID           string   `json:"provider_id"`
+	Family               string   `json:"family"`
+	HostLanguage         string   `json:"host_language"`
+	TargetLanguage       string   `json:"target_language"`
+	ParserName           string   `json:"parser_name"`
+	ParserVersion        string   `json:"parser_version"`
+	LanguageVersion      string   `json:"language_version"`
+	Dialect              string   `json:"dialect"`
+	ParseErrorBehavior   string   `json:"parse_error_behavior"`
+	SourceSpanSupport    string   `json:"source_span_support"`
+	RenderSupport        string   `json:"render_support"`
+	SemanticRoleSupport  string   `json:"semantic_role_support"`
+	RetainsNativeTree    bool     `json:"retains_native_tree"`
+	NativeTreeVisibility string   `json:"native_tree_visibility"`
+	MetadataPolicy       string   `json:"metadata_policy"`
+	Diagnostics          []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

@@ -484,6 +484,44 @@ func TestSharedFixtureNativeParserAdapterContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNativeProviderMetadata(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-822-native-provider-metadata", "native-provider-metadata.json")
+	metadataFixture := fixture["provider_metadata"].(map[string]any)
+	expected := fixture["expected"].(map[string]any)
+	metadata := NativeProviderMetadata{
+		ProviderID:           metadataFixture["provider_id"].(string),
+		Family:               metadataFixture["family"].(string),
+		HostLanguage:         metadataFixture["host_language"].(string),
+		TargetLanguage:       metadataFixture["target_language"].(string),
+		ParserName:           metadataFixture["parser_name"].(string),
+		ParserVersion:        metadataFixture["parser_version"].(string),
+		LanguageVersion:      metadataFixture["language_version"].(string),
+		Dialect:              metadataFixture["dialect"].(string),
+		ParseErrorBehavior:   metadataFixture["parse_error_behavior"].(string),
+		SourceSpanSupport:    metadataFixture["source_span_support"].(string),
+		RenderSupport:        metadataFixture["render_support"].(string),
+		SemanticRoleSupport:  metadataFixture["semantic_role_support"].(string),
+		RetainsNativeTree:    metadataFixture["retains_native_tree"].(bool),
+		NativeTreeVisibility: metadataFixture["native_tree_visibility"].(string),
+		MetadataPolicy:       metadataFixture["metadata_policy"].(string),
+		Diagnostics:          stringSliceFromFixture(metadataFixture["diagnostics"]),
+	}
+
+	if metadata.ProviderID != expected["provider_id"].(string) ||
+		metadata.Family != expected["family"].(string) ||
+		metadata.HostLanguage != expected["host_language"].(string) ||
+		metadata.TargetLanguage != expected["target_language"].(string) ||
+		metadata.ParserName != expected["parser_name"].(string) ||
+		metadata.ParseErrorBehavior != expected["parse_error_behavior"].(string) ||
+		metadata.SourceSpanSupport != expected["source_span_support"].(string) ||
+		metadata.RenderSupport != expected["render_support"].(string) ||
+		metadata.SemanticRoleSupport != expected["semantic_role_support"].(string) ||
+		metadata.RetainsNativeTree != expected["retains_native_tree"].(bool) ||
+		metadata.MetadataPolicy != expected["metadata_policy"].(string) {
+		t.Fatalf("unexpected native provider metadata: %+v", metadata)
+	}
+}
+
 func TestSharedFixtureTreeHaverProfile(t *testing.T) {
 	fixture := readParserFixture(t, "diagnostics", "slice-788-tree-haver-profile", "tree-haver-profile.json")
 	profileFixture := fixture["profile"].(map[string]any)

@@ -701,6 +701,26 @@ func TestSharedFixtureUnsafeRenderFallbackOrFailure(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureNativeProviderMetadataReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-822-native-provider-metadata", "native-provider-metadata.json"))
+	report := decodeFixtureValue[NativeProviderMetadataReport](t, fixture["provider_metadata"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.ProviderID != expected["provider_id"].(string) ||
+		report.Family != expected["family"].(string) ||
+		report.HostLanguage != expected["host_language"].(string) ||
+		report.TargetLanguage != expected["target_language"].(string) ||
+		report.ParserName != expected["parser_name"].(string) ||
+		report.ParseErrorBehavior != expected["parse_error_behavior"].(string) ||
+		report.SourceSpanSupport != expected["source_span_support"].(string) ||
+		report.RenderSupport != expected["render_support"].(string) ||
+		report.SemanticRoleSupport != expected["semantic_role_support"].(string) ||
+		report.RetainsNativeTree != expected["retains_native_tree"].(bool) ||
+		report.MetadataPolicy != expected["metadata_policy"].(string) {
+		t.Fatalf("unexpected native provider metadata report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
