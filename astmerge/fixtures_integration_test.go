@@ -118,6 +118,56 @@ func TestSharedFixtureGenericMergeIR(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMergeEngineSuiteSetting(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-906-merge-engine-suite-setting", "merge-engine-suite-setting.json"))
+	settings := fixture["settings"].(map[string]any)
+	expected := fixture["expected"].(map[string]any)
+
+	supportedEngines := decodeFixtureValue[[]MergeEngine](t, settings["supported_engines"])
+	if NormalizeMergeEngine("") != MergeEngine(expected["default_engine"].(string)) ||
+		NormalizeMergeEngine(MergeEngine(settings["experimental_engine"].(string))) != MergeEngine(expected["experimental_engine"].(string)) ||
+		len(supportedEngines) != int(expected["supported_engine_count"].(float64)) ||
+		MergeEngineEnvironmentVariable != expected["environment_variable"].(string) ||
+		settings["experimental_policy"].(string) != expected["experimental_policy"].(string) ||
+		settings["runs_same_suite"].(bool) != expected["runs_same_suite"].(bool) {
+		t.Fatalf("unexpected merge engine setting: %+v", settings)
+	}
+
+	t.Setenv(MergeEngineEnvironmentVariable, settings["experimental_engine"].(string))
+	if MergeEngineFromEnvironment() != MergeEngineExperimentalMergeIR {
+		t.Fatalf("expected experimental merge engine from environment, got %s", MergeEngineFromEnvironment())
+	}
+
+	manifest := ConformanceManifest{
+		Families: map[string][]ConformanceManifestEntry{
+			"go": {{
+				Role: "case",
+				Path: []string{"go", "case.json"},
+			}},
+		},
+		SuiteDescriptors: []ConformanceSuiteDefinition{{
+			Kind: "family",
+			Subject: ConformanceSuiteSubject{
+				Grammar: "go",
+			},
+			Roles: []string{"case"},
+		}},
+	}
+	familyProfile := FamilyFeatureProfile{
+		Family: "go",
+	}
+	plan := PlanNamedConformanceSuitesWithDiagnostics(manifest, ConformanceManifestPlanningOptions{
+		FamilyProfiles: map[string]FamilyFeatureProfile{"go": familyProfile},
+		MergeEngine:    MergeEngineExperimentalMergeIR,
+	})
+
+	if len(plan.Entries) != 1 ||
+		plan.Entries[0].Plan.MergeEngine != MergeEngineExperimentalMergeIR ||
+		plan.Entries[0].Plan.Entries[0].Run.MergeEngine != MergeEngineExperimentalMergeIR {
+		t.Fatalf("merge engine was not carried through conformance plan: %+v", plan)
+	}
+}
+
 func TestSharedFixturePairwiseMatchings(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-791-pairwise-matchings", "pairwise-matchings.json"))
 	matchings := decodeFixtureValue[[]PairwiseMatching](t, fixture["pairwise_matchings"])

@@ -20,6 +20,25 @@ const (
 	SeverityError   DiagnosticSeverity = "error"
 )
 
+type MergeEngine string
+
+const (
+	MergeEngineOwnerPath           MergeEngine = "owner_path"
+	MergeEngineExperimentalMergeIR MergeEngine = "merge_ir_experimental"
+	MergeEngineEnvironmentVariable             = "SMORG_MERGE_ENGINE"
+)
+
+func NormalizeMergeEngine(engine MergeEngine) MergeEngine {
+	if engine == MergeEngineExperimentalMergeIR {
+		return MergeEngineExperimentalMergeIR
+	}
+	return MergeEngineOwnerPath
+}
+
+func MergeEngineFromEnvironment() MergeEngine {
+	return NormalizeMergeEngine(MergeEngine(os.Getenv(MergeEngineEnvironmentVariable)))
+}
+
 type DiagnosticCategory string
 
 const (
@@ -2670,6 +2689,7 @@ type NamedConformanceSuiteReport struct {
 type ConformanceFamilyPlanContext struct {
 	FamilyProfile  FamilyFeatureProfile           `json:"family_profile"`
 	FeatureProfile *ConformanceFeatureProfileView `json:"feature_profile,omitempty"`
+	MergeEngine    MergeEngine                    `json:"merge_engine,omitempty"`
 }
 
 type NamedConformanceSuitePlan struct {
@@ -2691,6 +2711,7 @@ type ConformanceManifestPlanningOptions struct {
 	Contexts                map[string]ConformanceFamilyPlanContext `json:"contexts,omitempty"`
 	FamilyProfiles          map[string]FamilyFeatureProfile         `json:"family_profiles,omitempty"`
 	RequireExplicitContexts bool                                    `json:"require_explicit_contexts,omitempty"`
+	MergeEngine             MergeEngine                             `json:"merge_engine,omitempty"`
 }
 
 type ConformanceManifestReport struct {
@@ -2864,6 +2885,7 @@ type ConformanceManifestReviewOptions struct {
 	Contexts                map[string]ConformanceFamilyPlanContext `json:"contexts,omitempty"`
 	FamilyProfiles          map[string]FamilyFeatureProfile         `json:"family_profiles,omitempty"`
 	RequireExplicitContexts bool                                    `json:"require_explicit_contexts,omitempty"`
+	MergeEngine             MergeEngine                             `json:"merge_engine,omitempty"`
 	ReviewDecisions         []ReviewDecision                        `json:"review_decisions,omitempty"`
 	ReviewReplayContext     *ReviewReplayContext                    `json:"review_replay_context,omitempty"`
 	ReviewReplayBundle      *ReviewReplayBundle                     `json:"review_replay_bundle,omitempty"`
@@ -2905,6 +2927,7 @@ type ConformanceSuitePlanEntry struct {
 
 type ConformanceSuitePlan struct {
 	Family       string                      `json:"family"`
+	MergeEngine  MergeEngine                 `json:"merge_engine,omitempty"`
 	Entries      []ConformanceSuitePlanEntry `json:"entries"`
 	MissingRoles []string                    `json:"missing_roles"`
 }
@@ -2920,6 +2943,7 @@ type ConformanceCaseRun struct {
 	Requirements   ConformanceCaseRequirements    `json:"requirements"`
 	FamilyProfile  FamilyFeatureProfile           `json:"family_profile"`
 	FeatureProfile *ConformanceFeatureProfileView `json:"feature_profile,omitempty"`
+	MergeEngine    MergeEngine                    `json:"merge_engine,omitempty"`
 }
 
 type ConformanceCaseExecution struct {
@@ -4532,6 +4556,16 @@ func DefaultConformanceFamilyContext(
 	return ConformanceFamilyPlanContext{
 		FamilyProfile: familyProfile,
 	}
+}
+
+func applyPlanningMergeEngine(
+	context ConformanceFamilyPlanContext,
+	options ConformanceManifestPlanningOptions,
+) ConformanceFamilyPlanContext {
+	if context.MergeEngine == "" && options.MergeEngine != "" {
+		context.MergeEngine = NormalizeMergeEngine(options.MergeEngine)
+	}
+	return context
 }
 
 func ReviewRequestIDForFamilyContext(family string) string {
@@ -6514,6 +6548,7 @@ func ResolveConformanceFamilyContext(
 ) (*ConformanceFamilyPlanContext, []Diagnostic) {
 	if options.Contexts != nil {
 		if context, ok := options.Contexts[family]; ok {
+			context = applyPlanningMergeEngine(context, options)
 			return &context, nil
 		}
 	}
@@ -6529,6 +6564,7 @@ func ResolveConformanceFamilyContext(
 	if options.FamilyProfiles != nil {
 		if familyProfile, ok := options.FamilyProfiles[family]; ok {
 			context := DefaultConformanceFamilyContext(familyProfile)
+			context = applyPlanningMergeEngine(context, options)
 			return &context, []Diagnostic{{
 				Severity: SeverityWarning,
 				Category: CategoryAssumedDefault,
@@ -7148,6 +7184,17 @@ func PlanConformanceSuite(
 	familyProfile FamilyFeatureProfile,
 	featureProfile *ConformanceFeatureProfileView,
 ) ConformanceSuitePlan {
+	return PlanConformanceSuiteWithMergeEngine(manifest, family, roles, familyProfile, featureProfile, "")
+}
+
+func PlanConformanceSuiteWithMergeEngine(
+	manifest ConformanceManifest,
+	family string,
+	roles []string,
+	familyProfile FamilyFeatureProfile,
+	featureProfile *ConformanceFeatureProfileView,
+	mergeEngine MergeEngine,
+) ConformanceSuitePlan {
 	entries := make([]ConformanceSuitePlanEntry, 0, len(roles))
 	missingRoles := make([]string, 0)
 
@@ -7178,12 +7225,14 @@ func PlanConformanceSuite(
 				Requirements:   derefRequirements(entry.Requirements),
 				FamilyProfile:  familyProfile,
 				FeatureProfile: featureProfile,
+				MergeEngine:    mergeEngine,
 			},
 		})
 	}
 
 	return ConformanceSuitePlan{
 		Family:       family,
+		MergeEngine:  mergeEngine,
 		Entries:      entries,
 		MissingRoles: missingRoles,
 	}
@@ -7200,12 +7249,13 @@ func PlanNamedConformanceSuite(
 		return nil
 	}
 
-	plan := PlanConformanceSuite(
+	plan := PlanConformanceSuiteWithMergeEngine(
 		manifest,
 		definition.Subject.Grammar,
 		definition.Roles,
 		familyProfile,
 		featureProfile,
+		"",
 	)
 	return &plan
 }
@@ -7215,23 +7265,23 @@ func PlanNamedConformanceSuiteEntry(
 	selector ConformanceSuiteSelector,
 	context ConformanceFamilyPlanContext,
 ) *NamedConformanceSuitePlan {
-	plan := PlanNamedConformanceSuite(
-		manifest,
-		selector,
-		context.FamilyProfile,
-		context.FeatureProfile,
-	)
-	if plan == nil {
-		return nil
-	}
 	definition := ConformanceSuiteDefinitionForSelector(manifest, selector)
 	if definition == nil {
 		return nil
 	}
 
+	plan := PlanConformanceSuiteWithMergeEngine(
+		manifest,
+		definition.Subject.Grammar,
+		definition.Roles,
+		context.FamilyProfile,
+		context.FeatureProfile,
+		context.MergeEngine,
+	)
+
 	return &NamedConformanceSuitePlan{
 		Suite: *definition,
-		Plan:  *plan,
+		Plan:  plan,
 	}
 }
 
