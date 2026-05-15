@@ -661,6 +661,21 @@ type GenericConflictHandlerExecution struct {
 	Diagnostics []string                     `json:"diagnostics"`
 }
 
+type LanguageProfileHandlerRegistration struct {
+	Role               string   `json:"role"`
+	HandlerID          string   `json:"handler_id"`
+	ConflictCategories []string `json:"conflict_categories"`
+	Enabled            bool     `json:"enabled"`
+}
+
+type LanguageProfileHandlerRegistry struct {
+	ProfileID     string                               `json:"profile_id"`
+	Language      string                               `json:"language"`
+	Version       string                               `json:"version"`
+	Registrations []LanguageProfileHandlerRegistration `json:"registrations"`
+	Diagnostics   []string                             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

@@ -510,6 +510,32 @@ func TestSharedFixtureGenericConflictHandlerExecution(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureLanguageProfileHandlerRegistration(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-811-language-profile-handler-registration", "language-profile-handler-registration.json"))
+	registry := decodeFixtureValue[LanguageProfileHandlerRegistry](t, fixture["profile_handlers"])
+	expected := fixture["expected"].(map[string]any)
+	enabledCount := 0
+	roles := make([]string, 0, len(registry.Registrations))
+	duplicateMemberHandler := ""
+	for _, registration := range registry.Registrations {
+		if registration.Enabled {
+			enabledCount++
+		}
+		roles = append(roles, registration.Role)
+		if registration.Role == "duplicate_members" {
+			duplicateMemberHandler = registration.HandlerID
+		}
+	}
+
+	if registry.Language != expected["language"].(string) ||
+		len(registry.Registrations) != int(expected["registration_count"].(float64)) ||
+		enabledCount != int(expected["enabled_count"].(float64)) ||
+		!reflect.DeepEqual(roles, decodeFixtureValue[[]string](t, expected["roles"])) ||
+		duplicateMemberHandler != expected["duplicate_member_handler"].(string) {
+		t.Fatalf("unexpected language profile handler registry: %+v", registry)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
