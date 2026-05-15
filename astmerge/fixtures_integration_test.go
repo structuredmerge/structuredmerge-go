@@ -4739,6 +4739,38 @@ func TestSharedFixtureStructuredEditRequestEnvelopeApplication(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuredEditProfilePromotionEnvelope(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-915-structured-edit-profile-promotion-envelope", "structured-edit-profile-promotion-envelope.json"))
+	request := decodeFixtureValue[StructuredEditRequest](t, fixture["structured_edit_request"])
+	expectedRequestEnvelope := decodeFixtureValue[StructuredEditRequestEnvelope](t, fixture["expected_request_envelope"])
+	expectedRequirement := decodeFixtureValue[ProfileSelectionRequirement](t, fixture["profile_selection_requirement"])
+	report := decodeFixtureValue[StructuredEditExecutionReport](t, fixture["structured_edit_execution_report"])
+	expectedReportEnvelope := decodeFixtureValue[StructuredEditExecutionReportEnvelope](t, fixture["expected_execution_report_envelope"])
+	expected := fixture["expected"].(map[string]any)
+
+	requestEnvelope := StructuredEditRequestEnvelopeFor(request)
+	requestEnvelope.ProfileID = expectedRequestEnvelope.ProfileID
+	requestEnvelope.MinimumProfileStatus = expectedRequestEnvelope.MinimumProfileStatus
+	requestEnvelope.PromotionPolicyID = expectedRequestEnvelope.PromotionPolicyID
+	if !reflect.DeepEqual(requestEnvelope, expectedRequestEnvelope) {
+		t.Fatalf("unexpected profile promotion request envelope: %+v", requestEnvelope)
+	}
+	if requirement := ProfileSelectionRequirementFromRequestEnvelope(requestEnvelope); requirement == nil {
+		t.Fatal("expected profile selection requirement from request envelope")
+	} else if !reflect.DeepEqual(*requirement, expectedRequirement) {
+		t.Fatalf("unexpected profile selection requirement from request envelope: %+v", *requirement)
+	}
+
+	if envelope := StructuredEditExecutionReportEnvelopeFor(report); !reflect.DeepEqual(envelope, expectedReportEnvelope) {
+		t.Fatalf("unexpected profile promotion execution report envelope: %+v", envelope)
+	}
+	if report.ProfileSelectionDecision == nil ||
+		report.ProfileSelectionDecision.RejectionCode != expected["rejection_code"].(string) ||
+		len(report.ProfileBlockingReasons) != int(expected["profile_blocking_reason_count"].(float64)) {
+		t.Fatalf("unexpected profile promotion report rejection fields: %+v", report)
+	}
+}
+
 func TestSharedFixtureStructuredEditExecutionReport(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "structured_edit_execution_report"))
 	for _, rawCase := range fixture["cases"].([]any) {

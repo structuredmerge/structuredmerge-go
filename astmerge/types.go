@@ -2265,17 +2265,24 @@ type StructuredEditApplicationEnvelope struct {
 }
 
 type StructuredEditRequestEnvelope struct {
-	Kind    string                `json:"kind"`
-	Version int                   `json:"version"`
-	Request StructuredEditRequest `json:"request"`
+	Kind                 string                  `json:"kind"`
+	Version              int                     `json:"version"`
+	ProfileID            *string                 `json:"profile_id,omitempty"`
+	MinimumProfileStatus *ProfilePromotionStatus `json:"minimum_profile_status,omitempty"`
+	PromotionPolicyID    *string                 `json:"promotion_policy_id,omitempty"`
+	Request              StructuredEditRequest   `json:"request"`
 }
 
 type StructuredEditExecutionReport struct {
-	Application     StructuredEditApplication `json:"application"`
-	ProviderFamily  string                    `json:"provider_family"`
-	ProviderBackend *string                   `json:"provider_backend,omitempty"`
-	Diagnostics     []Diagnostic              `json:"diagnostics"`
-	Metadata        map[string]any            `json:"metadata,omitempty"`
+	Application                StructuredEditApplication   `json:"application"`
+	ProviderFamily             string                      `json:"provider_family"`
+	ProviderBackend            *string                     `json:"provider_backend,omitempty"`
+	ActiveProfile              *ActiveProfileView          `json:"active_profile,omitempty"`
+	ProfilePromotionEvaluation *ProfilePromotionEvaluation `json:"profile_promotion_evaluation,omitempty"`
+	ProfileSelectionDecision   *ProfileSelectionDecision   `json:"profile_selection_decision,omitempty"`
+	ProfileBlockingReasons     []string                    `json:"profile_blocking_reasons,omitempty"`
+	Diagnostics                []Diagnostic                `json:"diagnostics"`
+	Metadata                   map[string]any              `json:"metadata,omitempty"`
 }
 
 type StructuredEditCrisprExampleParityBackendNote struct {
@@ -5495,6 +5502,32 @@ func StructuredEditRequestEnvelopeFor(
 		Kind:    "structured_edit_request",
 		Version: StructuredEditTransportVersion,
 		Request: request,
+	}
+}
+
+func ProfileSelectionRequirementFromRequestEnvelope(
+	envelope StructuredEditRequestEnvelope,
+) *ProfileSelectionRequirement {
+	if envelope.ProfileID == nil && envelope.MinimumProfileStatus == nil && envelope.PromotionPolicyID == nil {
+		return nil
+	}
+	profileID := ""
+	if envelope.ProfileID != nil {
+		profileID = *envelope.ProfileID
+	}
+	promotionPolicyID := ""
+	if envelope.PromotionPolicyID != nil {
+		promotionPolicyID = *envelope.PromotionPolicyID
+	}
+	minimumStatus := ProfilePromotionAvailable
+	if envelope.MinimumProfileStatus != nil {
+		minimumStatus = *envelope.MinimumProfileStatus
+	}
+	return &ProfileSelectionRequirement{
+		ProfileID:            profileID,
+		PromotionPolicyID:    promotionPolicyID,
+		MinimumProfileStatus: minimumStatus,
+		EnforcementMode:      ProfileSelectionRequired,
 	}
 }
 
