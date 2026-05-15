@@ -32,6 +32,33 @@ type Limit struct {
 	constraints []limitConstraint
 }
 
+type MatchProfile struct {
+	StartBoundary string
+	EndBoundary   string
+	PayloadKind   string
+}
+
+type profileDescriptor struct {
+	family      string
+	description string
+}
+
+var knownStartBoundaries = map[string]profileDescriptor{
+	"owner_start":          {family: "structural_owner", description: "Span starts at the structural owner's boundary"},
+	"comment_region_start": {family: "comment_anchor", description: "Span starts at an owning comment-region boundary"},
+}
+
+var knownEndBoundaries = map[string]profileDescriptor{
+	"owner_end":                   {family: "structural_owner", description: "Span ends at the structural owner's boundary"},
+	"owner_end_plus_trailing_gap": {family: "gap_extension", description: "Span extends past the owner boundary to include trailing blank-line gap"},
+}
+
+var knownPayloadKinds = map[string]profileDescriptor{
+	"structural_owner_body": {family: "owner_body", description: "Span represents a structural owner's body"},
+	"comment_owned_body":    {family: "comment_owned", description: "Span represents a structural owner body selected through an owning comment marker"},
+	"section_branch":        {family: "section_branch", description: "Span represents a heading-owned section branch payload"},
+}
+
 func NewLimit(spec any) (Limit, error) {
 	if spec == nil {
 		spec = map[string]any{"exactly": float64(1)}
@@ -41,6 +68,50 @@ func NewLimit(spec any) (Limit, error) {
 		return Limit{}, err
 	}
 	return Limit{constraints: constraints}, nil
+}
+
+func NewMatchProfile(startBoundary, endBoundary, payloadKind string) MatchProfile {
+	if startBoundary == "" {
+		startBoundary = "owner_start"
+	}
+	if endBoundary == "" {
+		endBoundary = "owner_end"
+	}
+	if payloadKind == "" {
+		payloadKind = "structural_owner_body"
+	}
+	return MatchProfile{StartBoundary: startBoundary, EndBoundary: endBoundary, PayloadKind: payloadKind}
+}
+
+func (profile MatchProfile) Report() map[string]any {
+	startDescriptor, knownStart := knownStartBoundaries[profile.StartBoundary]
+	endDescriptor, knownEnd := knownEndBoundaries[profile.EndBoundary]
+	payloadDescriptor, knownPayload := knownPayloadKinds[profile.PayloadKind]
+	startFamily := startDescriptor.family
+	if startFamily == "" {
+		startFamily = "unknown"
+	}
+	endFamily := endDescriptor.family
+	if endFamily == "" {
+		endFamily = "unknown"
+	}
+	payloadFamily := payloadDescriptor.family
+	if payloadFamily == "" {
+		payloadFamily = "unknown"
+	}
+	return map[string]any{
+		"start_boundary":        profile.StartBoundary,
+		"start_boundary_family": startFamily,
+		"known_start_boundary":  knownStart,
+		"end_boundary":          profile.EndBoundary,
+		"end_boundary_family":   endFamily,
+		"known_end_boundary":    knownEnd,
+		"payload_kind":          profile.PayloadKind,
+		"payload_family":        payloadFamily,
+		"known_payload_kind":    knownPayload,
+		"comment_anchored":      startFamily == "comment_anchor" || payloadFamily == "comment_owned",
+		"trailing_gap_extended": endFamily == "gap_extension",
+	}
 }
 
 func (limit Limit) Allows(count int) bool {
@@ -223,9 +294,9 @@ func BoundaryReport() map[string]any {
 			"boundary report",
 			"ast-merge structured-edit contract anchor",
 			"limit helpers",
+			"match profile helpers",
 		},
 		"future_exports": []any{
-			"match profile helpers",
 			"selection profile helpers",
 			"destination profile helpers",
 			"operation profile helpers",

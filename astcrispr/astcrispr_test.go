@@ -85,3 +85,35 @@ func TestLimitHelpersFixture(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchProfileHelpersFixture(t *testing.T) {
+	fixturePath := filepath.Join(
+		"..",
+		"..",
+		"fixtures",
+		"diagnostics",
+		"slice-918-ast-crispr-match-profile-helpers",
+		"ast-crispr-match-profile-helpers.json",
+	)
+	source, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rawProfile := testCase["profile"].(map[string]any)
+		profile := NewMatchProfile(
+			rawProfile["start_boundary"].(string),
+			rawProfile["end_boundary"].(string),
+			rawProfile["payload_kind"].(string),
+		)
+		if !reflect.DeepEqual(profile.Report(), testCase["expected"]) {
+			t.Fatalf("unexpected match profile report for %s: %+v", testCase["name"], profile.Report())
+		}
+	}
+}
