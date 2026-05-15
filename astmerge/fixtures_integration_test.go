@@ -287,6 +287,23 @@ func TestSharedFixtureSignatureMatchingCommutativeParent(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSourceTextNormalizedLeafMatching(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-799-source-text-normalized-leaf-matching", "source-text-normalized-leaf-matching.json"))
+	report := decodeFixtureValue[SourceTextNormalizedMatchingReport](t, fixture["matching"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Strategy != expected["strategy"].(string) ||
+		!reflect.DeepEqual(report.Normalization, decodeFixtureValue[[]string](t, expected["normalization"])) ||
+		!reflect.DeepEqual(report.LeafKinds, decodeFixtureValue[[]string](t, expected["leaf_kinds"])) ||
+		len(report.Matches) != int(expected["match_count"].(float64)) ||
+		len(report.UnmatchedFrom) != int(expected["unmatched_from_count"].(float64)) ||
+		len(report.UnmatchedTo) != int(expected["unmatched_to_count"].(float64)) ||
+		report.Matches[0].NormalizedText != expected["first_match_normalized_text"].(string) ||
+		report.Matches[0].Confidence < expected["minimum_confidence"].(float64) {
+		t.Fatalf("unexpected source-text normalized matching report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

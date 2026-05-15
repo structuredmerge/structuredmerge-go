@@ -363,6 +363,31 @@ type SignatureMatchingReport struct {
 	Diagnostics         []string             `json:"diagnostics"`
 }
 
+type SourceTextNormalizedMatch struct {
+	NormalizedText string   `json:"normalized_text"`
+	FromPath       string   `json:"from_path"`
+	ToPath         string   `json:"to_path"`
+	FromNodeID     string   `json:"from_node_id"`
+	ToNodeID       string   `json:"to_node_id"`
+	FromSourceText string   `json:"from_source_text"`
+	ToSourceText   string   `json:"to_source_text"`
+	Confidence     float64  `json:"confidence"`
+	Diagnostics    []string `json:"diagnostics"`
+}
+
+type SourceTextNormalizedMatchingReport struct {
+	MatchingID    string                      `json:"matching_id"`
+	Strategy      string                      `json:"strategy"`
+	FromRevision  string                      `json:"from_revision"`
+	ToRevision    string                      `json:"to_revision"`
+	Normalization []string                    `json:"normalization"`
+	LeafKinds     []string                    `json:"leaf_kinds"`
+	Matches       []SourceTextNormalizedMatch `json:"matches"`
+	UnmatchedFrom []string                    `json:"unmatched_from"`
+	UnmatchedTo   []string                    `json:"unmatched_to"`
+	Diagnostics   []string                    `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
