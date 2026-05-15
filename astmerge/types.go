@@ -1266,6 +1266,79 @@ type FamilyFeatureProfile struct {
 	SupportedPolicies []PolicyReference `json:"supported_policies"`
 }
 
+type ParserIdentity struct {
+	Parser          string `json:"parser"`
+	Backend         string `json:"backend"`
+	BackendFamily   string `json:"backend_family"`
+	ParserVersion   string `json:"parser_version"`
+	LanguageVersion string `json:"language_version"`
+}
+
+type GitAttributeProfile struct {
+	AttributeNamespace          string   `json:"attribute_namespace"`
+	LanguageAttributes          []string `json:"language_attributes"`
+	Language                    string   `json:"language"`
+	MergeDriver                 string   `json:"merge_driver"`
+	DiffDriver                  string   `json:"diff_driver"`
+	ConflictMarkerSizeAttribute string   `json:"conflict_marker_size_attribute"`
+}
+
+type BackendProfile struct {
+	Backend      string   `json:"backend"`
+	Family       string   `json:"family"`
+	Default      bool     `json:"default"`
+	Capabilities []string `json:"capabilities"`
+}
+
+type AtomicNodeRule struct {
+	Selector string `json:"selector"`
+	Reason   string `json:"reason"`
+}
+
+type SignatureDefinition struct {
+	Name      string `json:"name"`
+	Selector  string `json:"selector"`
+	Extractor string `json:"extractor"`
+}
+
+type CommutativeParentDefinition struct {
+	Selector   string `json:"selector"`
+	ChildGroup string `json:"child_group"`
+}
+
+type ChildGroupDefinition struct {
+	Name      string  `json:"name"`
+	Separator string  `json:"separator"`
+	Delimiter *string `json:"delimiter"`
+}
+
+type CommentAttachmentRule struct {
+	Selector string `json:"selector"`
+	Strategy string `json:"strategy"`
+}
+
+type LanguageBackendProfileRules struct {
+	NodeRoles          []string                      `json:"node_roles"`
+	AtomicNodes        []AtomicNodeRule              `json:"atomic_nodes"`
+	Signatures         []SignatureDefinition         `json:"signatures"`
+	CommutativeParents []CommutativeParentDefinition `json:"commutative_parents"`
+	ChildGroups        []ChildGroupDefinition        `json:"child_groups"`
+	CommentAttachment  []CommentAttachmentRule       `json:"comment_attachment"`
+}
+
+type LanguageBackendProfile struct {
+	ProfileID         string                      `json:"profile_id"`
+	Family            string                      `json:"family"`
+	Version           string                      `json:"version"`
+	ParserIdentity    ParserIdentity              `json:"parser_identity"`
+	Extensions        []string                    `json:"extensions"`
+	Aliases           []string                    `json:"aliases"`
+	GitAttributes     GitAttributeProfile         `json:"git_attributes"`
+	SupportedDialects []string                    `json:"supported_dialects"`
+	Backends          []BackendProfile            `json:"backends"`
+	Rules             LanguageBackendProfileRules `json:"rules"`
+}
+
 type CompactRulesetDirective struct {
 	Name      string   `json:"name"`
 	Arguments []string `json:"arguments"`

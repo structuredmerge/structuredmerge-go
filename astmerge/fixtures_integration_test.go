@@ -1200,6 +1200,21 @@ func TestSharedFixtureFamilyFeatureProfile(t *testing.T) {
 	assertExpectedPolicies(t, profile.SupportedPolicies, expected["supported_policies"].([]any))
 }
 
+func TestSharedFixtureLanguageBackendProfileSchema(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-908-language-backend-profile-schema", "language-backend-profile-schema.json"))
+
+	profile := decodeFixtureValue[LanguageBackendProfile](t, fixture["profile"])
+	expected := fixture["expected"].(map[string]any)
+	if profile.ProfileID != expected["profile_id"].(string) ||
+		profile.Family != expected["family"].(string) ||
+		profile.Backends[0].Backend != expected["default_backend"].(string) ||
+		profile.GitAttributes.LanguageAttributes[0] != expected["primary_language_attribute"].(string) ||
+		profile.Rules.Signatures[0].Name != expected["first_signature"].(string) ||
+		profile.Rules.CommutativeParents[0].Selector != expected["first_commutative_parent"].(string) {
+		t.Fatalf("unexpected language backend profile: %+v", profile)
+	}
+}
+
 func TestTemplateTokenKeysFixture(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, diagnosticsFixturePath(t, "template_token_keys"))
 
