@@ -536,6 +536,23 @@ func TestSharedFixtureLanguageProfileHandlerRegistration(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFallbackUsageMachineOutput(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-812-fallback-usage-machine-output", "fallback-usage-machine-output.json"))
+	report := decodeFixtureValue[FallbackUsageReport](t, fixture["fallback_usage"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Mode != expected["mode"].(string) ||
+		report.QuietByDefault != expected["quiet_by_default"].(bool) ||
+		report.MachineOutput.Summary.FallbackCount != int(expected["fallback_count"].(float64)) ||
+		report.MachineOutput.Summary.ConflictCount != int(expected["conflict_count"].(float64)) ||
+		report.GitDriverOutput.Stdout != expected["stdout"].(string) ||
+		report.GitDriverOutput.Stderr != expected["stderr"].(string) ||
+		report.GitDriverOutput.ExitCode != int(expected["exit_code"].(float64)) ||
+		report.MachineOutput.Fallbacks[0].Scope != expected["first_fallback_scope"].(string) {
+		t.Fatalf("unexpected fallback usage report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

@@ -676,6 +676,41 @@ type LanguageProfileHandlerRegistry struct {
 	Diagnostics   []string                             `json:"diagnostics"`
 }
 
+type FallbackUsageEntry struct {
+	FallbackID       string `json:"fallback_id"`
+	Strategy         string `json:"strategy"`
+	Scope            string `json:"scope"`
+	Path             string `json:"path"`
+	ConflictCategory string `json:"conflict_category"`
+}
+
+type FallbackUsageSummary struct {
+	FallbackCount int `json:"fallback_count"`
+	ConflictCount int `json:"conflict_count"`
+	ResolvedCount int `json:"resolved_count"`
+}
+
+type FallbackUsageMachineOutput struct {
+	Fallbacks []FallbackUsageEntry `json:"fallbacks"`
+	Summary   FallbackUsageSummary `json:"summary"`
+}
+
+type GitDriverOutput struct {
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exit_code"`
+}
+
+type FallbackUsageReport struct {
+	ReportID        string                     `json:"report_id"`
+	Version         string                     `json:"version"`
+	Mode            string                     `json:"mode"`
+	QuietByDefault  bool                       `json:"quiet_by_default"`
+	MachineOutput   FallbackUsageMachineOutput `json:"machine_output"`
+	GitDriverOutput GitDriverOutput            `json:"git_driver_output"`
+	Diagnostics     []string                   `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
