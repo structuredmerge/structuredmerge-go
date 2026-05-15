@@ -464,6 +464,25 @@ func TestSharedFixtureConflictMarkerRendering(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureTypedConflictHandlerExtensionPoints(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-809-typed-conflict-handler-extension-points", "typed-conflict-handler-extension-points.json"))
+	report := decodeFixtureValue[ConflictHandlerRegistryReport](t, fixture["handlers"])
+	expected := fixture["expected"].(map[string]any)
+	enabledCount := 0
+	for _, handler := range report.Handlers {
+		if handler.Enabled {
+			enabledCount++
+		}
+	}
+
+	if len(report.Handlers) != int(expected["handler_count"].(float64)) ||
+		enabledCount != int(expected["enabled_count"].(float64)) ||
+		report.Handlers[0].ConflictCategory != expected["first_handler_category"].(string) ||
+		report.Handlers[1].FallbackScope != expected["second_handler_scope"].(string) {
+		t.Fatalf("unexpected conflict handler registry report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

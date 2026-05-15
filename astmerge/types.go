@@ -606,6 +606,22 @@ type ConflictMarkerRenderingReport struct {
 	Diagnostics []string `json:"diagnostics"`
 }
 
+type ConflictHandlerRegistration struct {
+	HandlerID        string   `json:"handler_id"`
+	ConflictCategory string   `json:"conflict_category"`
+	FallbackScope    string   `json:"fallback_scope"`
+	NodeRoles        []string `json:"node_roles"`
+	Capability       string   `json:"capability"`
+	Enabled          bool     `json:"enabled"`
+}
+
+type ConflictHandlerRegistryReport struct {
+	RegistryID  string                        `json:"registry_id"`
+	Version     string                        `json:"version"`
+	Handlers    []ConflictHandlerRegistration `json:"handlers"`
+	Diagnostics []string                      `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
