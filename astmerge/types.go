@@ -1247,6 +1247,48 @@ type ProfileDebugOutput struct {
 	Diagnostics   []string          `json:"diagnostics"`
 }
 
+type ProfilePromotionStatus string
+
+const (
+	ProfilePromotionExperimental ProfilePromotionStatus = "experimental"
+	ProfilePromotionAvailable    ProfilePromotionStatus = "available"
+	ProfilePromotionRecommended  ProfilePromotionStatus = "recommended"
+	ProfilePromotionDefault      ProfilePromotionStatus = "default"
+	ProfilePromotionDisabled     ProfilePromotionStatus = "disabled"
+)
+
+type ProfilePromotionHardGate struct {
+	Name        string   `json:"name"`
+	Passed      bool     `json:"passed"`
+	Required    bool     `json:"required"`
+	Diagnostics []string `json:"diagnostics"`
+}
+
+type ProfilePromotionMetrics struct {
+	RequiredFixtureCount        int     `json:"required_fixture_count"`
+	PassedFixtureCount          int     `json:"passed_fixture_count"`
+	FormattingPreservationScore float64 `json:"formatting_preservation_score"`
+	FormattingThreshold         float64 `json:"formatting_threshold"`
+	FallbackCount               int     `json:"fallback_count"`
+	FallbackThreshold           int     `json:"fallback_threshold"`
+	UnresolvedConflictCount     int     `json:"unresolved_conflict_count"`
+	BackendParityPassed         bool    `json:"backend_parity_passed"`
+}
+
+type ProfilePromotionReport struct {
+	ReportID        string                     `json:"report_id"`
+	Version         string                     `json:"version"`
+	ProfileID       string                     `json:"profile_id"`
+	Backend         string                     `json:"backend"`
+	Status          ProfilePromotionStatus     `json:"status"`
+	ActiveProfile   *ActiveProfileView         `json:"active_profile,omitempty"`
+	HardGates       []ProfilePromotionHardGate `json:"hard_gates"`
+	Metrics         ProfilePromotionMetrics    `json:"metrics"`
+	RequiredSuites  []string                   `json:"required_suites"`
+	BlockingReasons []string                   `json:"blocking_reasons"`
+	Diagnostics     []string                   `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

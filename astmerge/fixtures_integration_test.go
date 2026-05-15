@@ -1266,6 +1266,28 @@ func TestSharedFixtureActiveProfileReporting(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProfilePromotionReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-911-profile-promotion-report", "profile-promotion-report.json"))
+	expected := fixture["expected"].(map[string]any)
+
+	report := decodeFixtureValue[ProfilePromotionReport](t, fixture["report"])
+	if report.ProfileID != expected["profile_id"].(string) ||
+		report.Status != ProfilePromotionStatus(expected["recommended_status"].(string)) ||
+		len(report.HardGates) != int(expected["hard_gate_count"].(float64)) ||
+		report.Metrics.RequiredFixtureCount != int(expected["required_fixture_count"].(float64)) ||
+		report.Metrics.FormattingThreshold != expected["formatting_threshold"].(float64) ||
+		report.ActiveProfile == nil ||
+		report.ActiveProfile.ProfileID != expected["profile_id"].(string) {
+		t.Fatalf("unexpected profile promotion report: %+v", report)
+	}
+
+	blocked := decodeFixtureValue[ProfilePromotionReport](t, fixture["blocked_report"])
+	if blocked.Status != ProfilePromotionStatus(expected["blocked_status"].(string)) ||
+		len(blocked.BlockingReasons) != int(expected["blocking_reason_count"].(float64)) {
+		t.Fatalf("unexpected blocked profile promotion report: %+v", blocked)
+	}
+}
+
 func validationMessages(diagnostics []ProfileValidationDiagnostic) []string {
 	messages := make([]string, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {
