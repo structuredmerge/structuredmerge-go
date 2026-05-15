@@ -1331,6 +1331,71 @@ type ProfilePromotionPolicy struct {
 	Diagnostics     []string                      `json:"diagnostics"`
 }
 
+type ProfilePromotionEvaluation struct {
+	ProfileID       string                 `json:"profile_id"`
+	Status          ProfilePromotionStatus `json:"status"`
+	BlockingReasons []string               `json:"blocking_reasons"`
+	Diagnostics     []string               `json:"diagnostics"`
+}
+
+func EvaluateProfilePromotion(policy ProfilePromotionPolicy, report ProfilePromotionReport) ProfilePromotionEvaluation {
+	entry, ok := findPromotionPolicyEntry(policy, report.ProfileID)
+	if !ok {
+		return ProfilePromotionEvaluation{
+			ProfileID:       report.ProfileID,
+			Status:          ProfilePromotionExperimental,
+			BlockingReasons: []string{"profile has no promotion policy"},
+			Diagnostics:     []string{},
+		}
+	}
+
+	blockingReasons := profilePromotionBlockingReasons(entry, report)
+	status := ProfilePromotionAvailable
+	if len(blockingReasons) == 0 && slices.Contains(entry.EligibleStatuses, ProfilePromotionRecommended) {
+		status = ProfilePromotionRecommended
+	}
+	return ProfilePromotionEvaluation{
+		ProfileID:       report.ProfileID,
+		Status:          status,
+		BlockingReasons: blockingReasons,
+		Diagnostics:     []string{},
+	}
+}
+
+func findPromotionPolicyEntry(policy ProfilePromotionPolicy, profileID string) (ProfilePromotionPolicyEntry, bool) {
+	for _, entry := range policy.Profiles {
+		if entry.ProfileID == profileID {
+			return entry, true
+		}
+	}
+	return ProfilePromotionPolicyEntry{}, false
+}
+
+func profilePromotionBlockingReasons(entry ProfilePromotionPolicyEntry, report ProfilePromotionReport) []string {
+	reasons := []string{}
+	for _, gate := range report.HardGates {
+		if gate.Required && !gate.Passed {
+			reasons = append(reasons, "required hard gate "+gate.Name+" failed")
+		}
+	}
+	if report.Metrics.PassedFixtureCount < entry.RecommendationGate.RequiredFixtureCount {
+		reasons = append(reasons, "passed fixture count is below required fixture count")
+	}
+	if report.Metrics.FormattingPreservationScore < entry.RecommendationGate.FormattingThreshold {
+		reasons = append(reasons, "formatting preservation score is below threshold")
+	}
+	if report.Metrics.FallbackCount > entry.RecommendationGate.FallbackThreshold {
+		reasons = append(reasons, "fallback count exceeds threshold")
+	}
+	if report.Metrics.UnresolvedConflictCount > entry.RecommendationGate.UnresolvedConflictThreshold {
+		reasons = append(reasons, "unresolved conflict count exceeds threshold")
+	}
+	if entry.RecommendationGate.RequiresBackendParity && !report.Metrics.BackendParityPassed {
+		reasons = append(reasons, "backend parity did not pass")
+	}
+	return reasons
+}
+
 type PolicySurface string
 
 const (

@@ -1332,6 +1332,34 @@ func TestSharedFixtureProfilePromotionPolicy(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProfilePromotionEvaluation(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-913-profile-promotion-evaluation", "profile-promotion-evaluation.json"))
+	policy := decodeFixtureValue[ProfilePromotionPolicy](t, fixture["policy"])
+	recommendedReport := decodeFixtureValue[ProfilePromotionReport](t, fixture["recommended_report"])
+	blockedReport := decodeFixtureValue[ProfilePromotionReport](t, fixture["blocked_report"])
+	expected := fixture["expected"].(map[string]any)
+
+	recommended := EvaluateProfilePromotion(policy, recommendedReport)
+	if recommended.Status != ProfilePromotionStatus(expected["recommended_status"].(string)) ||
+		len(recommended.BlockingReasons) != int(expected["recommended_blocking_reason_count"].(float64)) {
+		t.Fatalf("unexpected recommended promotion evaluation: %+v", recommended)
+	}
+
+	blocked := EvaluateProfilePromotion(policy, blockedReport)
+	if blocked.Status != ProfilePromotionStatus(expected["blocked_status"].(string)) ||
+		len(blocked.BlockingReasons) != int(expected["blocked_blocking_reason_count"].(float64)) ||
+		blocked.BlockingReasons[0] != expected["first_blocking_reason"].(string) {
+		t.Fatalf("unexpected blocked promotion evaluation: %+v", blocked)
+	}
+
+	unknownReport := recommendedReport
+	unknownReport.ProfileID = "unknown.profile"
+	unknown := EvaluateProfilePromotion(policy, unknownReport)
+	if unknown.Status != ProfilePromotionStatus(expected["unknown_profile_status"].(string)) {
+		t.Fatalf("unexpected unknown profile promotion evaluation: %+v", unknown)
+	}
+}
+
 func validationMessages(diagnostics []ProfileValidationDiagnostic) []string {
 	messages := make([]string, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {
