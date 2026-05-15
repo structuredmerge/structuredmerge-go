@@ -504,6 +504,43 @@ type TieBreakMatchingReport struct {
 	Diagnostics   []string        `json:"diagnostics"`
 }
 
+type MatchingDebugOwnerSet struct {
+	OwnerID   string   `json:"owner_id"`
+	ScopePath string   `json:"scope_path"`
+	NodePaths []string `json:"node_paths"`
+}
+
+type MatchingDebugCandidate struct {
+	CandidateID string  `json:"candidate_id"`
+	Signature   string  `json:"signature"`
+	FromPath    string  `json:"from_path"`
+	ToPath      string  `json:"to_path"`
+	Confidence  float64 `json:"confidence"`
+	Reason      string  `json:"reason"`
+}
+
+type MatchingDebugSelectedMatch struct {
+	CandidateID string `json:"candidate_id"`
+	SelectedBy  string `json:"selected_by"`
+}
+
+type MatchingDebugRejectedMatch struct {
+	CandidateID string `json:"candidate_id"`
+	RejectedBy  string `json:"rejected_by"`
+	Reason      string `json:"reason"`
+}
+
+type MatchingDebugArtifacts struct {
+	ArtifactID      string                       `json:"artifact_id"`
+	MatchingID      string                       `json:"matching_id"`
+	Enabled         bool                         `json:"enabled"`
+	OwnerSets       []MatchingDebugOwnerSet      `json:"owner_sets"`
+	Candidates      []MatchingDebugCandidate     `json:"candidates"`
+	SelectedMatches []MatchingDebugSelectedMatch `json:"selected_matches"`
+	RejectedMatches []MatchingDebugRejectedMatch `json:"rejected_matches"`
+	Diagnostics     []string                     `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

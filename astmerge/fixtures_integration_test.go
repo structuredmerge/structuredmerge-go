@@ -383,6 +383,21 @@ func TestSharedFixtureDuplicateSignatureTieBreak(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMatchingDebugArtifacts(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-804-matching-debug-artifacts", "matching-debug-artifacts.json"))
+	artifacts := decodeFixtureValue[MatchingDebugArtifacts](t, fixture["debug_artifacts"])
+	expected := fixture["expected"].(map[string]any)
+
+	if artifacts.Enabled != expected["enabled"].(bool) ||
+		len(artifacts.OwnerSets) != int(expected["owner_set_count"].(float64)) ||
+		len(artifacts.Candidates) != int(expected["candidate_count"].(float64)) ||
+		len(artifacts.SelectedMatches) != int(expected["selected_count"].(float64)) ||
+		len(artifacts.RejectedMatches) != int(expected["rejected_count"].(float64)) ||
+		artifacts.RejectedMatches[0].Reason != expected["first_rejection_reason"].(string) {
+		t.Fatalf("unexpected matching debug artifacts: %+v", artifacts)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
