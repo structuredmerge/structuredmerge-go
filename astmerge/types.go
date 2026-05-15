@@ -304,6 +304,14 @@ type InconsistencyReport struct {
 	Diagnostics     []string             `json:"diagnostics"`
 }
 
+type MergeIREvaluationReport struct {
+	MergeEngine         MergeEngine         `json:"merge_engine"`
+	RawMerge            RawMerge            `json:"raw_merge"`
+	InconsistencyReport InconsistencyReport `json:"inconsistency_report"`
+	Outcome             string              `json:"outcome"`
+	Diagnostics         []string            `json:"diagnostics"`
+}
+
 type MergeIRComparisonCase struct {
 	CaseID           string   `json:"case_id"`
 	Family           string   `json:"family"`
@@ -312,6 +320,150 @@ type MergeIRComparisonCase struct {
 	MergeIROutcome   string   `json:"merge_ir_outcome"`
 	MergeIRAdvantage string   `json:"merge_ir_advantage"`
 	Diagnostics      []string `json:"diagnostics"`
+}
+
+func RawMergeChangeSets(rawMergeID string, changeSets []ChangeSet) RawMerge {
+	inputIDs := make([]string, 0, len(changeSets))
+	changes := make([]RawMergeChange, 0)
+	for _, changeSet := range changeSets {
+		inputIDs = append(inputIDs, changeSet.ChangeSetID)
+		for _, change := range changeSet.Changes {
+			changes = append(changes, RawMergeChange{
+				ChangeID:           change.ChangeID,
+				SourceChangeSetID:  changeSet.ChangeSetID,
+				Side:               changeSet.Side,
+				Kind:               change.Kind,
+				ClassID:            change.ClassID,
+				ParentClassID:      change.ParentClassID,
+				PredecessorClassID: change.PredecessorClassID,
+				SuccessorClassID:   change.SuccessorClassID,
+				ContentHash:        change.ContentHash,
+			})
+		}
+	}
+	return RawMerge{
+		RawMergeID:        rawMergeID,
+		InputChangeSetIDs: inputIDs,
+		Changes:           changes,
+		Diagnostics:       []string{"raw merge intentionally preserves both sides before inconsistency detection"},
+	}
+}
+
+func DetectRawMergeInconsistencies(reportID string, rawMerge RawMerge) InconsistencyReport {
+	changesByClass := map[string][]RawMergeChange{}
+	for _, change := range rawMerge.Changes {
+		changesByClass[change.ClassID] = append(changesByClass[change.ClassID], change)
+	}
+
+	inconsistencies := []MergeInconsistency{}
+	for _, change := range rawMerge.Changes {
+		if change.Kind == "move" {
+			inconsistencies = append(inconsistencies, MergeInconsistency{
+				InconsistencyID: "order-" + change.ClassID,
+				Category:        "order_conflict",
+				Severity:        "warning",
+				ClassIDs:        []string{change.ClassID},
+				ChangeIDs:       []string{change.ChangeID},
+				Message:         "branch changes predecessor/successor ordering relation",
+			})
+		}
+	}
+
+	classIDs := make([]string, 0, len(changesByClass))
+	for classID := range changesByClass {
+		classIDs = append(classIDs, classID)
+	}
+	slices.Sort(classIDs)
+
+	changeIDsByClassAndKind := map[string]map[string][]string{}
+	contentHashesByClassAndKind := map[string]map[string]map[string]bool{}
+	for _, classID := range classIDs {
+		classChanges := changesByClass[classID]
+		changeIDsByKind := map[string][]string{}
+		contentHashesByKind := map[string]map[string]bool{}
+		for _, change := range classChanges {
+			changeIDsByKind[change.Kind] = append(changeIDsByKind[change.Kind], change.ChangeID)
+			if contentHashesByKind[change.Kind] == nil {
+				contentHashesByKind[change.Kind] = map[string]bool{}
+			}
+			contentHashesByKind[change.Kind][change.ContentHash] = true
+		}
+		changeIDsByClassAndKind[classID] = changeIDsByKind
+		contentHashesByClassAndKind[classID] = contentHashesByKind
+	}
+
+	for _, classID := range classIDs {
+		changeIDsByKind := changeIDsByClassAndKind[classID]
+		contentHashesByKind := contentHashesByClassAndKind[classID]
+		if len(changeIDsByKind["insert"]) > 1 && len(contentHashesByKind["insert"]) > 1 {
+			inconsistencies = append(inconsistencies, MergeInconsistency{
+				InconsistencyID: "duplicate-" + classID,
+				Category:        "duplicate_insertion_conflict",
+				Severity:        "error",
+				ClassIDs:        []string{classID},
+				ChangeIDs:       changeIDsByKind["insert"],
+				Message:         "branches insert the same class with incompatible content hashes",
+			})
+		}
+	}
+	for _, classID := range classIDs {
+		changeIDsByKind := changeIDsByClassAndKind[classID]
+		if len(changeIDsByKind["delete"]) > 0 && len(changeIDsByKind["content_change"]) > 0 {
+			changeIDs := append(slices.Clone(changeIDsByKind["content_change"]), changeIDsByKind["delete"]...)
+			inconsistencies = append(inconsistencies, MergeInconsistency{
+				InconsistencyID: "delete-edit-" + classID,
+				Category:        "delete_edit_conflict",
+				Severity:        "error",
+				ClassIDs:        []string{classID},
+				ChangeIDs:       changeIDs,
+				Message:         "one branch edits a class that another branch deletes",
+			})
+		}
+	}
+	for _, classID := range classIDs {
+		changeIDsByKind := changeIDsByClassAndKind[classID]
+		contentHashesByKind := contentHashesByClassAndKind[classID]
+		if len(changeIDsByKind["content_change"]) > 1 && len(contentHashesByKind["content_change"]) > 1 {
+			inconsistencies = append(inconsistencies, MergeInconsistency{
+				InconsistencyID: "content-" + classID,
+				Category:        "content_conflict",
+				Severity:        "error",
+				ClassIDs:        []string{classID},
+				ChangeIDs:       changeIDsByKind["content_change"],
+				Message:         "branches change class content differently",
+			})
+		}
+	}
+
+	return InconsistencyReport{
+		ReportID:        reportID,
+		RawMergeID:      rawMerge.RawMergeID,
+		Inconsistencies: inconsistencies,
+		Diagnostics:     []string{"inconsistency detection classifies raw merge candidates before any conflict rendering"},
+	}
+}
+
+func EvaluateMergeIRChangeSets(engine MergeEngine, rawMergeID string, reportID string, changeSets []ChangeSet) MergeIREvaluationReport {
+	engine = NormalizeMergeEngine(engine)
+	rawMerge := RawMergeChangeSets(rawMergeID, changeSets)
+	report := DetectRawMergeInconsistencies(reportID, rawMerge)
+	blocking := 0
+	for _, inconsistency := range report.Inconsistencies {
+		if inconsistency.Severity == "error" {
+			blocking++
+		}
+	}
+	outcome := "clean"
+	if blocking > 0 {
+		outcome = "blocked_by_inconsistency"
+	}
+	return MergeIREvaluationReport{
+		MergeEngine:         engine,
+		RawMerge:            rawMerge,
+		InconsistencyReport: report,
+		Outcome:             outcome,
+		Diagnostics:         []string{"merge_ir_experimental evaluates PCS-style change sets behind the opt-in engine flag"},
+	}
 }
 
 type MergeIRComparisonSummary struct {

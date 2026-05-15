@@ -283,6 +283,37 @@ func TestSharedFixtureInconsistencyDetection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMergeIRExperimentalEvaluation(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-907-merge-ir-experimental-evaluation", "merge-ir-experimental-evaluation.json"))
+	request := fixture["request"].(map[string]any)
+	expected := fixture["expected"].(map[string]any)
+	changeSets := decodeFixtureValue[[]ChangeSet](t, request["change_sets"])
+
+	report := EvaluateMergeIRChangeSets(
+		MergeEngine(request["merge_engine"].(string)),
+		request["raw_merge_id"].(string),
+		request["report_id"].(string),
+		changeSets,
+	)
+	categories := make([]string, 0, len(report.InconsistencyReport.Inconsistencies))
+	blockingCount := 0
+	for _, inconsistency := range report.InconsistencyReport.Inconsistencies {
+		categories = append(categories, inconsistency.Category)
+		if inconsistency.Severity == "error" {
+			blockingCount++
+		}
+	}
+
+	if report.MergeEngine != MergeEngine(expected["merge_engine"].(string)) ||
+		len(report.RawMerge.Changes) != int(expected["raw_change_count"].(float64)) ||
+		len(report.RawMerge.InputChangeSetIDs) != int(expected["input_change_set_count"].(float64)) ||
+		!reflect.DeepEqual(categories, decodeFixtureValue[[]string](t, expected["categories"])) ||
+		blockingCount != int(expected["blocking_count"].(float64)) ||
+		report.Outcome != expected["outcome"].(string) {
+		t.Fatalf("unexpected merge IR experimental evaluation: %+v", report)
+	}
+}
+
 func TestSharedFixtureMergeIRComparison(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-796-merge-ir-comparison", "merge-ir-comparison.json"))
 	report := decodeFixtureValue[MergeIRComparisonReport](t, fixture["comparison"])
