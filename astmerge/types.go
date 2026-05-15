@@ -874,6 +874,16 @@ type NativeProviderProvingGroundReport struct {
 	Diagnostics []string `json:"diagnostics"`
 }
 
+type GoDSTProviderStackReport struct {
+	ProviderID    string   `json:"provider_id"`
+	Module        string   `json:"module"`
+	BackendFamily string   `json:"backend_family"`
+	Language      string   `json:"language"`
+	Role          string   `json:"role"`
+	ComparesWith  []string `json:"compares_with"`
+	Diagnostics   []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

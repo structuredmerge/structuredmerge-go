@@ -755,6 +755,20 @@ func TestSharedFixtureGoNativeProvingGround(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureGoDSTProviderStack(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-825-go-dst-provider-stack", "go-dst-provider-stack.json"))
+	report := decodeFixtureValue[GoDSTProviderStackReport](t, fixture["provider_stack"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.ProviderID != expected["provider_id"].(string) ||
+		report.Module != expected["module"].(string) ||
+		report.BackendFamily != expected["backend_family"].(string) ||
+		report.Language != expected["language"].(string) ||
+		len(report.ComparesWith) != int(expected["comparison_count"].(float64)) {
+		t.Fatalf("unexpected go-dst provider stack report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
