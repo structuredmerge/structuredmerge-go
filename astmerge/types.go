@@ -865,6 +865,15 @@ type HostLanguageNativeProviderContracts struct {
 	Diagnostics []string                             `json:"diagnostics"`
 }
 
+type NativeProviderProvingGroundReport struct {
+	ReportID    string   `json:"report_id"`
+	Version     string   `json:"version"`
+	Language    string   `json:"language"`
+	Providers   []string `json:"providers"`
+	Checks      []string `json:"checks"`
+	Diagnostics []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

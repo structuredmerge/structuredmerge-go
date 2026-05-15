@@ -742,6 +742,19 @@ func TestSharedFixtureHostLanguageNativeProviderContracts(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureGoNativeProvingGround(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-824-go-native-proving-ground", "go-native-proving-ground.json"))
+	report := decodeFixtureValue[NativeProviderProvingGroundReport](t, fixture["proving_ground"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Language != expected["language"].(string) ||
+		len(report.Providers) != int(expected["provider_count"].(float64)) ||
+		!reflect.DeepEqual(report.Providers, decodeFixtureValue[[]string](t, expected["providers"])) ||
+		!reflect.DeepEqual(report.Checks, decodeFixtureValue[[]string](t, expected["checks"])) {
+		t.Fatalf("unexpected Go native proving-ground report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
