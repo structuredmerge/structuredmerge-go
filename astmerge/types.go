@@ -776,6 +776,19 @@ type FormattingRecommendationGate struct {
 	Diagnostics []string                        `json:"diagnostics"`
 }
 
+type FormattingHardGate struct {
+	Name     string `json:"name"`
+	Passed   bool   `json:"passed"`
+	Weighted bool   `json:"weighted"`
+}
+
+type FormattingHardGateReport struct {
+	ReportID    string               `json:"report_id"`
+	Version     string               `json:"version"`
+	Gates       []FormattingHardGate `json:"gates"`
+	Diagnostics []string             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

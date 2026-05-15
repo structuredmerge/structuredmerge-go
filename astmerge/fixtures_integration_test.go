@@ -615,6 +615,30 @@ func TestSharedFixtureFormattingRecommendationGate(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFormattingHardGates(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-817-formatting-hard-gates", "formatting-hard-gates.json"))
+	report := decodeFixtureValue[FormattingHardGateReport](t, fixture["hard_gate_report"])
+	expected := fixture["expected"].(map[string]any)
+	passedCount := 0
+	weightedCount := 0
+	for _, gate := range report.Gates {
+		if gate.Passed {
+			passedCount++
+		}
+		if gate.Weighted {
+			weightedCount++
+		}
+	}
+
+	if len(report.Gates) != int(expected["gate_count"].(float64)) ||
+		(passedCount == len(report.Gates)) != expected["all_passed"].(bool) ||
+		weightedCount != int(expected["weighted_gate_count"].(float64)) ||
+		report.Gates[0].Name != expected["first_gate"].(string) ||
+		report.Gates[1].Name != expected["second_gate"].(string) {
+		t.Fatalf("unexpected formatting hard gate report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
