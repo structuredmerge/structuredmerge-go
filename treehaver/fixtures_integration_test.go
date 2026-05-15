@@ -629,6 +629,29 @@ func TestSharedFixtureBackendCapabilityReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureEditProjectionSupport(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-924-tree-haver-edit-projection-support", "edit-projection-support.json")
+	support := editProjectionSupportFromFixture(fixture["support"])
+	unsupported := editProjectionSupportFromFixture(fixture["unsupported"])
+
+	if !support.SupportsEditProjection ||
+		support.BackendRef.ID != "go-dst" ||
+		support.SupportedOperations[0] != "replace_node" ||
+		support.CorrelationKeys[1] != "metadata.go_dst.node_path" ||
+		!support.PreservesSourceFragments ||
+		support.UnsupportedReason != nil {
+		t.Fatalf("unexpected edit projection support: %+v", support)
+	}
+	if unsupported.SupportsEditProjection ||
+		unsupported.BackendRef.ID != "psych" ||
+		unsupported.UnsupportedReason == nil ||
+		*unsupported.UnsupportedReason != "backend_does_not_retain_native_tree" ||
+		len(unsupported.SupportedOperations) != 0 ||
+		unsupported.Diagnostics[0] != "edit projection unavailable: native tree not retained" {
+		t.Fatalf("unexpected unsupported edit projection support: %+v", unsupported)
+	}
+}
+
 func backendCapabilityFromFixture(value any) BackendCapability {
 	capabilityFixture := value.(map[string]any)
 	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)
@@ -657,6 +680,31 @@ func backendCapabilityFromFixture(value any) BackendCapability {
 		NormalizedTreeSupport: capabilityFixture["normalized_tree_support"].(bool),
 		NativeNodeAccess:      capabilityFixture["native_node_access"].(bool),
 		Diagnostics:           stringSliceFromFixture(capabilityFixture["diagnostics"]),
+	}
+}
+
+func editProjectionSupportFromFixture(value any) EditProjectionSupport {
+	fixture := value.(map[string]any)
+	backendRefFixture := fixture["backend_ref"].(map[string]any)
+	var unsupportedReason *string
+	if raw, ok := fixture["unsupported_reason"].(string); ok {
+		unsupportedReason = &raw
+	}
+	return EditProjectionSupport{
+		BackendRef: BackendReference{
+			ID:     backendRefFixture["id"].(string),
+			Family: backendRefFixture["family"].(string),
+		},
+		Language:                 fixture["language"].(string),
+		SupportsEditProjection:   fixture["supports_edit_projection"].(bool),
+		NativeEditTarget:         fixture["native_edit_target"].(string),
+		NormalizedEditTarget:     fixture["normalized_edit_target"].(string),
+		SupportedOperations:      stringSliceFromFixture(fixture["supported_operations"]),
+		RequiredNodeFields:       stringSliceFromFixture(fixture["required_node_fields"]),
+		CorrelationKeys:          stringSliceFromFixture(fixture["correlation_keys"]),
+		PreservesSourceFragments: fixture["preserves_source_fragments"].(bool),
+		UnsupportedReason:        unsupportedReason,
+		Diagnostics:              stringSliceFromFixture(fixture["diagnostics"]),
 	}
 }
 

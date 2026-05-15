@@ -175,6 +175,20 @@ type TreeHaverProfile struct {
 	Diagnostics          []string
 }
 
+type EditProjectionSupport struct {
+	BackendRef               BackendReference `json:"backend_ref"`
+	Language                 string           `json:"language"`
+	SupportsEditProjection   bool             `json:"supports_edit_projection"`
+	NativeEditTarget         string           `json:"native_edit_target"`
+	NormalizedEditTarget     string           `json:"normalized_edit_target"`
+	SupportedOperations      []string         `json:"supported_operations"`
+	RequiredNodeFields       []string         `json:"required_node_fields"`
+	CorrelationKeys          []string         `json:"correlation_keys"`
+	PreservesSourceFragments bool             `json:"preserves_source_fragments"`
+	UnsupportedReason        *string          `json:"unsupported_reason"`
+	Diagnostics              []string         `json:"diagnostics"`
+}
+
 type OrderedSiblingEdge struct {
 	ParentID          string
 	NodeID            string
