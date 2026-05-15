@@ -366,6 +366,23 @@ func TestSharedFixtureAmbiguityDiagnostics(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureDuplicateSignatureTieBreak(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-803-duplicate-signature-tie-break", "duplicate-signature-tie-break.json"))
+	report := decodeFixtureValue[TieBreakMatchingReport](t, fixture["matching"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Strategy != expected["strategy"].(string) ||
+		report.ScopePath != expected["scope_path"].(string) ||
+		!reflect.DeepEqual(report.TieBreakRules, decodeFixtureValue[[]string](t, expected["tie_break_rules"])) ||
+		len(report.Matches) != int(expected["match_count"].(float64)) ||
+		report.Matches[0].Signature != expected["first_match_signature"].(string) ||
+		report.Matches[0].SelectedBy != expected["first_match_selected_by"].(string) ||
+		len(report.Matches[0].RejectedCandidates) != int(expected["rejected_candidate_count"].(float64)) ||
+		report.Matches[0].RejectedCandidates[0].RejectedBy != expected["first_rejected_by"].(string) {
+		t.Fatalf("unexpected tie-break matching report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

@@ -476,6 +476,34 @@ type AmbiguityMatchingReport struct {
 	Diagnostics []Diagnostic         `json:"diagnostics"`
 }
 
+type RejectedTieBreakCandidate struct {
+	FromPath   string  `json:"from_path"`
+	FromNodeID string  `json:"from_node_id"`
+	Confidence float64 `json:"confidence"`
+	RejectedBy string  `json:"rejected_by"`
+}
+
+type TieBreakMatch struct {
+	Signature          string                      `json:"signature"`
+	FromPath           string                      `json:"from_path"`
+	ToPath             string                      `json:"to_path"`
+	FromNodeID         string                      `json:"from_node_id"`
+	ToNodeID           string                      `json:"to_node_id"`
+	Confidence         float64                     `json:"confidence"`
+	SelectedBy         string                      `json:"selected_by"`
+	RejectedCandidates []RejectedTieBreakCandidate `json:"rejected_candidates"`
+	Diagnostics        []string                    `json:"diagnostics"`
+}
+
+type TieBreakMatchingReport struct {
+	MatchingID    string          `json:"matching_id"`
+	Strategy      string          `json:"strategy"`
+	ScopePath     string          `json:"scope_path"`
+	TieBreakRules []string        `json:"tie_break_rules"`
+	Matches       []TieBreakMatch `json:"matches"`
+	Diagnostics   []string        `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
