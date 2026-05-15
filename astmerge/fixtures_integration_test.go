@@ -348,6 +348,24 @@ func TestSharedFixtureRenameAwareMatchingGated(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureAmbiguityDiagnostics(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-802-ambiguity-diagnostics", "ambiguity-diagnostics.json"))
+	report := decodeFixtureValue[AmbiguityMatchingReport](t, fixture["matching"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Strategy != expected["strategy"].(string) ||
+		report.ScopePath != expected["scope_path"].(string) ||
+		report.Ambiguous != expected["ambiguous"].(bool) ||
+		len(report.Matches) != int(expected["match_count"].(float64)) ||
+		len(report.Ambiguities) != int(expected["ambiguity_count"].(float64)) ||
+		string(report.Diagnostics[0].Category) != expected["diagnostic_category"].(string) ||
+		report.Ambiguities[0].Signature != expected["first_ambiguity_signature"].(string) ||
+		report.Ambiguities[0].Reason != expected["first_ambiguity_reason"].(string) ||
+		report.Ambiguities[0].Selected != expected["first_ambiguity_selected"].(bool) {
+		t.Fatalf("unexpected ambiguity matching report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

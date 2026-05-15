@@ -456,6 +456,26 @@ type RenameAwareMatchingReport struct {
 	Diagnostics   []string               `json:"diagnostics"`
 }
 
+type MatchingAmbiguity struct {
+	Signature      string   `json:"signature"`
+	ScopePath      string   `json:"scope_path"`
+	FromCandidates []string `json:"from_candidates"`
+	ToCandidates   []string `json:"to_candidates"`
+	Selected       bool     `json:"selected"`
+	Reason         string   `json:"reason"`
+	Diagnostics    []string `json:"diagnostics"`
+}
+
+type AmbiguityMatchingReport struct {
+	MatchingID  string               `json:"matching_id"`
+	Strategy    string               `json:"strategy"`
+	ScopePath   string               `json:"scope_path"`
+	Ambiguous   bool                 `json:"ambiguous"`
+	Matches     []SignatureNodeMatch `json:"matches"`
+	Ambiguities []MatchingAmbiguity  `json:"ambiguities"`
+	Diagnostics []Diagnostic         `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
