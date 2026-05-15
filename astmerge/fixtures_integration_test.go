@@ -923,6 +923,21 @@ func TestSharedFixturePerformanceGuardrails(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProfileConformanceReports(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-905-profile-conformance-reports", "profile-conformance-reports.json"))
+	report := decodeFixtureValue[ProfileConformanceReport](t, fixture["report"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Profile != expected["profile"].(string) ||
+		len(report.EnabledRules) != int(expected["enabled_rule_count"].(float64)) ||
+		len(report.SkippedRules) != int(expected["skipped_rule_count"].(float64)) ||
+		report.FallbackCount != int(expected["fallback_count"].(float64)) ||
+		report.UnresolvedConflictCount != int(expected["unresolved_conflict_count"].(float64)) ||
+		report.SkippedRules[0].Rule != expected["skipped_rule"].(string) {
+		t.Fatalf("unexpected profile conformance report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

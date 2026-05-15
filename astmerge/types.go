@@ -1024,6 +1024,22 @@ type PerformanceGuardrails struct {
 	Diagnostics        []string                     `json:"diagnostics"`
 }
 
+type ProfileSkippedRule struct {
+	Rule   string `json:"rule"`
+	Reason string `json:"reason"`
+}
+
+type ProfileConformanceReport struct {
+	ReportID                string               `json:"report_id"`
+	Version                 string               `json:"version"`
+	Profile                 string               `json:"profile"`
+	EnabledRules            []string             `json:"enabled_rules"`
+	SkippedRules            []ProfileSkippedRule `json:"skipped_rules"`
+	FallbackCount           int                  `json:"fallback_count"`
+	UnresolvedConflictCount int                  `json:"unresolved_conflict_count"`
+	Diagnostics             []string             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
