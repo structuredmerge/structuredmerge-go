@@ -711,6 +711,27 @@ type FallbackUsageReport struct {
 	Diagnostics     []string                   `json:"diagnostics"`
 }
 
+type RenderByteSpan struct {
+	StartByte int `json:"start_byte"`
+	EndByte   int `json:"end_byte"`
+}
+
+type RenderStrategyMetadata struct {
+	Strategy                string          `json:"strategy"`
+	Path                    string          `json:"path"`
+	Span                    *RenderByteSpan `json:"span"`
+	PreservesSourceFragment bool            `json:"preserves_source_fragment"`
+	RequiresReparse         bool            `json:"requires_reparse"`
+}
+
+type RenderPlanReport struct {
+	PlanID      string                   `json:"plan_id"`
+	Version     string                   `json:"version"`
+	Language    string                   `json:"language"`
+	Strategies  []RenderStrategyMetadata `json:"strategies"`
+	Diagnostics []string                 `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

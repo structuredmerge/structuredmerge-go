@@ -553,6 +553,24 @@ func TestSharedFixtureFallbackUsageMachineOutput(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRenderStrategyMetadata(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-813-render-strategy-metadata", "render-strategy-metadata.json"))
+	report := decodeFixtureValue[RenderPlanReport](t, fixture["render_plan"])
+	expected := fixture["expected"].(map[string]any)
+	strategies := make([]string, 0, len(report.Strategies))
+	for _, strategy := range report.Strategies {
+		strategies = append(strategies, strategy.Strategy)
+	}
+
+	if report.Language != expected["language"].(string) ||
+		len(report.Strategies) != int(expected["strategy_count"].(float64)) ||
+		!reflect.DeepEqual(strategies, decodeFixtureValue[[]string](t, expected["strategies"])) ||
+		report.Strategies[0].PreservesSourceFragment != expected["source_reuse_preserves_fragment"].(bool) ||
+		report.Strategies[len(report.Strategies)-1].RequiresReparse != expected["full_file_requires_reparse"].(bool) {
+		t.Fatalf("unexpected render plan report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
