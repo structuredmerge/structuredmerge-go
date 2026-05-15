@@ -862,6 +862,31 @@ func TestSharedFixtureFalseTextualConflicts(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureGitDriverSmokeFixtures(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-902-git-driver-smoke-fixtures", "git-driver-smoke-fixtures.json"))
+	suite := decodeFixtureValue[GitDriverSmokeSuite](t, fixture["suite"])
+	expected := fixture["expected"].(map[string]any)
+	placeholderSet := []string{
+		suite.Cases[0].AncestorPlaceholder,
+		suite.Cases[0].CurrentPlaceholder,
+		suite.Cases[0].OtherPlaceholder,
+		suite.Cases[0].PathPlaceholder,
+	}
+	updatedCurrentFileCount := 0
+	for _, smokeCase := range suite.Cases {
+		if smokeCase.ExpectedCurrentFileUpdated {
+			updatedCurrentFileCount++
+		}
+	}
+
+	if suite.DriverName != expected["driver_name"].(string) ||
+		len(suite.Cases) != int(expected["case_count"].(float64)) ||
+		!reflect.DeepEqual(placeholderSet, decodeFixtureValue[[]string](t, expected["placeholder_set"])) ||
+		updatedCurrentFileCount != int(expected["updated_current_file_count"].(float64)) {
+		t.Fatalf("unexpected git driver smoke suite: %+v", suite)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

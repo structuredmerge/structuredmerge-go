@@ -971,6 +971,25 @@ type FalseTextualConflictSuite struct {
 	Diagnostics []string                   `json:"diagnostics"`
 }
 
+type GitDriverSmokeCase struct {
+	CaseID                     string `json:"case_id"`
+	Family                     string `json:"family"`
+	AncestorPlaceholder        string `json:"ancestor_placeholder"`
+	CurrentPlaceholder         string `json:"current_placeholder"`
+	OtherPlaceholder           string `json:"other_placeholder"`
+	PathPlaceholder            string `json:"path_placeholder"`
+	ExpectedExitCode           int    `json:"expected_exit_code"`
+	ExpectedCurrentFileUpdated bool   `json:"expected_current_file_updated"`
+}
+
+type GitDriverSmokeSuite struct {
+	SuiteID     string               `json:"suite_id"`
+	Version     string               `json:"version"`
+	DriverName  string               `json:"driver_name"`
+	Cases       []GitDriverSmokeCase `json:"cases"`
+	Diagnostics []string             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
