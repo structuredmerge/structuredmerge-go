@@ -732,6 +732,19 @@ type RenderPlanReport struct {
 	Diagnostics []string                 `json:"diagnostics"`
 }
 
+type RenderVerificationReport struct {
+	VerificationID string   `json:"verification_id"`
+	Version        string   `json:"version"`
+	Mode           string   `json:"mode"`
+	Language       string   `json:"language"`
+	RenderStrategy string   `json:"render_strategy"`
+	Attempted      bool     `json:"attempted"`
+	Passed         bool     `json:"passed"`
+	HardGate       bool     `json:"hard_gate"`
+	ParseErrors    []string `json:"parse_errors"`
+	Diagnostics    []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

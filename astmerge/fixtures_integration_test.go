@@ -571,6 +571,22 @@ func TestSharedFixtureRenderStrategyMetadata(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureReparseAfterRenderVerification(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-814-reparse-after-render-verification", "reparse-after-render-verification.json"))
+	report := decodeFixtureValue[RenderVerificationReport](t, fixture["render_verification"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Mode != expected["mode"].(string) ||
+		report.Language != expected["language"].(string) ||
+		report.Attempted != expected["attempted"].(bool) ||
+		report.Passed != expected["passed"].(bool) ||
+		report.HardGate != expected["hard_gate"].(bool) ||
+		len(report.ParseErrors) != int(expected["parse_error_count"].(float64)) ||
+		report.RenderStrategy != expected["render_strategy"].(string) {
+		t.Fatalf("unexpected render verification report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
