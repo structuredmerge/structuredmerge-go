@@ -483,6 +483,33 @@ func TestSharedFixtureTypedConflictHandlerExtensionPoints(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureGenericConflictHandlerExecution(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-810-generic-conflict-handler-execution", "generic-conflict-handler-execution.json"))
+	execution := decodeFixtureValue[GenericConflictHandlerExecution](t, fixture["execution"])
+	expected := fixture["expected"].(map[string]any)
+	resolvedCount := 0
+	results := make([]GenericConflictHandlerResult, 0, len(execution.Cases))
+	for _, handlerCase := range execution.Cases {
+		result := ExecuteGenericConflictHandler(handlerCase)
+		results = append(results, result)
+		if result.Resolved {
+			resolvedCount++
+		}
+		if !reflect.DeepEqual(result, handlerCase.ExpectedResult) {
+			t.Fatalf("unexpected handler result for %s: %+v", handlerCase.CaseID, result)
+		}
+	}
+
+	if len(execution.Cases) != int(expected["case_count"].(float64)) ||
+		resolvedCount != int(expected["resolved_count"].(float64)) ||
+		execution.Cases[0].HandlerID != expected["first_handler_id"].(string) ||
+		len(results[0].MergedChildren) != int(expected["first_merged_child_count"].(float64)) ||
+		execution.Cases[1].HandlerID != expected["second_handler_id"].(string) ||
+		len(results[1].MergedMembers) != int(expected["second_merged_member_count"].(float64)) {
+		t.Fatalf("unexpected generic handler execution: %+v", execution)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

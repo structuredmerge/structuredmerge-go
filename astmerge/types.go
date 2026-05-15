@@ -622,6 +622,45 @@ type ConflictHandlerRegistryReport struct {
 	Diagnostics []string                      `json:"diagnostics"`
 }
 
+type HandlerChildNode struct {
+	NodeID    string `json:"node_id"`
+	Signature string `json:"signature"`
+	Source    string `json:"source"`
+}
+
+type HandlerKeyedMember struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type GenericConflictHandlerResult struct {
+	Resolved       bool                 `json:"resolved"`
+	MergedChildren []HandlerChildNode   `json:"merged_children,omitempty"`
+	MergedMembers  []HandlerKeyedMember `json:"merged_members,omitempty"`
+	Diagnostics    []string             `json:"diagnostics"`
+}
+
+type GenericConflictHandlerCase struct {
+	CaseID           string                       `json:"case_id"`
+	HandlerID        string                       `json:"handler_id"`
+	ConflictCategory string                       `json:"conflict_category"`
+	ParentPolicy     string                       `json:"parent_policy,omitempty"`
+	BaseChildren     []HandlerChildNode           `json:"base_children,omitempty"`
+	LeftInsertions   []HandlerChildNode           `json:"left_insertions,omitempty"`
+	RightInsertions  []HandlerChildNode           `json:"right_insertions,omitempty"`
+	BaseMembers      []HandlerKeyedMember         `json:"base_members,omitempty"`
+	LeftEdits        []HandlerKeyedMember         `json:"left_edits,omitempty"`
+	RightEdits       []HandlerKeyedMember         `json:"right_edits,omitempty"`
+	ExpectedResult   GenericConflictHandlerResult `json:"expected_result"`
+}
+
+type GenericConflictHandlerExecution struct {
+	ExecutionID string                       `json:"execution_id"`
+	Version     string                       `json:"version"`
+	Cases       []GenericConflictHandlerCase `json:"cases"`
+	Diagnostics []string                     `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
