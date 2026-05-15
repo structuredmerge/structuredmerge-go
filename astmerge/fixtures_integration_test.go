@@ -1363,6 +1363,43 @@ func TestSharedFixtureProfilePromotionEvaluation(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProfileSelectionEnforcement(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-914-profile-selection-enforcement", "profile-selection-enforcement.json"))
+	activeProfile := decodeFixtureValue[ActiveProfileView](t, fixture["active_profile"])
+	availableEvaluation := decodeFixtureValue[ProfilePromotionEvaluation](t, fixture["available_evaluation"])
+	recommendedEvaluation := decodeFixtureValue[ProfilePromotionEvaluation](t, fixture["recommended_evaluation"])
+	advisoryRequirement := decodeFixtureValue[ProfileSelectionRequirement](t, fixture["advisory_requirement"])
+	requiredRequirement := decodeFixtureValue[ProfileSelectionRequirement](t, fixture["required_requirement"])
+	satisfiedRequirement := decodeFixtureValue[ProfileSelectionRequirement](t, fixture["satisfied_requirement"])
+	expected := fixture["expected"].(map[string]any)
+
+	advisory := EvaluateProfileSelectionRequirement(advisoryRequirement, &activeProfile, availableEvaluation)
+	if advisory.Allowed != expected["advisory_allowed"].(bool) ||
+		advisory.Satisfied != expected["advisory_satisfied"].(bool) ||
+		advisory.Enforced != expected["advisory_enforced"].(bool) ||
+		advisory.RejectionCode != expected["advisory_rejection_code"].(string) {
+		t.Fatalf("unexpected advisory profile selection decision: %+v", advisory)
+	}
+
+	required := EvaluateProfileSelectionRequirement(requiredRequirement, &activeProfile, availableEvaluation)
+	if required.Allowed != expected["required_allowed"].(bool) ||
+		required.Satisfied != expected["required_satisfied"].(bool) ||
+		required.Enforced != expected["required_enforced"].(bool) ||
+		required.RejectionCode != expected["required_rejection_code"].(string) ||
+		required.BlockingReasons[0] != expected["required_first_blocking_reason"].(string) {
+		t.Fatalf("unexpected required profile selection decision: %+v", required)
+	}
+
+	satisfied := EvaluateProfileSelectionRequirement(satisfiedRequirement, &activeProfile, recommendedEvaluation)
+	if satisfied.Allowed != expected["satisfied_allowed"].(bool) ||
+		satisfied.Satisfied != expected["satisfied_satisfied"].(bool) ||
+		satisfied.Enforced != expected["satisfied_enforced"].(bool) ||
+		satisfied.RejectionCode != expected["satisfied_rejection_code"].(string) ||
+		len(satisfied.BlockingReasons) != 0 {
+		t.Fatalf("unexpected satisfied profile selection decision: %+v", satisfied)
+	}
+}
+
 func validationMessages(diagnostics []ProfileValidationDiagnostic) []string {
 	messages := make([]string, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {

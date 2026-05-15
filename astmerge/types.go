@@ -1426,6 +1426,36 @@ type ProfilePromotionEvaluation struct {
 	Diagnostics     []string               `json:"diagnostics"`
 }
 
+type ProfileSelectionEnforcementMode string
+
+const (
+	ProfileSelectionAdvisory ProfileSelectionEnforcementMode = "advisory"
+	ProfileSelectionRequired ProfileSelectionEnforcementMode = "required"
+)
+
+type ProfileSelectionRequirement struct {
+	ProfileID            string                          `json:"profile_id"`
+	PromotionPolicyID    string                          `json:"promotion_policy_id"`
+	MinimumProfileStatus ProfilePromotionStatus          `json:"minimum_profile_status"`
+	EnforcementMode      ProfileSelectionEnforcementMode `json:"enforcement_mode"`
+}
+
+type ProfileSelectionDecision struct {
+	ProfileID                  string                          `json:"profile_id"`
+	PromotionPolicyID          string                          `json:"promotion_policy_id"`
+	MinimumProfileStatus       ProfilePromotionStatus          `json:"minimum_profile_status"`
+	EvaluatedStatus            ProfilePromotionStatus          `json:"evaluated_status"`
+	EnforcementMode            ProfileSelectionEnforcementMode `json:"enforcement_mode"`
+	Satisfied                  bool                            `json:"satisfied"`
+	Enforced                   bool                            `json:"enforced"`
+	Allowed                    bool                            `json:"allowed"`
+	RejectionCode              string                          `json:"rejection_code,omitempty"`
+	ActiveProfile              *ActiveProfileView              `json:"active_profile,omitempty"`
+	ProfilePromotionEvaluation ProfilePromotionEvaluation      `json:"profile_promotion_evaluation"`
+	BlockingReasons            []string                        `json:"blocking_reasons"`
+	Diagnostics                []string                        `json:"diagnostics"`
+}
+
 func EvaluateProfilePromotion(policy ProfilePromotionPolicy, report ProfilePromotionReport) ProfilePromotionEvaluation {
 	entry, ok := findPromotionPolicyEntry(policy, report.ProfileID)
 	if !ok {
@@ -1447,6 +1477,56 @@ func EvaluateProfilePromotion(policy ProfilePromotionPolicy, report ProfilePromo
 		Status:          status,
 		BlockingReasons: blockingReasons,
 		Diagnostics:     []string{},
+	}
+}
+
+func EvaluateProfileSelectionRequirement(requirement ProfileSelectionRequirement, activeProfile *ActiveProfileView, evaluation ProfilePromotionEvaluation) ProfileSelectionDecision {
+	satisfied := profilePromotionStatusRank(evaluation.Status) >= profilePromotionStatusRank(requirement.MinimumProfileStatus) &&
+		evaluation.Status != ProfilePromotionDisabled
+	enforced := requirement.EnforcementMode == ProfileSelectionRequired
+	allowed := satisfied || !enforced
+	blockingReasons := append([]string{}, evaluation.BlockingReasons...)
+	rejectionCode := ""
+	if !satisfied {
+		statusReason := "profile status " + string(evaluation.Status) + " is below required " + string(requirement.MinimumProfileStatus)
+		blockingReasons = append([]string{statusReason}, blockingReasons...)
+		if enforced {
+			rejectionCode = "profile_status_unmet"
+		}
+	}
+	diagnostics := append([]string{}, evaluation.Diagnostics...)
+	if requirement.ProfileID != evaluation.ProfileID {
+		diagnostics = append(diagnostics, "selected profile does not match promotion evaluation profile")
+	}
+	return ProfileSelectionDecision{
+		ProfileID:                  requirement.ProfileID,
+		PromotionPolicyID:          requirement.PromotionPolicyID,
+		MinimumProfileStatus:       requirement.MinimumProfileStatus,
+		EvaluatedStatus:            evaluation.Status,
+		EnforcementMode:            requirement.EnforcementMode,
+		Satisfied:                  satisfied,
+		Enforced:                   enforced,
+		Allowed:                    allowed,
+		RejectionCode:              rejectionCode,
+		ActiveProfile:              activeProfile,
+		ProfilePromotionEvaluation: evaluation,
+		BlockingReasons:            blockingReasons,
+		Diagnostics:                diagnostics,
+	}
+}
+
+func profilePromotionStatusRank(status ProfilePromotionStatus) int {
+	switch status {
+	case ProfilePromotionExperimental:
+		return 1
+	case ProfilePromotionAvailable:
+		return 2
+	case ProfilePromotionRecommended:
+		return 3
+	case ProfilePromotionDefault:
+		return 4
+	default:
+		return 0
 	}
 }
 
