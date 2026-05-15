@@ -330,6 +330,39 @@ type StructuralMatchingReport struct {
 	Diagnostics   []string              `json:"diagnostics"`
 }
 
+type SignatureMatchingParent struct {
+	Kind       string `json:"kind"`
+	Role       string `json:"role"`
+	FromPath   string `json:"from_path"`
+	ToPath     string `json:"to_path"`
+	FromNodeID string `json:"from_node_id"`
+	ToNodeID   string `json:"to_node_id"`
+	ChildOrder string `json:"child_order"`
+}
+
+type SignatureNodeMatch struct {
+	Signature   string   `json:"signature"`
+	FromPath    string   `json:"from_path"`
+	ToPath      string   `json:"to_path"`
+	FromNodeID  string   `json:"from_node_id"`
+	ToNodeID    string   `json:"to_node_id"`
+	Confidence  float64  `json:"confidence"`
+	Diagnostics []string `json:"diagnostics"`
+}
+
+type SignatureMatchingReport struct {
+	MatchingID          string               `json:"matching_id"`
+	Strategy            string               `json:"strategy"`
+	ParentPolicy        string               `json:"parent_policy"`
+	SignatureComponents []string             `json:"signature_components"`
+	FromRevision        string               `json:"from_revision"`
+	ToRevision          string               `json:"to_revision"`
+	Matches             []SignatureNodeMatch `json:"matches"`
+	UnmatchedFrom       []string             `json:"unmatched_from"`
+	UnmatchedTo         []string             `json:"unmatched_to"`
+	Diagnostics         []string             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

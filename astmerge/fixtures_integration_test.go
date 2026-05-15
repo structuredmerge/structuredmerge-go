@@ -267,6 +267,26 @@ func TestSharedFixtureStructuralMatchingBaseline(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSignatureMatchingCommutativeParent(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-798-signature-matching-commutative-parent", "signature-matching-commutative-parent.json"))
+	parent := decodeFixtureValue[SignatureMatchingParent](t, fixture["parent"])
+	report := decodeFixtureValue[SignatureMatchingReport](t, fixture["matching"])
+	expected := fixture["expected"].(map[string]any)
+
+	if parent.ChildOrder != expected["parent_policy"].(string) ||
+		report.Strategy != expected["strategy"].(string) ||
+		report.ParentPolicy != expected["parent_policy"].(string) ||
+		!reflect.DeepEqual(report.SignatureComponents, decodeFixtureValue[[]string](t, expected["signature_components"])) ||
+		len(report.Matches) != int(expected["match_count"].(float64)) ||
+		len(report.UnmatchedFrom) != int(expected["unmatched_from_count"].(float64)) ||
+		len(report.UnmatchedTo) != int(expected["unmatched_to_count"].(float64)) ||
+		expected["order_sensitive"].(bool) ||
+		report.Matches[0].Signature != expected["first_match_signature"].(string) ||
+		report.Matches[0].ToPath != expected["first_match_to_path"].(string) {
+		t.Fatalf("unexpected signature matching report: parent=%+v report=%+v", parent, report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
