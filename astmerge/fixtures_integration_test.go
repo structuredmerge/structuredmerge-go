@@ -908,6 +908,21 @@ func TestSharedFixtureDiffDriverSmokeFixtures(t *testing.T) {
 	}
 }
 
+func TestSharedFixturePerformanceGuardrails(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-904-performance-guardrails", "performance-guardrails.json"))
+	guardrails := decodeFixtureValue[PerformanceGuardrails](t, fixture["guardrails"])
+	expected := fixture["expected"].(map[string]any)
+
+	if guardrails.MaxBytes != int(expected["max_bytes"].(float64)) ||
+		guardrails.MaxNodes != int(expected["max_nodes"].(float64)) ||
+		guardrails.MaxMatchCandidates != int(expected["max_match_candidates"].(float64)) ||
+		guardrails.TimeoutMS != int(expected["timeout_ms"].(float64)) ||
+		guardrails.TimeoutDiagnostic.Code != expected["timeout_code"].(string) ||
+		guardrails.TimeoutDiagnostic.Fallback != expected["fallback"].(string) {
+		t.Fatalf("unexpected performance guardrails: %+v", guardrails)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

@@ -1006,6 +1006,24 @@ type DiffDriverSmokeSuite struct {
 	Diagnostics []string              `json:"diagnostics"`
 }
 
+type PerformanceTimeoutDiagnostic struct {
+	Severity string `json:"severity"`
+	Category string `json:"category"`
+	Code     string `json:"code"`
+	Fallback string `json:"fallback"`
+}
+
+type PerformanceGuardrails struct {
+	GuardrailID        string                       `json:"guardrail_id"`
+	Version            string                       `json:"version"`
+	MaxBytes           int                          `json:"max_bytes"`
+	MaxNodes           int                          `json:"max_nodes"`
+	MaxMatchCandidates int                          `json:"max_match_candidates"`
+	TimeoutMS          int                          `json:"timeout_ms"`
+	TimeoutDiagnostic  PerformanceTimeoutDiagnostic `json:"timeout_diagnostic"`
+	Diagnostics        []string                     `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
