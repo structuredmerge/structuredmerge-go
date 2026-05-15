@@ -155,6 +155,26 @@ func TestMergeDriverCheckOnlyExitCodeReportsNoChange(t *testing.T) {
 	}
 }
 
+func TestMergeDriverProfileReportAndRequiredStatus(t *testing.T) {
+	dir := t.TempDir()
+	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"structuredmerge"}`)
+	current := writeTestFile(t, dir, "current.json", `{"name":"structuredmerge","current":true}`)
+	other := writeTestFile(t, dir, "other.json", `{"name":"structuredmerge","other":true}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", "--profile", "json.keyed-object", "--profile-report", "--require-profile-status", "recommended", ancestor, current, other, "package.json"}, &stdout, &stderr)
+	if exitCode != exitUserError {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"rejection_code":"profile_status_unmet"`) {
+		t.Fatalf("expected profile report rejection, got %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "profile status available is below required recommended") {
+		t.Fatalf("expected concise profile status stderr, got %q", stderr.String())
+	}
+}
+
 func TestPathSettingsUseLinguistLanguageAndConflictMarkerSize(t *testing.T) {
 	settings := pathSettings{conflictMarkerSize: 7}
 	applyAttributes(&settings, "fixtures/package.data", strings.Join([]string{

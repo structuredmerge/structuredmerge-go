@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -23,15 +24,18 @@ const (
 )
 
 type mergeDriverOptions struct {
-	ancestor  string
-	current   string
-	other     string
-	pathName  string
-	output    string
-	strict    bool
-	fallback  string
-	checkOnly bool
-	exitCode  bool
+	ancestor             string
+	current              string
+	other                string
+	pathName             string
+	output               string
+	strict               bool
+	fallback             string
+	checkOnly            bool
+	exitCode             bool
+	profileID            string
+	profileReport        bool
+	requireProfileStatus string
 }
 
 type diffDriverOptions struct {
@@ -95,10 +99,13 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "       smorg-go languages --gitattributes")
 }
 
-func runMergeDriver(args []string, _ io.Writer, stderr io.Writer) int {
+func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	options, ok := parseMergeDriverOptions(args, stderr)
 	if !ok {
 		return exitUserError
+	}
+	if exitCode := reportAndEnforceProfile(options.profileID, options.profileReport, options.requireProfileStatus, stdout, stderr); exitCode != exitSuccess {
+		return exitCode
 	}
 
 	ancestorSource, err := os.ReadFile(options.ancestor)
@@ -163,6 +170,9 @@ func parseMergeDriverOptions(args []string, stderr io.Writer) (mergeDriverOption
 	flags.StringVar(&options.fallback, "fallback", "full-file", "fallback mode: none, line, local, full-file")
 	flags.BoolVar(&options.checkOnly, "check-only", false, "validate merge without writing")
 	flags.BoolVar(&options.exitCode, "exit-code", false, "use exit code to report result")
+	flags.StringVar(&options.profileID, "profile", "", "select merge profile")
+	flags.BoolVar(&options.profileReport, "profile-report", false, "write selected profile promotion report to stdout")
+	flags.StringVar(&options.requireProfileStatus, "require-profile-status", "", "require profile status: available, recommended, default")
 	if err := flags.Parse(args); err != nil {
 		return options, false
 	}
@@ -193,6 +203,43 @@ func parseMergeDriverOptions(args []string, stderr io.Writer) (mergeDriverOption
 	}
 
 	return options, true
+}
+
+func reportAndEnforceProfile(profileID string, profileReport bool, requireStatus string, stdout io.Writer, stderr io.Writer) int {
+	if profileID == "" && requireStatus == "" && !profileReport {
+		return exitSuccess
+	}
+	if profileID == "" {
+		profileID = astmerge.PromotionProfileJSONKeyedObject
+	}
+	evaluation := astmerge.ProfilePromotionEvaluation{
+		ProfileID:       profileID,
+		Status:          astmerge.ProfilePromotionAvailable,
+		BlockingReasons: []string{"profile promotion evidence is not loaded by this CLI command"},
+		Diagnostics:     []string{},
+	}
+	minimumStatus := astmerge.ProfilePromotionAvailable
+	if requireStatus != "" {
+		minimumStatus = astmerge.ProfilePromotionStatus(requireStatus)
+	}
+	requirement := astmerge.ProfileSelectionRequirement{
+		ProfileID:            profileID,
+		PromotionPolicyID:    astmerge.InitialProfilePromotionPolicy().PolicyID,
+		MinimumProfileStatus: minimumStatus,
+		EnforcementMode:      astmerge.ProfileSelectionAdvisory,
+	}
+	if requireStatus != "" {
+		requirement.EnforcementMode = astmerge.ProfileSelectionRequired
+	}
+	decision := astmerge.EvaluateProfileSelectionRequirement(requirement, nil, evaluation)
+	if profileReport {
+		_ = json.NewEncoder(stdout).Encode(decision)
+	}
+	if !decision.Allowed {
+		fmt.Fprintln(stderr, decision.BlockingReasons[0])
+		return exitUserError
+	}
+	return exitSuccess
 }
 
 func runDiffDriver(args []string, stdout io.Writer, stderr io.Writer) int {
