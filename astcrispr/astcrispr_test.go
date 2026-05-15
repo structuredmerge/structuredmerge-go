@@ -221,3 +221,42 @@ func TestOperationProfileHelpersFixture(t *testing.T) {
 		}
 	}
 }
+
+func TestOperationHelpersFixture(t *testing.T) {
+	fixturePath := filepath.Join(
+		"..",
+		"..",
+		"fixtures",
+		"diagnostics",
+		"slice-922-ast-crispr-operation-helpers",
+		"ast-crispr-operation-helpers.json",
+	)
+	source, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		var profile OperationProfile
+		switch testCase["helper"].(string) {
+		case "replace":
+			profile = ReplaceOperation()
+		case "delete":
+			profile = DeleteOperation()
+		case "insert":
+			profile = InsertOperation()
+		case "move":
+			profile = MoveOperation()
+		default:
+			t.Fatalf("unknown helper %s", testCase["helper"])
+		}
+		if !reflect.DeepEqual(profile.Report(), testCase["expected_operation_profile"]) {
+			t.Fatalf("unexpected operation helper report for %s: %+v", testCase["name"], profile.Report())
+		}
+	}
+}

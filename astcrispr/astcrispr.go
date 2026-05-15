@@ -222,6 +222,22 @@ func NewOperationProfile(operationKind, sourceRequirement, destinationRequiremen
 	}
 }
 
+func ReplaceOperation() OperationProfile {
+	return NewOperationProfile("replace", "required", "none", "explicit_text", true, false)
+}
+
+func DeleteOperation() OperationProfile {
+	return NewOperationProfile("delete", "required", "none", "none", true, false)
+}
+
+func InsertOperation() OperationProfile {
+	return NewOperationProfile("insert", "none", "optional", "explicit_text", false, true)
+}
+
+func MoveOperation() OperationProfile {
+	return NewOperationProfile("move", "optional", "optional", "captured_text_or_explicit", true, true)
+}
+
 func (profile MatchProfile) Report() map[string]any {
 	startDescriptor, knownStart := knownStartBoundaries[profile.StartBoundary]
 	endDescriptor, knownEnd := knownEndBoundaries[profile.EndBoundary]
@@ -518,9 +534,9 @@ func BoundaryReport() map[string]any {
 			"selection profile helpers",
 			"destination profile helpers",
 			"operation profile helpers",
+			"replace/delete/insert/move helpers",
 		},
 		"future_exports": []any{
-			"replace/delete/insert/move helpers",
 			"batch operation helpers",
 		},
 		"metadata": map[string]any{
