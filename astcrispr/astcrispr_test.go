@@ -260,3 +260,44 @@ func TestOperationHelpersFixture(t *testing.T) {
 		}
 	}
 }
+
+func TestBatchOperationHelpersFixture(t *testing.T) {
+	fixturePath := filepath.Join(
+		"..",
+		"..",
+		"fixtures",
+		"diagnostics",
+		"slice-923-ast-crispr-batch-operation-helpers",
+		"ast-crispr-batch-operation-helpers.json",
+	)
+	source, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		profiles := make([]OperationProfile, 0, len(testCase["helpers"].([]any)))
+		for _, rawHelper := range testCase["helpers"].([]any) {
+			switch rawHelper.(string) {
+			case "replace":
+				profiles = append(profiles, ReplaceOperation())
+			case "delete":
+				profiles = append(profiles, DeleteOperation())
+			case "insert":
+				profiles = append(profiles, InsertOperation())
+			case "move":
+				profiles = append(profiles, MoveOperation())
+			default:
+				t.Fatalf("unknown helper %s", rawHelper)
+			}
+		}
+		if !reflect.DeepEqual(BatchOperationReport(profiles), testCase["expected"]) {
+			t.Fatalf("unexpected batch operation report for %s: %+v", testCase["name"], BatchOperationReport(profiles))
+		}
+	}
+}

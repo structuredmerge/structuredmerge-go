@@ -238,6 +238,20 @@ func MoveOperation() OperationProfile {
 	return NewOperationProfile("move", "optional", "optional", "captured_text_or_explicit", true, true)
 }
 
+func BatchOperationReport(profiles []OperationProfile) map[string]any {
+	operationKinds := make([]any, 0, len(profiles))
+	operationProfiles := make([]any, 0, len(profiles))
+	for _, profile := range profiles {
+		operationKinds = append(operationKinds, profile.OperationKind)
+		operationProfiles = append(operationProfiles, profile.Report())
+	}
+	return map[string]any{
+		"operation_count":    float64(len(profiles)),
+		"operation_kinds":    operationKinds,
+		"operation_profiles": operationProfiles,
+	}
+}
+
 func (profile MatchProfile) Report() map[string]any {
 	startDescriptor, knownStart := knownStartBoundaries[profile.StartBoundary]
 	endDescriptor, knownEnd := knownEndBoundaries[profile.EndBoundary]
@@ -535,10 +549,9 @@ func BoundaryReport() map[string]any {
 			"destination profile helpers",
 			"operation profile helpers",
 			"replace/delete/insert/move helpers",
-		},
-		"future_exports": []any{
 			"batch operation helpers",
 		},
+		"future_exports": []any{},
 		"metadata": map[string]any{
 			"source":   "legacy_crispr_reference",
 			"decision": "Keep ast-merge as the base contract layer and revive ast-crispr as a separate thin package in every implementation.",
