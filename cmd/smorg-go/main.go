@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -37,6 +38,11 @@ type diffDriverOptions struct {
 	pathName string
 	oldPath  string
 	newPath  string
+}
+
+type pathSettings struct {
+	language           string
+	conflictMarkerSize int
 }
 
 func main() {
@@ -98,7 +104,9 @@ func runMergeDriver(args []string, _ io.Writer, stderr io.Writer) int {
 		return exitUserError
 	}
 
-	result := mergeByPath(options.effectivePath(), string(otherSource), string(currentSource))
+	effectivePath := options.effectivePath()
+	settings := loadPathSettings(effectivePath)
+	result := mergeByPath(effectivePath, settings.language, string(otherSource), string(currentSource))
 	if !result.OK || result.Output == nil {
 		if options.strict || options.fallback == "none" {
 			printDiagnostics(stderr, result.Diagnostics)
@@ -279,17 +287,111 @@ func (options mergeDriverOptions) effectivePath() string {
 	return options.current
 }
 
-func mergeByPath(pathName string, otherSource string, currentSource string) astmerge.MergeResult[string] {
-	switch strings.ToLower(filepath.Ext(pathName)) {
-	case ".go":
+func mergeByPath(pathName string, language string, otherSource string, currentSource string) astmerge.MergeResult[string] {
+	switch normalizeLanguage(language, pathName) {
+	case "go":
 		return gomerge.MergeGo(otherSource, currentSource, gomerge.DialectGo)
-	case ".json":
+	case "json":
 		return jsonmerge.MergeJSON(otherSource, currentSource, jsonmerge.DialectJSON)
-	case ".jsonc":
+	case "jsonc":
 		return jsonmerge.MergeJSON(otherSource, currentSource, jsonmerge.DialectJSONC)
 	default:
 		return plainmerge.MergeText(otherSource, currentSource)
 	}
+}
+
+func normalizeLanguage(language string, pathName string) string {
+	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "go", "golang":
+		return "go"
+	case "json":
+		return "json"
+	case "jsonc", "json with comments":
+		return "jsonc"
+	case "plain", "text", "plaintext", "text/plain":
+		return "text"
+	}
+
+	switch strings.ToLower(filepath.Ext(pathName)) {
+	case ".go":
+		return "go"
+	case ".json":
+		return "json"
+	case ".jsonc":
+		return "jsonc"
+	default:
+		return "text"
+	}
+}
+
+func loadPathSettings(pathName string) pathSettings {
+	settings := pathSettings{conflictMarkerSize: 7}
+	for _, attributesPath := range attributeFilesForPath(pathName) {
+		source, err := os.ReadFile(attributesPath)
+		if err != nil {
+			continue
+		}
+		applyAttributes(&settings, pathName, string(source))
+	}
+	return settings
+}
+
+func attributeFilesForPath(pathName string) []string {
+	cleanPath := filepath.Clean(filepath.FromSlash(pathName))
+	dir := filepath.Dir(cleanPath)
+	if dir == "." || strings.HasPrefix(dir, "..") || filepath.IsAbs(dir) {
+		return []string{".gitattributes"}
+	}
+
+	parts := strings.Split(dir, string(filepath.Separator))
+	files := []string{".gitattributes"}
+	for index := range parts {
+		if parts[index] == "" || parts[index] == "." {
+			continue
+		}
+		files = append(files, filepath.Join(filepath.Join(parts[:index+1]...), ".gitattributes"))
+	}
+	return files
+}
+
+func applyAttributes(settings *pathSettings, pathName string, source string) {
+	for _, rawLine := range strings.Split(source, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 || !attributePatternMatches(fields[0], pathName) {
+			continue
+		}
+		for _, field := range fields[1:] {
+			key, value, ok := strings.Cut(field, "=")
+			if !ok {
+				continue
+			}
+			switch key {
+			case "smorg.language", "linguist-language":
+				settings.language = value
+			case "conflict-marker-size":
+				if markerSize, err := strconv.Atoi(value); err == nil && markerSize > 0 {
+					settings.conflictMarkerSize = markerSize
+				}
+			}
+		}
+	}
+}
+
+func attributePatternMatches(pattern string, pathName string) bool {
+	cleanPath := filepath.Clean(filepath.FromSlash(pathName))
+	if pattern == cleanPath {
+		return true
+	}
+	if !strings.Contains(pattern, "/") {
+		matched, err := filepath.Match(pattern, filepath.Base(cleanPath))
+		return err == nil && matched
+	}
+	matched, err := filepath.Match(filepath.Clean(filepath.FromSlash(pattern)), cleanPath)
+	return err == nil && matched
 }
 
 func firstNonEmpty(values ...string) string {

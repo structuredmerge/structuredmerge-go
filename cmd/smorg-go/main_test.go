@@ -92,6 +92,48 @@ func TestMergeDriverStrictFailureReturnsConflictExitCode(t *testing.T) {
 	}
 }
 
+func TestMergeDriverUsesSmorgLanguageAttribute(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.WriteFile(filepath.Join(dir, ".gitattributes"), []byte("*.data smorg.language=json\n"), 0o644); err != nil {
+		t.Fatalf("write gitattributes: %v", err)
+	}
+	ancestor := writeTestFile(t, dir, "ancestor.tmp", `{"name":"structuredmerge"}`)
+	current := writeTestFile(t, dir, "current.tmp", `{"name":"structuredmerge","current":true}`)
+	other := writeTestFile(t, dir, "other.tmp", `{"name":"structuredmerge","other":true}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", ancestor, current, other, "package.data"}, &stdout, &stderr)
+	if exitCode != exitSuccess {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+
+	merged, err := os.ReadFile(current)
+	if err != nil {
+		t.Fatalf("read merged current file: %v", err)
+	}
+	mergedSource := string(merged)
+	if !strings.Contains(mergedSource, `"current":true`) || !strings.Contains(mergedSource, `"other":true`) {
+		t.Fatalf("attribute-selected JSON merge did not preserve both sides: %s", mergedSource)
+	}
+}
+
+func TestPathSettingsUseLinguistLanguageAndConflictMarkerSize(t *testing.T) {
+	settings := pathSettings{conflictMarkerSize: 7}
+	applyAttributes(&settings, "fixtures/package.data", strings.Join([]string{
+		"*.skip smorg.language=go",
+		"*.data linguist-language=json conflict-marker-size=12",
+	}, "\n"))
+
+	if settings.language != "json" {
+		t.Fatalf("expected linguist language, got %q", settings.language)
+	}
+	if settings.conflictMarkerSize != 12 {
+		t.Fatalf("expected conflict marker size 12, got %d", settings.conflictMarkerSize)
+	}
+}
+
 func TestDiffDriverTwoArgumentFormPrintsStructuredDiff(t *testing.T) {
 	dir := t.TempDir()
 	oldPath := writeTestFile(t, dir, "old.go", "package main\n\nfunc Old() {}\n")
