@@ -685,6 +685,22 @@ func TestSharedFixtureFormattingEdgeFixtures(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureUnsafeRenderFallbackOrFailure(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-821-unsafe-render-fallback-or-failure", "unsafe-render-fallback-or-failure.json"))
+	report := decodeFixtureValue[RenderSafetyReport](t, fixture["render_safety"])
+	expected := fixture["expected"].(map[string]any)
+	allowedOutcomes := decodeFixtureValue[[]string](t, expected["allowed_outcomes"])
+	outcomeAllowed := slices.Contains(allowedOutcomes, report.Outcome)
+
+	if report.SafeToRender != expected["safe_to_render"].(bool) ||
+		!outcomeAllowed ||
+		report.Outcome != expected["outcome"].(string) ||
+		report.FallbackStrategy != expected["fallback_strategy"].(string) ||
+		len(report.Diagnostics) != int(expected["diagnostic_count"].(float64)) {
+		t.Fatalf("unexpected render safety report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

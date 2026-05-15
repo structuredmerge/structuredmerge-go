@@ -822,6 +822,16 @@ type FormattingEdgeFixtureSuite struct {
 	Diagnostics []string                    `json:"diagnostics"`
 }
 
+type RenderSafetyReport struct {
+	ReportID         string   `json:"report_id"`
+	Version          string   `json:"version"`
+	ProviderID       string   `json:"provider_id"`
+	SafeToRender     bool     `json:"safe_to_render"`
+	Outcome          string   `json:"outcome"`
+	FallbackStrategy string   `json:"fallback_strategy"`
+	Diagnostics      []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
