@@ -541,6 +541,23 @@ type MatchingDebugArtifacts struct {
 	Diagnostics     []string                     `json:"diagnostics"`
 }
 
+type FallbackScopeDefinition struct {
+	Scope              string `json:"scope"`
+	Path               string `json:"path"`
+	OwnerPath          string `json:"owner_path"`
+	CoversChildren     bool   `json:"covers_children"`
+	RequiresSourceSpan bool   `json:"requires_source_span"`
+	Description        string `json:"description"`
+}
+
+type FallbackScopeReport struct {
+	ReportID     string                    `json:"report_id"`
+	Version      string                    `json:"version"`
+	Scopes       []FallbackScopeDefinition `json:"scopes"`
+	DefaultOrder []string                  `json:"default_order"`
+	Diagnostics  []string                  `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

@@ -398,6 +398,20 @@ func TestSharedFixtureMatchingDebugArtifacts(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFallbackScopes(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-805-fallback-scopes", "fallback-scopes.json"))
+	report := decodeFixtureValue[FallbackScopeReport](t, fixture["fallback"])
+	expected := fixture["expected"].(map[string]any)
+
+	if len(report.Scopes) != int(expected["scope_count"].(float64)) ||
+		!reflect.DeepEqual(report.DefaultOrder, decodeFixtureValue[[]string](t, expected["default_order"])) ||
+		report.Scopes[0].Scope != expected["first_scope"].(string) ||
+		report.Scopes[len(report.Scopes)-1].Scope != expected["last_scope"].(string) ||
+		report.Scopes[len(report.Scopes)-1].RequiresSourceSpan != expected["whole_file_requires_source_span"].(bool) {
+		t.Fatalf("unexpected fallback scope report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
