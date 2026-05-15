@@ -304,6 +304,31 @@ func TestSharedFixtureSourceTextNormalizedLeafMatching(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMoveDetectionOptIn(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-800-move-detection-opt-in", "move-detection-opt-in.json"))
+	report := decodeFixtureValue[MoveDetectionMatchingReport](t, fixture["matching"])
+	expected := fixture["expected"].(map[string]any)
+	moveCount := 0
+	for _, match := range report.Matches {
+		if match.Moved {
+			moveCount++
+		}
+	}
+
+	if report.Strategy != expected["strategy"].(string) ||
+		report.Capability.Name != expected["capability"].(string) ||
+		report.Capability.Enabled != expected["enabled"].(bool) ||
+		report.Capability.DefaultEnabled != expected["default_enabled"].(bool) ||
+		report.Capability.RequiresStableNodeIdentity != expected["requires_stable_node_identity"].(bool) ||
+		len(report.Matches) != int(expected["match_count"].(float64)) ||
+		moveCount != int(expected["move_count"].(float64)) ||
+		report.Matches[0].Signature != expected["first_moved_signature"].(string) ||
+		report.Matches[0].FromIndex != int(expected["first_moved_from_index"].(float64)) ||
+		report.Matches[0].ToIndex != int(expected["first_moved_to_index"].(float64)) {
+		t.Fatalf("unexpected move detection matching report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

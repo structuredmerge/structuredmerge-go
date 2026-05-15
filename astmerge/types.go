@@ -388,6 +388,40 @@ type SourceTextNormalizedMatchingReport struct {
 	Diagnostics   []string                    `json:"diagnostics"`
 }
 
+type MoveDetectionCapability struct {
+	Name                       string `json:"name"`
+	Enabled                    bool   `json:"enabled"`
+	DefaultEnabled             bool   `json:"default_enabled"`
+	RequiresStableNodeIdentity bool   `json:"requires_stable_node_identity"`
+}
+
+type MoveDetectionMatch struct {
+	FromPath       string   `json:"from_path"`
+	ToPath         string   `json:"to_path"`
+	FromNodeID     string   `json:"from_node_id"`
+	ToNodeID       string   `json:"to_node_id"`
+	Signature      string   `json:"signature"`
+	Moved          bool     `json:"moved"`
+	FromParentPath string   `json:"from_parent_path"`
+	ToParentPath   string   `json:"to_parent_path"`
+	FromIndex      int      `json:"from_index"`
+	ToIndex        int      `json:"to_index"`
+	Confidence     float64  `json:"confidence"`
+	Diagnostics    []string `json:"diagnostics"`
+}
+
+type MoveDetectionMatchingReport struct {
+	MatchingID    string                  `json:"matching_id"`
+	Strategy      string                  `json:"strategy"`
+	FromRevision  string                  `json:"from_revision"`
+	ToRevision    string                  `json:"to_revision"`
+	Capability    MoveDetectionCapability `json:"capability"`
+	Matches       []MoveDetectionMatch    `json:"matches"`
+	UnmatchedFrom []string                `json:"unmatched_from"`
+	UnmatchedTo   []string                `json:"unmatched_to"`
+	Diagnostics   []string                `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
