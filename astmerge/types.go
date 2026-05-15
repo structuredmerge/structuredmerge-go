@@ -893,6 +893,21 @@ type GoProviderComparisonReport struct {
 	Diagnostics  []string `json:"diagnostics"`
 }
 
+type BackendParityCase struct {
+	CaseID             string   `json:"case_id"`
+	NativeProvider     string   `json:"native_provider"`
+	TreeSitterProvider string   `json:"tree_sitter_provider"`
+	Dimensions         []string `json:"dimensions"`
+}
+
+type BackendParitySuite struct {
+	SuiteID     string              `json:"suite_id"`
+	Version     string              `json:"version"`
+	Language    string              `json:"language"`
+	Cases       []BackendParityCase `json:"cases"`
+	Diagnostics []string            `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

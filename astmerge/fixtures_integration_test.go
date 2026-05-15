@@ -782,6 +782,28 @@ func TestSharedFixtureGoProviderComparison(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureBackendParityFixtures(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-827-backend-parity-fixtures", "backend-parity-fixtures.json"))
+	suite := decodeFixtureValue[BackendParitySuite](t, fixture["parity_suite"])
+	expected := fixture["expected"].(map[string]any)
+	nativeProviders := make([]string, 0, len(suite.Cases))
+	sourceSpanCaseCount := 0
+	for _, parityCase := range suite.Cases {
+		nativeProviders = append(nativeProviders, parityCase.NativeProvider)
+		if slices.Contains(parityCase.Dimensions, "source_spans") {
+			sourceSpanCaseCount++
+		}
+	}
+
+	if suite.Language != expected["language"].(string) ||
+		len(suite.Cases) != int(expected["case_count"].(float64)) ||
+		!reflect.DeepEqual(nativeProviders, decodeFixtureValue[[]string](t, expected["native_providers"])) ||
+		suite.Cases[0].TreeSitterProvider != expected["tree_sitter_provider"].(string) ||
+		sourceSpanCaseCount != int(expected["source_span_case_count"].(float64)) {
+		t.Fatalf("unexpected backend parity suite: %+v", suite)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
