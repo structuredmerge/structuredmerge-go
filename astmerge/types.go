@@ -574,6 +574,25 @@ type ConflictCategoryReport struct {
 	Diagnostics []string        `json:"diagnostics"`
 }
 
+type LineSpan struct {
+	StartLine int `json:"start_line"`
+	EndLine   int `json:"end_line"`
+}
+
+type LocalLineFallbackReport struct {
+	FallbackID       string   `json:"fallback_id"`
+	Strategy         string   `json:"strategy"`
+	Scope            string   `json:"scope"`
+	Path             string   `json:"path"`
+	OwnerPath        string   `json:"owner_path"`
+	BaseSpan         LineSpan `json:"base_span"`
+	LeftSpan         LineSpan `json:"left_span"`
+	RightSpan        LineSpan `json:"right_span"`
+	Result           string   `json:"result"`
+	ConflictCategory string   `json:"conflict_category"`
+	Diagnostics      []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

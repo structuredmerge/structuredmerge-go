@@ -432,6 +432,22 @@ func TestSharedFixtureConflictCategories(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureLocalLineBasedFallback(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-807-local-line-based-fallback", "local-line-based-fallback.json"))
+	report := decodeFixtureValue[LocalLineFallbackReport](t, fixture["fallback"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Strategy != expected["strategy"].(string) ||
+		report.Scope != expected["scope"].(string) ||
+		report.Path != expected["path"].(string) ||
+		report.Result != expected["result"].(string) ||
+		report.ConflictCategory != expected["conflict_category"].(string) ||
+		report.LeftSpan.EndLine-report.LeftSpan.StartLine+1 != int(expected["left_line_count"].(float64)) ||
+		report.RightSpan.EndLine-report.RightSpan.StartLine+1 != int(expected["right_line_count"].(float64)) {
+		t.Fatalf("unexpected local line fallback report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
