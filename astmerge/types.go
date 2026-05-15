@@ -422,6 +422,40 @@ type MoveDetectionMatchingReport struct {
 	Diagnostics   []string                `json:"diagnostics"`
 }
 
+type RenameAwareCapability struct {
+	Name                    string `json:"name"`
+	Status                  string `json:"status"`
+	Enabled                 bool   `json:"enabled"`
+	RequiresExplicitProfile bool   `json:"requires_explicit_profile"`
+	RequiresDiagnostics     bool   `json:"requires_diagnostics"`
+}
+
+type RenameAwareCandidate struct {
+	FromPath       string   `json:"from_path"`
+	ToPath         string   `json:"to_path"`
+	FromNodeID     string   `json:"from_node_id"`
+	ToNodeID       string   `json:"to_node_id"`
+	FromSignature  string   `json:"from_signature"`
+	ToSignature    string   `json:"to_signature"`
+	StableBodyHash string   `json:"stable_body_hash"`
+	RenameDistance float64  `json:"rename_distance"`
+	Selected       bool     `json:"selected"`
+	Diagnostics    []string `json:"diagnostics"`
+}
+
+type RenameAwareMatchingReport struct {
+	MatchingID    string                 `json:"matching_id"`
+	Strategy      string                 `json:"strategy"`
+	FromRevision  string                 `json:"from_revision"`
+	ToRevision    string                 `json:"to_revision"`
+	Capability    RenameAwareCapability  `json:"capability"`
+	Candidates    []RenameAwareCandidate `json:"candidates"`
+	Matches       []SignatureNodeMatch   `json:"matches"`
+	UnmatchedFrom []string               `json:"unmatched_from"`
+	UnmatchedTo   []string               `json:"unmatched_to"`
+	Diagnostics   []string               `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

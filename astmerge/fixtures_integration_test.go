@@ -329,6 +329,25 @@ func TestSharedFixtureMoveDetectionOptIn(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureRenameAwareMatchingGated(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-801-rename-aware-matching-gated", "rename-aware-matching-gated.json"))
+	report := decodeFixtureValue[RenameAwareMatchingReport](t, fixture["matching"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Strategy != expected["strategy"].(string) ||
+		report.Capability.Name != expected["capability"].(string) ||
+		report.Capability.Status != expected["status"].(string) ||
+		report.Capability.Enabled != expected["enabled"].(bool) ||
+		report.Capability.RequiresExplicitProfile != expected["requires_explicit_profile"].(bool) ||
+		report.Capability.RequiresDiagnostics != expected["requires_diagnostics"].(bool) ||
+		len(report.Candidates) != int(expected["candidate_count"].(float64)) ||
+		len(report.Matches) != int(expected["match_count"].(float64)) ||
+		report.Candidates[0].Selected != expected["first_candidate_selected"].(bool) ||
+		report.Candidates[0].StableBodyHash != expected["first_candidate_body_hash"].(string) {
+		t.Fatalf("unexpected rename-aware matching report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
