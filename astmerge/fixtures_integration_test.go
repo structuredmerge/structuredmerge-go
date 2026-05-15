@@ -887,6 +887,27 @@ func TestSharedFixtureGitDriverSmokeFixtures(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureDiffDriverSmokeFixtures(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-903-diff-driver-smoke-fixtures", "diff-driver-smoke-fixtures.json"))
+	suite := decodeFixtureValue[DiffDriverSmokeSuite](t, fixture["suite"])
+	expected := fixture["expected"].(map[string]any)
+	argumentCounts := make([]int, 0, len(suite.Cases))
+	structuredDiffCount := 0
+	for _, smokeCase := range suite.Cases {
+		argumentCounts = append(argumentCounts, smokeCase.ArgumentCount)
+		if smokeCase.ExpectedOutputKind == "structured_diff" {
+			structuredDiffCount++
+		}
+	}
+
+	if suite.DriverName != expected["driver_name"].(string) ||
+		len(suite.Cases) != int(expected["case_count"].(float64)) ||
+		!reflect.DeepEqual(argumentCounts, decodeFixtureValue[[]int](t, expected["argument_counts"])) ||
+		structuredDiffCount != int(expected["structured_diff_count"].(float64)) {
+		t.Fatalf("unexpected diff driver smoke suite: %+v", suite)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

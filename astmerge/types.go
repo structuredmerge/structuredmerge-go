@@ -990,6 +990,22 @@ type GitDriverSmokeSuite struct {
 	Diagnostics []string             `json:"diagnostics"`
 }
 
+type DiffDriverSmokeCase struct {
+	CaseID             string   `json:"case_id"`
+	ArgumentCount      int      `json:"argument_count"`
+	ArgumentRoles      []string `json:"argument_roles"`
+	ExpectedExitCode   int      `json:"expected_exit_code"`
+	ExpectedOutputKind string   `json:"expected_output_kind"`
+}
+
+type DiffDriverSmokeSuite struct {
+	SuiteID     string                `json:"suite_id"`
+	Version     string                `json:"version"`
+	DriverName  string                `json:"driver_name"`
+	Cases       []DiffDriverSmokeCase `json:"cases"`
+	Diagnostics []string              `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
