@@ -1200,15 +1200,51 @@ type ProfileSkippedRule struct {
 	Reason string `json:"reason"`
 }
 
+type ActiveProfileRuleCounts struct {
+	NodeRoles          int `json:"node_roles"`
+	AtomicNodes        int `json:"atomic_nodes"`
+	Signatures         int `json:"signatures"`
+	CommutativeParents int `json:"commutative_parents"`
+	ChildGroups        int `json:"child_groups"`
+	CommentAttachment  int `json:"comment_attachment"`
+}
+
+type ActiveProfileValidationSummary struct {
+	OK           bool `json:"ok"`
+	ErrorCount   int  `json:"error_count"`
+	WarningCount int  `json:"warning_count"`
+}
+
+type ActiveProfileView struct {
+	ProfileID         string                         `json:"profile_id"`
+	Family            string                         `json:"family"`
+	Backend           string                         `json:"backend"`
+	BackendFamily     string                         `json:"backend_family"`
+	Parser            string                         `json:"parser"`
+	ParserVersion     string                         `json:"parser_version"`
+	LanguageVersion   string                         `json:"language_version"`
+	Dialect           string                         `json:"dialect"`
+	SupportedDialects []string                       `json:"supported_dialects"`
+	RuleCounts        ActiveProfileRuleCounts        `json:"rule_counts"`
+	Validation        ActiveProfileValidationSummary `json:"validation"`
+}
+
 type ProfileConformanceReport struct {
 	ReportID                string               `json:"report_id"`
 	Version                 string               `json:"version"`
 	Profile                 string               `json:"profile"`
+	ActiveProfile           *ActiveProfileView   `json:"active_profile,omitempty"`
 	EnabledRules            []string             `json:"enabled_rules"`
 	SkippedRules            []ProfileSkippedRule `json:"skipped_rules"`
 	FallbackCount           int                  `json:"fallback_count"`
 	UnresolvedConflictCount int                  `json:"unresolved_conflict_count"`
 	Diagnostics             []string             `json:"diagnostics"`
+}
+
+type ProfileDebugOutput struct {
+	Mode          string            `json:"mode"`
+	ActiveProfile ActiveProfileView `json:"active_profile"`
+	Diagnostics   []string          `json:"diagnostics"`
 }
 
 type PolicySurface string

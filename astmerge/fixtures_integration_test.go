@@ -1241,6 +1241,31 @@ func TestSharedFixtureProfileValidation(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureActiveProfileReporting(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-910-active-profile-reporting", "active-profile-reporting.json"))
+	expected := fixture["expected"].(map[string]any)
+
+	activeProfile := decodeFixtureValue[ActiveProfileView](t, fixture["active_profile"])
+	if activeProfile.ProfileID != expected["profile_id"].(string) ||
+		activeProfile.Family != expected["family"].(string) ||
+		activeProfile.Backend != expected["backend"].(string) ||
+		activeProfile.Parser != expected["parser"].(string) ||
+		activeProfile.RuleCounts.Signatures != int(expected["signature_count"].(float64)) ||
+		activeProfile.Validation.OK != expected["validation_ok"].(bool) {
+		t.Fatalf("unexpected active profile view: %+v", activeProfile)
+	}
+
+	report := decodeFixtureValue[ProfileConformanceReport](t, fixture["conformance_report"])
+	if report.ActiveProfile == nil || report.ActiveProfile.ProfileID != expected["profile_id"].(string) {
+		t.Fatalf("expected conformance report to include active profile: %+v", report)
+	}
+
+	debugOutput := decodeFixtureValue[ProfileDebugOutput](t, fixture["debug_output"])
+	if debugOutput.Mode != expected["debug_mode"].(string) || debugOutput.ActiveProfile.ProfileID != expected["profile_id"].(string) {
+		t.Fatalf("unexpected profile debug output: %+v", debugOutput)
+	}
+}
+
 func validationMessages(diagnostics []ProfileValidationDiagnostic) []string {
 	messages := make([]string, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {
