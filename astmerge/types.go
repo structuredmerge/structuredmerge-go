@@ -761,6 +761,21 @@ type FormattingPreservationConformanceReport struct {
 	Diagnostics       []string                      `json:"diagnostics"`
 }
 
+type FormattingRecommendationWeights struct {
+	ExpectedOutputLineDiffSize      float64 `json:"expected_output_line_diff_size"`
+	ExpectedOutputCharacterDiffSize float64 `json:"expected_output_character_diff_size"`
+}
+
+type FormattingRecommendationGate struct {
+	GateID      string                          `json:"gate_id"`
+	Version     string                          `json:"version"`
+	Threshold   float64                         `json:"threshold"`
+	Passed      bool                            `json:"passed"`
+	Weights     FormattingRecommendationWeights `json:"weights"`
+	Metrics     FormattingPreservationMetrics   `json:"metrics"`
+	Diagnostics []string                        `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

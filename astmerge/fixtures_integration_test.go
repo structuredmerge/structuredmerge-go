@@ -601,6 +601,20 @@ func TestSharedFixtureFormattingPreservationMetrics(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFormattingRecommendationGate(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-816-formatting-recommendation-gate", "formatting-recommendation-gate.json"))
+	gate := decodeFixtureValue[FormattingRecommendationGate](t, fixture["recommendation_gate"])
+	expected := fixture["expected"].(map[string]any)
+
+	if gate.Threshold != expected["threshold"].(float64) ||
+		gate.Passed != expected["passed"].(bool) ||
+		gate.Weights.ExpectedOutputLineDiffSize != expected["line_weight"].(float64) ||
+		gate.Weights.ExpectedOutputCharacterDiffSize != expected["character_weight"].(float64) ||
+		gate.Metrics.FormattingPreservationScore != expected["score"].(float64) {
+		t.Fatalf("unexpected formatting recommendation gate: %+v", gate)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
