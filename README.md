@@ -38,12 +38,15 @@ provided a `smorg` symlink.
 ```sh
 git config merge.smorg-go.driver 'smorg-go merge-driver %O %A %B %P'
 git config diff.smorg-go.command 'smorg-go diff-driver'
+smorg-go conflicts diff path/to/file-with-conflicts.go
 smorg-go languages --gitattributes
 ```
 
 `merge-driver` updates Git's `%A` file by default, or writes to `--output` when
 used outside git. `diff-driver` accepts both the two-argument local form and the
 seven- or nine-argument forms Git passes to external diff commands.
+`conflicts diff` reports conflict-marker regions in a file that already contains
+Git conflict markers.
 
 ## Packages
 

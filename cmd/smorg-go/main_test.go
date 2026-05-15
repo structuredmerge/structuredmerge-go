@@ -196,3 +196,66 @@ func TestLanguagesGitattributes(t *testing.T) {
 		}
 	}
 }
+
+func TestConflictsDiffReportsConflictRegions(t *testing.T) {
+	dir := t.TempDir()
+	conflicted := writeTestFile(t, dir, "conflicted.go", strings.Join([]string{
+		"package main",
+		"<<<<<<< ours",
+		"func Current() {}",
+		"=======",
+		"func Other() {}",
+		">>>>>>> theirs",
+		"",
+	}, "\n"))
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"conflicts", "diff", "--path-name", "main.go", conflicted}, &stdout, &stderr)
+	if exitCode != exitSuccess {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "conflicts main.go") || !strings.Contains(output, "count 1") || !strings.Contains(output, "conflict 1 lines 2-6 separator 4") {
+		t.Fatalf("expected conflict region output, got %q", output)
+	}
+}
+
+func TestConflictsDiffExitCodeReportsUnresolvedConflicts(t *testing.T) {
+	dir := t.TempDir()
+	conflicted := writeTestFile(t, dir, "conflicted.go", "<<<<<<< ours\nx\n=======\ny\n>>>>>>> theirs\n")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"conflicts", "diff", "--exit-code", conflicted}, &stdout, &stderr)
+	if exitCode != exitUnresolvedConflict {
+		t.Fatalf("unexpected exit code %d stderr=%s stdout=%s", exitCode, stderr.String(), stdout.String())
+	}
+}
+
+func TestConflictsDiffUsesConflictMarkerSizeAttribute(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.WriteFile(filepath.Join(dir, ".gitattributes"), []byte("*.go conflict-marker-size=9\n"), 0o644); err != nil {
+		t.Fatalf("write gitattributes: %v", err)
+	}
+	conflicted := writeTestFile(t, dir, "conflicted.go", strings.Join([]string{
+		"<<<<<<<<< ours",
+		"x",
+		"=========",
+		"y",
+		">>>>>>>>> theirs",
+		"",
+	}, "\n"))
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"conflicts", "diff", "--path-name", "conflicted.go", conflicted}, &stdout, &stderr)
+	if exitCode != exitSuccess {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "count 1") {
+		t.Fatalf("expected custom-marker conflict count, got %q", stdout.String())
+	}
+}

@@ -45,6 +45,18 @@ type pathSettings struct {
 	conflictMarkerSize int
 }
 
+type conflictDiffOptions struct {
+	pathName string
+	filePath string
+	exitCode bool
+}
+
+type conflictRegion struct {
+	startLine     int
+	separatorLine int
+	endLine       int
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -62,6 +74,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return runDiffDriver(args[1:], stdout, stderr)
 	case "languages":
 		return runLanguages(args[1:], stdout, stderr)
+	case "conflicts":
+		return runConflicts(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		printUsage(stdout)
 		return exitSuccess
@@ -77,6 +91,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "       smorg-go merge-driver --ancestor %O --current %A --other %B --path-name %P")
 	fmt.Fprintln(out, "       smorg-go diff-driver [--path-name PATH] OLD NEW")
 	fmt.Fprintln(out, "       smorg-go diff-driver PATH OLD-FILE OLD-HEX OLD-MODE NEW-FILE NEW-HEX NEW-MODE [OLD-PREFIX NEW-PREFIX]")
+	fmt.Fprintln(out, "       smorg-go conflicts diff [--path-name PATH] [--exit-code] FILE")
 	fmt.Fprintln(out, "       smorg-go languages --gitattributes")
 }
 
@@ -278,6 +293,94 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stdout, line)
 	}
 	return exitSuccess
+}
+
+func runConflicts(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "conflicts requires a subcommand")
+		return exitUserError
+	}
+	switch args[0] {
+	case "diff":
+		return runConflictsDiff(args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown conflicts subcommand %q\n", args[0])
+		return exitUserError
+	}
+}
+
+func runConflictsDiff(args []string, stdout io.Writer, stderr io.Writer) int {
+	options, ok := parseConflictsDiffOptions(args, stderr)
+	if !ok {
+		return exitUserError
+	}
+
+	source, err := os.ReadFile(options.filePath)
+	if err != nil {
+		fmt.Fprintf(stderr, "read conflicted file: %v\n", err)
+		return exitUserError
+	}
+
+	effectivePath := firstNonEmpty(options.pathName, options.filePath)
+	settings := loadPathSettings(effectivePath)
+	regions := findConflictRegions(string(source), settings.conflictMarkerSize)
+	printConflictDiff(stdout, effectivePath, regions)
+	if options.exitCode && len(regions) > 0 {
+		return exitUnresolvedConflict
+	}
+	return exitSuccess
+}
+
+func parseConflictsDiffOptions(args []string, stderr io.Writer) (conflictDiffOptions, bool) {
+	var options conflictDiffOptions
+	flags := flag.NewFlagSet("conflicts diff", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&options.pathName, "path-name", "", "original git path name")
+	flags.BoolVar(&options.exitCode, "exit-code", false, "return unresolved-conflict exit code when conflicts are present")
+	if err := flags.Parse(args); err != nil {
+		return options, false
+	}
+	positionals := flags.Args()
+	if len(positionals) != 1 {
+		fmt.Fprintln(stderr, "conflicts diff requires exactly one file path")
+		return options, false
+	}
+	options.filePath = positionals[0]
+	return options, true
+}
+
+func findConflictRegions(source string, markerSize int) []conflictRegion {
+	if markerSize <= 0 {
+		markerSize = 7
+	}
+	startPrefix := strings.Repeat("<", markerSize)
+	separatorPrefix := strings.Repeat("=", markerSize)
+	endPrefix := strings.Repeat(">", markerSize)
+
+	var regions []conflictRegion
+	var current *conflictRegion
+	for index, line := range strings.Split(source, "\n") {
+		lineNumber := index + 1
+		switch {
+		case strings.HasPrefix(line, startPrefix):
+			current = &conflictRegion{startLine: lineNumber}
+		case current != nil && current.separatorLine == 0 && strings.HasPrefix(line, separatorPrefix):
+			current.separatorLine = lineNumber
+		case current != nil && strings.HasPrefix(line, endPrefix):
+			current.endLine = lineNumber
+			regions = append(regions, *current)
+			current = nil
+		}
+	}
+	return regions
+}
+
+func printConflictDiff(stdout io.Writer, pathName string, regions []conflictRegion) {
+	fmt.Fprintf(stdout, "conflicts %s\n", pathName)
+	fmt.Fprintf(stdout, "count %d\n", len(regions))
+	for index, region := range regions {
+		fmt.Fprintf(stdout, "conflict %d lines %d-%d separator %d\n", index+1, region.startLine, region.endLine, region.separatorLine)
+	}
 }
 
 func (options mergeDriverOptions) effectivePath() string {
