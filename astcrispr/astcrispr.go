@@ -47,6 +47,13 @@ type SelectionProfile struct {
 	IncludeTrailingGap bool
 }
 
+type DestinationProfile struct {
+	ResolutionKind   string
+	ResolutionSource string
+	AnchorBoundary   string
+	UsedIfMissing    bool
+}
+
 type profileDescriptor struct {
 	family      string
 	description string
@@ -89,6 +96,22 @@ var knownCommentRegions = map[string]profileDescriptor{
 	"leading":  {family: "leading", description: "Leading comment region"},
 	"trailing": {family: "trailing", description: "Trailing comment region"},
 	"inline":   {family: "inline", description: "Inline comment region"},
+}
+
+var knownResolutionKinds = map[string]profileDescriptor{
+	"append_fallback":        {family: "append", description: "Insertion fell back to appending at the end of the document"},
+	"anchor_after_statement": {family: "anchored", description: "Insertion resolved a statement anchor and spliced after it"},
+}
+
+var knownResolutionSources = map[string]profileDescriptor{
+	"none":     {family: "implicit", description: "No destination object was provided"},
+	"callable": {family: "callable", description: "Destination was resolved from a callable"},
+	"selector": {family: "selector", description: "Destination was resolved from an owner selector anchor"},
+}
+
+var knownAnchorBoundaries = map[string]profileDescriptor{
+	"none":                             {family: "none", description: "No anchor boundary was used"},
+	"statement_end_plus_following_gap": {family: "gap_preserving_statement", description: "Insertion anchored after a statement and preserved its following blank-line gap"},
 }
 
 func NewLimit(spec any) (Limit, error) {
@@ -138,6 +161,24 @@ func NewSelectionProfile(ownerScope, ownerSelector, selectorKind, selectionInten
 	}
 }
 
+func NewDestinationProfile(resolutionKind, resolutionSource, anchorBoundary string, usedIfMissing bool) DestinationProfile {
+	if resolutionKind == "" {
+		resolutionKind = "append_fallback"
+	}
+	if resolutionSource == "" {
+		resolutionSource = "none"
+	}
+	if anchorBoundary == "" {
+		anchorBoundary = "none"
+	}
+	return DestinationProfile{
+		ResolutionKind:   resolutionKind,
+		ResolutionSource: resolutionSource,
+		AnchorBoundary:   anchorBoundary,
+		UsedIfMissing:    usedIfMissing,
+	}
+}
+
 func (profile MatchProfile) Report() map[string]any {
 	startDescriptor, knownStart := knownStartBoundaries[profile.StartBoundary]
 	endDescriptor, knownEnd := knownEndBoundaries[profile.EndBoundary]
@@ -166,6 +207,26 @@ func (profile MatchProfile) Report() map[string]any {
 		"known_payload_kind":    knownPayload,
 		"comment_anchored":      startFamily == "comment_anchor" || payloadFamily == "comment_owned",
 		"trailing_gap_extended": endFamily == "gap_extension",
+	}
+}
+
+func (profile DestinationProfile) Report() map[string]any {
+	resolutionFamily, knownResolutionKind := descriptorFamily(knownResolutionKinds, profile.ResolutionKind)
+	resolutionSourceFamily, knownResolutionSource := descriptorFamily(knownResolutionSources, profile.ResolutionSource)
+	anchorBoundaryFamily, knownAnchorBoundary := descriptorFamily(knownAnchorBoundaries, profile.AnchorBoundary)
+	return map[string]any{
+		"resolution_kind":          profile.ResolutionKind,
+		"resolution_family":        resolutionFamily,
+		"known_resolution_kind":    knownResolutionKind,
+		"resolution_source":        profile.ResolutionSource,
+		"resolution_source_family": resolutionSourceFamily,
+		"known_resolution_source":  knownResolutionSource,
+		"anchor_boundary":          profile.AnchorBoundary,
+		"anchor_boundary_family":   anchorBoundaryFamily,
+		"known_anchor_boundary":    knownAnchorBoundary,
+		"used_if_missing":          profile.UsedIfMissing,
+		"append_fallback":          profile.ResolutionKind == "append_fallback",
+		"anchored":                 resolutionFamily == "anchored",
 	}
 }
 
@@ -389,9 +450,9 @@ func BoundaryReport() map[string]any {
 			"limit helpers",
 			"match profile helpers",
 			"selection profile helpers",
+			"destination profile helpers",
 		},
 		"future_exports": []any{
-			"destination profile helpers",
 			"operation profile helpers",
 			"replace/delete/insert/move helpers",
 			"batch operation helpers",
