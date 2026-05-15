@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -649,6 +650,51 @@ func TestSharedFixtureEditProjectionSupport(t *testing.T) {
 		len(unsupported.SupportedOperations) != 0 ||
 		unsupported.Diagnostics[0] != "edit projection unavailable: native tree not retained" {
 		t.Fatalf("unexpected unsupported edit projection support: %+v", unsupported)
+	}
+}
+
+func TestSharedFixturePathValidation(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-925-tree-haver-path-validation", "path-validation.json")
+
+	for _, rawCase := range fixture["library_path_cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		result := ValidateLibraryPath(testCase["path"].(string))
+		if result.Valid != testCase["expected_valid"].(bool) {
+			t.Fatalf("unexpected library path validity for %s: %+v", testCase["name"], result)
+		}
+		if !reflect.DeepEqual(result.Errors, stringSliceFromFixture(testCase["expected_errors"])) {
+			t.Fatalf("unexpected library path errors for %s: %+v", testCase["name"], result.Errors)
+		}
+	}
+
+	for _, rawCase := range fixture["language_name_cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		value := testCase["value"].(string)
+		if SafeLanguageName(value) != testCase["expected_valid"].(bool) {
+			t.Fatalf("unexpected language validity for %s", testCase["name"])
+		}
+		sanitized := SanitizeLanguageName(value)
+		if testCase["expected_sanitized"] == nil {
+			if sanitized != nil {
+				t.Fatalf("unexpected sanitized language for %s: %s", testCase["name"], *sanitized)
+			}
+		} else if sanitized == nil || *sanitized != testCase["expected_sanitized"].(string) {
+			t.Fatalf("unexpected sanitized language for %s: %v", testCase["name"], sanitized)
+		}
+	}
+
+	for _, rawCase := range fixture["symbol_name_cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		if SafeSymbolName(testCase["value"].(string)) != testCase["expected_valid"].(bool) {
+			t.Fatalf("unexpected symbol validity for %s", testCase["name"])
+		}
+	}
+
+	for _, rawCase := range fixture["backend_name_cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		if SafeBackendName(testCase["value"].(string)) != testCase["expected_valid"].(bool) {
+			t.Fatalf("unexpected backend validity for %s", testCase["name"])
+		}
 	}
 }
 

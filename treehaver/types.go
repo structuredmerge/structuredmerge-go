@@ -2,6 +2,7 @@ package treehaver
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -187,6 +188,12 @@ type EditProjectionSupport struct {
 	PreservesSourceFragments bool             `json:"preserves_source_fragments"`
 	UnsupportedReason        *string          `json:"unsupported_reason"`
 	Diagnostics              []string         `json:"diagnostics"`
+}
+
+type LibraryPathValidation struct {
+	Path   string
+	Valid  bool
+	Errors []string
 }
 
 type OrderedSiblingEdge struct {
@@ -620,6 +627,107 @@ func RegisteredBackends() []BackendReference {
 		return strings.Compare(left.ID, right.ID)
 	})
 	return backends
+}
+
+var (
+	validLibraryFilenamePattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+	validLanguageNamePattern     = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	validSymbolNamePattern       = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	versionedSharedObjectPattern = regexp.MustCompile(`\.so\.\d+$`)
+)
+
+const MaxLibraryPathLength = 4096
+
+func ValidateLibraryPath(libraryPath string) LibraryPathValidation {
+	errors := LibraryPathErrors(libraryPath)
+	return LibraryPathValidation{Path: libraryPath, Valid: len(errors) == 0, Errors: errors}
+}
+
+func LibraryPathErrors(libraryPath string) []string {
+	errors := []string{}
+	if libraryPath == "" {
+		return []string{"path_empty"}
+	}
+	if len(libraryPath) > MaxLibraryPathLength {
+		errors = append(errors, "path_too_long")
+	}
+	if strings.Contains(libraryPath, "\x00") {
+		errors = append(errors, "path_contains_null_byte")
+	}
+	if !strings.HasPrefix(libraryPath, "/") && !windowsAbsolutePath(libraryPath) {
+		errors = append(errors, "path_not_absolute")
+	}
+	segments := strings.FieldsFunc(libraryPath, func(r rune) bool { return r == '/' || r == '\\' })
+	for _, segment := range segments {
+		if segment == ".." {
+			errors = append(errors, "path_contains_parent_traversal")
+			break
+		}
+	}
+	for _, segment := range segments {
+		if segment == "." {
+			errors = append(errors, "path_contains_current_directory_traversal")
+			break
+		}
+	}
+	if !hasAllowedLibraryExtension(libraryPath) {
+		errors = append(errors, "path_extension_not_allowed")
+	}
+	if !validLibraryFilenamePattern.MatchString(libraryFilename(libraryPath)) {
+		errors = append(errors, "filename_contains_invalid_characters")
+	}
+	return errors
+}
+
+func SafeLanguageName(name string) bool {
+	return len(name) <= 64 && validLanguageNamePattern.MatchString(name)
+}
+
+func SanitizeLanguageName(name string) *string {
+	var sanitized strings.Builder
+	for _, char := range strings.ToLower(name) {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '_' {
+			sanitized.WriteRune(char)
+		}
+	}
+	result := sanitized.String()
+	if result == "" || result[0] < 'a' || result[0] > 'z' {
+		return nil
+	}
+	return &result
+}
+
+func SafeSymbolName(symbol string) bool {
+	return len(symbol) <= 256 && validSymbolNamePattern.MatchString(symbol)
+}
+
+func SafeBackendName(name string) bool {
+	return name == "auto" || BackendReferenceByID(name) != nil
+}
+
+func windowsAbsolutePath(libraryPath string) bool {
+	if len(libraryPath) < 3 {
+		return false
+	}
+	letter := libraryPath[0]
+	return ((letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')) &&
+		libraryPath[1] == ':' &&
+		(libraryPath[2] == '/' || libraryPath[2] == '\\')
+}
+
+func hasAllowedLibraryExtension(libraryPath string) bool {
+	return strings.HasSuffix(libraryPath, ".so") ||
+		strings.HasSuffix(libraryPath, ".dylib") ||
+		strings.HasSuffix(libraryPath, ".dll") ||
+		versionedSharedObjectPattern.MatchString(libraryPath)
+}
+
+func libraryFilename(libraryPath string) string {
+	segments := strings.FieldsFunc(libraryPath, func(r rune) bool { return r == '/' || r == '\\' })
+	if len(segments) == 0 {
+		return ""
+	}
+	return segments[len(segments)-1]
 }
 
 func LanguagePackAdapterInfo() AdapterInfo {
