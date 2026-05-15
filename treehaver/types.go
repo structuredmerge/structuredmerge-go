@@ -235,6 +235,36 @@ type ProviderDiagnosticsReport struct {
 	Diagnostics []ProviderDiagnostic
 }
 
+type EditProjectionOperationRequest struct {
+	Operation         string
+	TargetNodeID      string
+	TargetNodePath    string
+	ReplacementSource string
+}
+
+type EditProjectionExecutionRequest struct {
+	ProviderID string
+	BackendRef BackendReference
+	Language   string
+	Source     string
+	Operations []EditProjectionOperationRequest
+}
+
+type AppliedEditProjectionOperation struct {
+	Operation        string
+	TargetNodeID     string
+	CorrelationKey   string
+	CorrelationValue string
+}
+
+type EditProjectionExecutionResult struct {
+	OK                bool
+	Status            string
+	Source            string
+	AppliedOperations []AppliedEditProjectionOperation
+	Diagnostics       []ProviderDiagnostic
+}
+
 type OrderedSiblingEdge struct {
 	ParentID          string
 	NodeID            string
@@ -782,6 +812,38 @@ func BuildProviderDiagnosticsReport(providerID string, backendRef BackendReferen
 		Language:    language,
 		Status:      status,
 		Diagnostics: diagnostics,
+	}
+}
+
+func BuildEditProjectionExecutionResult(source string, applied []AppliedEditProjectionOperation, diagnostics []ProviderDiagnostic) EditProjectionExecutionResult {
+	if applied == nil {
+		applied = []AppliedEditProjectionOperation{}
+	}
+	if diagnostics == nil {
+		diagnostics = []ProviderDiagnostic{}
+	}
+	blocking := false
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Blocking {
+			blocking = true
+			break
+		}
+	}
+	if blocking {
+		return EditProjectionExecutionResult{
+			OK:                false,
+			Status:            "rejected",
+			Source:            source,
+			AppliedOperations: []AppliedEditProjectionOperation{},
+			Diagnostics:       diagnostics,
+		}
+	}
+	return EditProjectionExecutionResult{
+		OK:                true,
+		Status:            "applied",
+		Source:            source,
+		AppliedOperations: applied,
+		Diagnostics:       diagnostics,
 	}
 }
 

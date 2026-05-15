@@ -1,10 +1,12 @@
 package godstmerge
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -124,6 +126,71 @@ func MergeGo(templateSource string, destinationSource string, dialect gomerge.Go
 	})
 }
 
+func ApplyEditProjection(request treehaver.EditProjectionExecutionRequest) treehaver.EditProjectionExecutionResult {
+	if request.ProviderID != BackendGoDST || request.BackendRef.ID != BackendGoDST {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "provider_edit_projection_unsupported",
+			Message:  fmt.Sprintf("provider %s does not support edit projection execution", request.ProviderID),
+			Path:     "provider_id",
+			Blocking: true,
+		}})
+	}
+	if request.Language != "go" {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "edit_projection_language_unsupported",
+			Message:  fmt.Sprintf("language %s is not supported by go-dst edit projection", request.Language),
+			Path:     "language",
+			Blocking: true,
+		}})
+	}
+	if len(request.Operations) != 1 {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "edit_projection_batch_unsupported",
+			Message:  "go-dst edit projection currently supports exactly one operation",
+			Path:     "operations",
+			Blocking: true,
+		}})
+	}
+
+	operation := request.Operations[0]
+	if operation.Operation != "replace_node" {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "edit_projection_operation_unsupported",
+			Message:  fmt.Sprintf("go-dst edit projection does not support %s", operation.Operation),
+			Path:     "operations[0].operation",
+			Blocking: true,
+		}})
+	}
+
+	output, err := replaceGoDSTNode(request.Source, operation.TargetNodePath, operation.ReplacementSource)
+	if err != nil {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "parse_error",
+			Code:     "edit_projection_apply_failed",
+			Message:  err.Error(),
+			Path:     "operations[0]",
+			Blocking: true,
+		}})
+	}
+
+	applied := []treehaver.AppliedEditProjectionOperation{{
+		Operation:        operation.Operation,
+		TargetNodeID:     operation.TargetNodeID,
+		CorrelationKey:   "metadata.go_dst.node_path",
+		CorrelationValue: operation.TargetNodePath,
+	}}
+	return treehaver.BuildEditProjectionExecutionResult(output, applied, nil)
+}
+
 func parseGoDST(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	originalSource := source
 	offsetBytes := 0
@@ -206,6 +273,49 @@ func parseGoDST(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func replaceGoDSTNode(source string, targetNodePath string, replacementSource string) (string, error) {
+	index, err := declIndex(targetNodePath)
+	if err != nil {
+		return "", err
+	}
+
+	fset := token.NewFileSet()
+	file, err := decorator.ParseFile(fset, "input.go", source, goparser.ParseComments)
+	if err != nil {
+		return "", err
+	}
+	if index < 0 || index >= len(file.Decls) {
+		return "", fmt.Errorf("target node path %s is outside declaration bounds", targetNodePath)
+	}
+
+	replacementFile, err := decorator.ParseFile(token.NewFileSet(), "replacement.go", "package replacement\n\n"+replacementSource, goparser.ParseComments)
+	if err != nil {
+		return "", err
+	}
+	if len(replacementFile.Decls) != 1 {
+		return "", fmt.Errorf("replacement source must contain exactly one declaration")
+	}
+	file.Decls[index] = replacementFile.Decls[0]
+
+	var buffer bytes.Buffer
+	if err := decorator.Fprint(&buffer, file); err != nil {
+		return "", err
+	}
+	return buffer.String(), nil
+}
+
+func declIndex(targetNodePath string) (int, error) {
+	matches := regexp.MustCompile(`^decls\[(\d+)\]$`).FindStringSubmatch(targetNodePath)
+	if matches == nil {
+		return 0, fmt.Errorf("unsupported go-dst node path %s", targetNodePath)
+	}
+	index, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+	return index, nil
 }
 
 func importLineText(source string, quotedPath string) string {

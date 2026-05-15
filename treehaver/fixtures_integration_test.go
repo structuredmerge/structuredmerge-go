@@ -722,6 +722,22 @@ func TestSharedFixtureProviderDiagnostics(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureEditProjectionExecutionContract(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-928-go-dst-edit-projection-execution", "edit-projection-execution.json")
+
+	expected := editProjectionExecutionResultFromFixture(fixture["expected_result"])
+	result := BuildEditProjectionExecutionResult(expected.Source, expected.AppliedOperations, expected.Diagnostics)
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected edit projection execution result: %+v", result)
+	}
+
+	unsupported := editProjectionExecutionResultFromFixture(fixture["unsupported_result"])
+	rejected := BuildEditProjectionExecutionResult(unsupported.Source, nil, unsupported.Diagnostics)
+	if !reflect.DeepEqual(rejected, unsupported) {
+		t.Fatalf("unexpected edit projection rejection result: %+v", rejected)
+	}
+}
+
 func backendCapabilityFromFixture(value any) BackendCapability {
 	capabilityFixture := value.(map[string]any)
 	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)
@@ -954,6 +970,39 @@ func providerDiagnosticsReportFromFixture(value any) ProviderDiagnosticsReport {
 		Language:    fixture["language"].(string),
 		Status:      fixture["status"].(string),
 		Diagnostics: diagnostics,
+	}
+}
+
+func editProjectionExecutionResultFromFixture(value any) EditProjectionExecutionResult {
+	fixture := value.(map[string]any)
+	applied := []AppliedEditProjectionOperation{}
+	for _, rawOperation := range fixture["applied_operations"].([]any) {
+		operationFixture := rawOperation.(map[string]any)
+		applied = append(applied, AppliedEditProjectionOperation{
+			Operation:        operationFixture["operation"].(string),
+			TargetNodeID:     operationFixture["target_node_id"].(string),
+			CorrelationKey:   operationFixture["correlation_key"].(string),
+			CorrelationValue: operationFixture["correlation_value"].(string),
+		})
+	}
+	diagnostics := []ProviderDiagnostic{}
+	for _, rawDiagnostic := range fixture["diagnostics"].([]any) {
+		diagnosticFixture := rawDiagnostic.(map[string]any)
+		diagnostics = append(diagnostics, ProviderDiagnostic{
+			Severity: diagnosticFixture["severity"].(string),
+			Category: diagnosticFixture["category"].(string),
+			Code:     diagnosticFixture["code"].(string),
+			Message:  diagnosticFixture["message"].(string),
+			Path:     diagnosticFixture["path"].(string),
+			Blocking: diagnosticFixture["blocking"].(bool),
+		})
+	}
+	return EditProjectionExecutionResult{
+		OK:                fixture["ok"].(bool),
+		Status:            fixture["status"].(string),
+		Source:            fixture["source"].(string),
+		AppliedOperations: applied,
+		Diagnostics:       diagnostics,
 	}
 }
 

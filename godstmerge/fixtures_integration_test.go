@@ -112,3 +112,79 @@ func TestGoDSTProviderRejectsUnsupportedBackendOverrides(t *testing.T) {
 		t.Fatalf("unexpected merge diagnostics: %+v", actual)
 	}
 }
+
+func TestGoDSTEditProjectionExecutionFixture(t *testing.T) {
+	fixture := readFixture(t, "diagnostics", "slice-928-go-dst-edit-projection-execution", "edit-projection-execution.json")
+
+	request := editProjectionExecutionRequestFromFixture(fixture["request"])
+	result := ApplyEditProjection(request)
+	expected := editProjectionExecutionResultFromFixture(fixture["expected_result"])
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected edit projection result:\n%#v", result)
+	}
+
+	unsupportedRequest := editProjectionExecutionRequestFromFixture(fixture["unsupported_request"])
+	unsupportedResult := ApplyEditProjection(unsupportedRequest)
+	expectedUnsupported := editProjectionExecutionResultFromFixture(fixture["unsupported_result"])
+	if !reflect.DeepEqual(unsupportedResult, expectedUnsupported) {
+		t.Fatalf("unexpected unsupported edit projection result:\n%#v", unsupportedResult)
+	}
+}
+
+func editProjectionExecutionRequestFromFixture(value any) treehaver.EditProjectionExecutionRequest {
+	fixture := value.(map[string]any)
+	operations := []treehaver.EditProjectionOperationRequest{}
+	for _, rawOperation := range fixture["operations"].([]any) {
+		operationFixture := rawOperation.(map[string]any)
+		operations = append(operations, treehaver.EditProjectionOperationRequest{
+			Operation:         operationFixture["operation"].(string),
+			TargetNodeID:      operationFixture["target_node_id"].(string),
+			TargetNodePath:    operationFixture["target_node_path"].(string),
+			ReplacementSource: operationFixture["replacement_source"].(string),
+		})
+	}
+	backendRefFixture := fixture["backend_ref"].(map[string]any)
+	return treehaver.EditProjectionExecutionRequest{
+		ProviderID: fixture["provider_id"].(string),
+		BackendRef: treehaver.BackendReference{
+			ID:     backendRefFixture["id"].(string),
+			Family: backendRefFixture["family"].(string),
+		},
+		Language:   fixture["language"].(string),
+		Source:     fixture["source"].(string),
+		Operations: operations,
+	}
+}
+
+func editProjectionExecutionResultFromFixture(value any) treehaver.EditProjectionExecutionResult {
+	fixture := value.(map[string]any)
+	applied := []treehaver.AppliedEditProjectionOperation{}
+	for _, rawOperation := range fixture["applied_operations"].([]any) {
+		operationFixture := rawOperation.(map[string]any)
+		applied = append(applied, treehaver.AppliedEditProjectionOperation{
+			Operation:        operationFixture["operation"].(string),
+			TargetNodeID:     operationFixture["target_node_id"].(string),
+			CorrelationKey:   operationFixture["correlation_key"].(string),
+			CorrelationValue: operationFixture["correlation_value"].(string),
+		})
+	}
+	diagnostics := []treehaver.ProviderDiagnostic{}
+	for _, rawDiagnostic := range fixture["diagnostics"].([]any) {
+		diagnosticFixture := rawDiagnostic.(map[string]any)
+		diagnostics = append(diagnostics, treehaver.ProviderDiagnostic{
+			Severity: diagnosticFixture["severity"].(string),
+			Category: diagnosticFixture["category"].(string),
+			Code:     diagnosticFixture["code"].(string),
+			Message:  diagnosticFixture["message"].(string),
+			Path:     diagnosticFixture["path"].(string),
+			Blocking: diagnosticFixture["blocking"].(bool),
+		})
+	}
+	return treehaver.EditProjectionExecutionResult{
+		OK:                fixture["ok"].(bool),
+		Status:            fixture["status"].(string),
+		Source:            fixture["source"].(string),
+		AppliedOperations: applied,
+		Diagnostics:       diagnostics,
+	}
+}
