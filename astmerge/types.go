@@ -1339,6 +1339,86 @@ type ProfilePromotionPolicy struct {
 	Diagnostics     []string                      `json:"diagnostics"`
 }
 
+func InitialProfilePromotionPolicy() ProfilePromotionPolicy {
+	sourceSubprofile := func(profileID string, family string) ProfilePromotionPolicyEntry {
+		return ProfilePromotionPolicyEntry{
+			ProfileID:        profileID,
+			Family:           family,
+			Scope:            ProfilePromotionScopeSourceSubprofile,
+			EligibleStatuses: []ProfilePromotionStatus{ProfilePromotionAvailable, ProfilePromotionRecommended},
+			RecommendationGate: ProfileRecommendationGate{
+				RequiredFixtureCount:              16,
+				FormattingThreshold:               0.95,
+				FallbackThreshold:                 2,
+				UnresolvedConflictThreshold:       0,
+				RequiresBackendParity:             true,
+				RequiresCrossImplementationParity: false,
+			},
+			DefaultGate: ProfileDefaultGate{
+				RequiresRecommendedStatus:      true,
+				RequiresExplicitPackageRollout: true,
+				MinimumRecommendedDays:         30,
+				RequiresNarrowScope:            true,
+			},
+			RequiredSuites: []string{"slice-827-backend-parity-fixtures", "slice-815-formatting-preservation-metrics"},
+			Diagnostics:    []string{"source-language profile is narrow and not language-wide"},
+		}
+	}
+	rubyProfile := sourceSubprofile(PromotionProfileRubyGemspecDependencyDeclarations, "ruby")
+	rubyProfile.RecommendationGate.RequiredFixtureCount = 10
+	rubyProfile.RecommendationGate.FallbackThreshold = 1
+	rubyProfile.RecommendationGate.RequiresBackendParity = false
+	rubyProfile.RequiredSuites = []string{
+		"slice-702-ruby-gemspec-signature-merge-acceptance",
+		"slice-703-ruby-gemspec-field-policy-acceptance",
+		"slice-704-ruby-gemspec-dependency-section-policy-acceptance",
+	}
+	rubyProfile.Diagnostics = []string{"Ruby source subprofile is limited to dependency declarations"}
+	return ProfilePromotionPolicy{
+		PolicyID: "initial-profile-promotion-policy",
+		Version:  "1",
+		GlobalHardGates: []string{
+			"parse_or_fail_closed",
+			"render_or_fail_closed",
+			"coherent_conflict_markers",
+			"performance_guardrails",
+		},
+		Profiles: []ProfilePromotionPolicyEntry{
+			{
+				ProfileID:        PromotionProfileJSONKeyedObject,
+				Family:           "json",
+				Scope:            ProfilePromotionScopeDataFormat,
+				EligibleStatuses: []ProfilePromotionStatus{ProfilePromotionAvailable, ProfilePromotionRecommended, ProfilePromotionDefault},
+				RecommendationGate: ProfileRecommendationGate{
+					RequiredFixtureCount:              12,
+					FormattingThreshold:               0.95,
+					FallbackThreshold:                 1,
+					UnresolvedConflictThreshold:       0,
+					RequiresBackendParity:             true,
+					RequiresCrossImplementationParity: true,
+				},
+				DefaultGate: ProfileDefaultGate{
+					RequiresRecommendedStatus:      true,
+					RequiresExplicitPackageRollout: true,
+					MinimumRecommendedDays:         30,
+					RequiresNarrowScope:            true,
+				},
+				RequiredSuites: []string{
+					"slice-901-false-textual-conflicts",
+					"slice-902-git-driver-smoke-fixtures",
+					"slice-815-formatting-preservation-metrics",
+				},
+				Diagnostics: []string{"data-format profile may become default after recommendation soak time"},
+			},
+			sourceSubprofile(PromotionProfileGoImportDeclarations, "go"),
+			sourceSubprofile(PromotionProfileRustUseDeclarations, "rust"),
+			sourceSubprofile(PromotionProfileTypeScriptImportDeclarations, "typescript"),
+			rubyProfile,
+		},
+		Diagnostics: []string{"default status is allowed only after recommendation status and explicit package rollout"},
+	}
+}
+
 type ProfilePromotionEvaluation struct {
 	ProfileID       string                 `json:"profile_id"`
 	Status          ProfilePromotionStatus `json:"status"`

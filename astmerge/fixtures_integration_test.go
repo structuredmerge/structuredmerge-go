@@ -1330,6 +1330,9 @@ func TestSharedFixtureProfilePromotionPolicy(t *testing.T) {
 		jsonPolicy.RecommendationGate.FormattingThreshold != expected["formatting_threshold"].(float64) {
 		t.Fatalf("unexpected profile promotion policy: %+v", policy)
 	}
+	if !reflect.DeepEqual(InitialProfilePromotionPolicy(), policy) {
+		t.Fatalf("initial profile promotion policy drifted from fixture")
+	}
 }
 
 func TestSharedFixtureProfilePromotionEvaluation(t *testing.T) {
