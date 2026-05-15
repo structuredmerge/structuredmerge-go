@@ -809,6 +809,19 @@ type TokenSpanPreservationMetricsReport struct {
 	Diagnostics          []string `json:"diagnostics"`
 }
 
+type FormattingEdgeFixtureCase struct {
+	CaseID                  string `json:"case_id"`
+	Category                string `json:"category"`
+	RequiresConflictMarkers bool   `json:"requires_conflict_markers"`
+}
+
+type FormattingEdgeFixtureSuite struct {
+	SuiteID     string                      `json:"suite_id"`
+	Version     string                      `json:"version"`
+	Cases       []FormattingEdgeFixtureCase `json:"cases"`
+	Diagnostics []string                    `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

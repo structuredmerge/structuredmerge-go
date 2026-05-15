@@ -665,6 +665,26 @@ func TestSharedFixtureTokenSpanPreservationMetrics(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFormattingEdgeFixtures(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-820-formatting-edge-fixtures", "formatting-edge-fixtures.json"))
+	suite := decodeFixtureValue[FormattingEdgeFixtureSuite](t, fixture["fixture_suite"])
+	expected := fixture["expected"].(map[string]any)
+	categories := make([]string, 0, len(suite.Cases))
+	conflictMarkerCaseCount := 0
+	for _, fixtureCase := range suite.Cases {
+		categories = append(categories, fixtureCase.Category)
+		if fixtureCase.RequiresConflictMarkers {
+			conflictMarkerCaseCount++
+		}
+	}
+
+	if len(suite.Cases) != int(expected["case_count"].(float64)) ||
+		!reflect.DeepEqual(categories, decodeFixtureValue[[]string](t, expected["categories"])) ||
+		conflictMarkerCaseCount != int(expected["conflict_marker_case_count"].(float64)) {
+		t.Fatalf("unexpected formatting edge fixture suite: %+v", suite)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
