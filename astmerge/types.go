@@ -851,6 +851,20 @@ type NativeProviderMetadataReport struct {
 	Diagnostics          []string `json:"diagnostics"`
 }
 
+type HostLanguageNativeProviderContract struct {
+	ProviderID     string `json:"provider_id"`
+	HostLanguage   string `json:"host_language"`
+	TargetLanguage string `json:"target_language"`
+	ParserName     string `json:"parser_name"`
+}
+
+type HostLanguageNativeProviderContracts struct {
+	SuiteID     string                               `json:"suite_id"`
+	Version     string                               `json:"version"`
+	Providers   []HostLanguageNativeProviderContract `json:"providers"`
+	Diagnostics []string                             `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

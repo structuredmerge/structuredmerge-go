@@ -721,6 +721,27 @@ func TestSharedFixtureNativeProviderMetadataReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureHostLanguageNativeProviderContracts(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-823-host-language-native-provider-contracts", "host-language-native-provider-contracts.json"))
+	contracts := decodeFixtureValue[HostLanguageNativeProviderContracts](t, fixture["native_provider_contracts"])
+	expected := fixture["expected"].(map[string]any)
+	providerIDs := make([]string, 0, len(contracts.Providers))
+	rubyProviderCount := 0
+	for _, provider := range contracts.Providers {
+		providerIDs = append(providerIDs, provider.ProviderID)
+		if provider.HostLanguage == "ruby" {
+			rubyProviderCount++
+		}
+	}
+
+	if len(contracts.Providers) != int(expected["provider_count"].(float64)) ||
+		!reflect.DeepEqual(providerIDs, decodeFixtureValue[[]string](t, expected["provider_ids"])) ||
+		rubyProviderCount != int(expected["ruby_provider_count"].(float64)) ||
+		contracts.Providers[0].ParserName != expected["first_provider_parser"].(string) {
+		t.Fatalf("unexpected host-language native provider contracts: %+v", contracts)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
