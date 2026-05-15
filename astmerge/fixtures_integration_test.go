@@ -252,6 +252,21 @@ func TestSharedFixtureMergeIRComparison(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureStructuralMatchingBaseline(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-797-structural-matching-baseline", "structural-matching-baseline.json"))
+	report := decodeFixtureValue[StructuralMatchingReport](t, fixture["matching"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Strategy != expected["strategy"].(string) ||
+		len(report.Matches) != int(expected["match_count"].(float64)) ||
+		len(report.UnmatchedFrom) != int(expected["unmatched_from_count"].(float64)) ||
+		len(report.UnmatchedTo) != int(expected["unmatched_to_count"].(float64)) ||
+		expected["move_detection"].(bool) ||
+		report.Matches[1].FromPath != "/declarations/Greet" {
+		t.Fatalf("unexpected structural matching baseline: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

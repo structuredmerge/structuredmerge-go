@@ -311,6 +311,25 @@ type MergeIRComparisonReport struct {
 	Summary      MergeIRComparisonSummary `json:"summary"`
 }
 
+type StructuralPathMatch struct {
+	FromPath   string  `json:"from_path"`
+	ToPath     string  `json:"to_path"`
+	FromNodeID string  `json:"from_node_id"`
+	ToNodeID   string  `json:"to_node_id"`
+	Confidence float64 `json:"confidence"`
+}
+
+type StructuralMatchingReport struct {
+	MatchingID    string                `json:"matching_id"`
+	Strategy      string                `json:"strategy"`
+	FromRevision  string                `json:"from_revision"`
+	ToRevision    string                `json:"to_revision"`
+	Matches       []StructuralPathMatch `json:"matches"`
+	UnmatchedFrom []string              `json:"unmatched_from"`
+	UnmatchedTo   []string              `json:"unmatched_to"`
+	Diagnostics   []string              `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
