@@ -769,6 +769,19 @@ func TestSharedFixtureGoDSTProviderStack(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureGoProviderComparison(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-826-go-provider-comparison", "go-provider-comparison.json"))
+	report := decodeFixtureValue[GoProviderComparisonReport](t, fixture["comparison"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Language != expected["language"].(string) ||
+		len(report.Providers) != int(expected["provider_count"].(float64)) ||
+		len(report.Dimensions) != int(expected["dimension_count"].(float64)) ||
+		slices.Contains(report.Dimensions, "backend_deficiencies") != expected["includes_backend_deficiencies"].(bool) {
+		t.Fatalf("unexpected Go provider comparison report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

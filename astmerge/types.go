@@ -884,6 +884,15 @@ type GoDSTProviderStackReport struct {
 	Diagnostics   []string `json:"diagnostics"`
 }
 
+type GoProviderComparisonReport struct {
+	ComparisonID string   `json:"comparison_id"`
+	Version      string   `json:"version"`
+	Language     string   `json:"language"`
+	Providers    []string `json:"providers"`
+	Dimensions   []string `json:"dimensions"`
+	Diagnostics  []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
