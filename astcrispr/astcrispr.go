@@ -38,6 +38,15 @@ type MatchProfile struct {
 	PayloadKind   string
 }
 
+type SelectionProfile struct {
+	OwnerScope         string
+	OwnerSelector      string
+	SelectorKind       string
+	SelectionIntent    string
+	CommentRegion      string
+	IncludeTrailingGap bool
+}
+
 type profileDescriptor struct {
 	family      string
 	description string
@@ -57,6 +66,29 @@ var knownPayloadKinds = map[string]profileDescriptor{
 	"structural_owner_body": {family: "owner_body", description: "Span represents a structural owner's body"},
 	"comment_owned_body":    {family: "comment_owned", description: "Span represents a structural owner body selected through an owning comment marker"},
 	"section_branch":        {family: "section_branch", description: "Span represents a heading-owned section branch payload"},
+}
+
+var knownOwnerSelectors = map[string]profileDescriptor{
+	"line_bound_statements": {family: "line_oriented", description: "Selects owners from line-bound statements"},
+	"heading_sections":      {family: "section", description: "Selects heading-owned section branches"},
+}
+
+var knownSelectorKinds = map[string]profileDescriptor{
+	"owner_filter":         {family: "owner_filter", description: "Selects structural owners by predicate"},
+	"comment_region_owner": {family: "comment_anchor", description: "Selects owners anchored by comment regions"},
+	"heading_section":      {family: "section_branch", description: "Selects heading-owned section branches"},
+}
+
+var knownSelectionIntents = map[string]profileDescriptor{
+	"predicate_filter":      {family: "predicate", description: "Selection is driven by a predicate"},
+	"comment_region_filter": {family: "comment", description: "Selection is driven by a comment region"},
+	"section_heading":       {family: "section", description: "Selection is driven by a section heading"},
+}
+
+var knownCommentRegions = map[string]profileDescriptor{
+	"leading":  {family: "leading", description: "Leading comment region"},
+	"trailing": {family: "trailing", description: "Trailing comment region"},
+	"inline":   {family: "inline", description: "Inline comment region"},
 }
 
 func NewLimit(spec any) (Limit, error) {
@@ -81,6 +113,29 @@ func NewMatchProfile(startBoundary, endBoundary, payloadKind string) MatchProfil
 		payloadKind = "structural_owner_body"
 	}
 	return MatchProfile{StartBoundary: startBoundary, EndBoundary: endBoundary, PayloadKind: payloadKind}
+}
+
+func NewSelectionProfile(ownerScope, ownerSelector, selectorKind, selectionIntent, commentRegion string, includeTrailingGap bool) SelectionProfile {
+	if ownerScope == "" {
+		ownerScope = "shared_default"
+	}
+	if ownerSelector == "" {
+		ownerSelector = "line_bound_statements"
+	}
+	if selectorKind == "" {
+		selectorKind = "owner_filter"
+	}
+	if selectionIntent == "" {
+		selectionIntent = "predicate_filter"
+	}
+	return SelectionProfile{
+		OwnerScope:         ownerScope,
+		OwnerSelector:      ownerSelector,
+		SelectorKind:       selectorKind,
+		SelectionIntent:    selectionIntent,
+		CommentRegion:      commentRegion,
+		IncludeTrailingGap: includeTrailingGap,
+	}
 }
 
 func (profile MatchProfile) Report() map[string]any {
@@ -112,6 +167,44 @@ func (profile MatchProfile) Report() map[string]any {
 		"comment_anchored":      startFamily == "comment_anchor" || payloadFamily == "comment_owned",
 		"trailing_gap_extended": endFamily == "gap_extension",
 	}
+}
+
+func (profile SelectionProfile) Report() map[string]any {
+	ownerSelectorFamily, knownOwnerSelector := descriptorFamily(knownOwnerSelectors, profile.OwnerSelector)
+	selectorKindFamily, knownSelectorKind := descriptorFamily(knownSelectorKinds, profile.SelectorKind)
+	selectionIntentFamily, knownSelectionIntent := descriptorFamily(knownSelectionIntents, profile.SelectionIntent)
+	commentRegionFamily := "none"
+	knownCommentRegion := false
+	var commentRegion any
+	if profile.CommentRegion != "" {
+		commentRegion = profile.CommentRegion
+		commentRegionFamily, knownCommentRegion = descriptorFamily(knownCommentRegions, profile.CommentRegion)
+	}
+	return map[string]any{
+		"owner_scope":             profile.OwnerScope,
+		"owner_selector":          profile.OwnerSelector,
+		"owner_selector_family":   ownerSelectorFamily,
+		"known_owner_selector":    knownOwnerSelector,
+		"selector_kind":           profile.SelectorKind,
+		"selector_kind_family":    selectorKindFamily,
+		"known_selector_kind":     knownSelectorKind,
+		"selection_intent":        profile.SelectionIntent,
+		"selection_intent_family": selectionIntentFamily,
+		"known_selection_intent":  knownSelectionIntent,
+		"comment_region":          commentRegion,
+		"comment_region_family":   commentRegionFamily,
+		"known_comment_region":    knownCommentRegion,
+		"comment_anchored":        selectorKindFamily == "comment_anchor" || selectionIntentFamily == "comment" || knownCommentRegion,
+		"include_trailing_gap":    profile.IncludeTrailingGap,
+	}
+}
+
+func descriptorFamily(descriptors map[string]profileDescriptor, value string) (string, bool) {
+	descriptor, ok := descriptors[value]
+	if !ok || descriptor.family == "" {
+		return "unknown", false
+	}
+	return descriptor.family, true
 }
 
 func (limit Limit) Allows(count int) bool {
@@ -295,9 +388,9 @@ func BoundaryReport() map[string]any {
 			"ast-merge structured-edit contract anchor",
 			"limit helpers",
 			"match profile helpers",
+			"selection profile helpers",
 		},
 		"future_exports": []any{
-			"selection profile helpers",
 			"destination profile helpers",
 			"operation profile helpers",
 			"replace/delete/insert/move helpers",

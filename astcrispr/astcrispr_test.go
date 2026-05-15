@@ -117,3 +117,39 @@ func TestMatchProfileHelpersFixture(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectionProfileHelpersFixture(t *testing.T) {
+	fixturePath := filepath.Join(
+		"..",
+		"..",
+		"fixtures",
+		"diagnostics",
+		"slice-919-ast-crispr-selection-profile-helpers",
+		"ast-crispr-selection-profile-helpers.json",
+	)
+	source, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rawProfile := testCase["profile"].(map[string]any)
+		commentRegion, _ := rawProfile["comment_region"].(string)
+		profile := NewSelectionProfile(
+			rawProfile["owner_scope"].(string),
+			rawProfile["owner_selector"].(string),
+			rawProfile["selector_kind"].(string),
+			rawProfile["selection_intent"].(string),
+			commentRegion,
+			rawProfile["include_trailing_gap"].(bool),
+		)
+		if !reflect.DeepEqual(profile.Report(), testCase["expected"]) {
+			t.Fatalf("unexpected selection profile report for %s: %+v", testCase["name"], profile.Report())
+		}
+	}
+}
