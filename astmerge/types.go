@@ -745,6 +745,22 @@ type RenderVerificationReport struct {
 	Diagnostics    []string `json:"diagnostics"`
 }
 
+type FormattingPreservationMetrics struct {
+	ExpectedOutputLineDiffSize      int     `json:"expected_output_line_diff_size"`
+	ExpectedOutputCharacterDiffSize int     `json:"expected_output_character_diff_size"`
+	FormattingPreservationScore     float64 `json:"formatting_preservation_score"`
+}
+
+type FormattingPreservationConformanceReport struct {
+	ReportID          string                        `json:"report_id"`
+	Version           string                        `json:"version"`
+	Suite             string                        `json:"suite"`
+	CaseID            string                        `json:"case_id"`
+	Language          string                        `json:"language"`
+	FormattingMetrics FormattingPreservationMetrics `json:"formatting_metrics"`
+	Diagnostics       []string                      `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

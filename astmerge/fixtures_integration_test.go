@@ -587,6 +587,20 @@ func TestSharedFixtureReparseAfterRenderVerification(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFormattingPreservationMetrics(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-815-formatting-preservation-metrics", "formatting-preservation-metrics.json"))
+	report := decodeFixtureValue[FormattingPreservationConformanceReport](t, fixture["conformance_report"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Suite != expected["suite"].(string) ||
+		report.Language != expected["language"].(string) ||
+		report.FormattingMetrics.ExpectedOutputLineDiffSize != int(expected["line_diff_size"].(float64)) ||
+		report.FormattingMetrics.ExpectedOutputCharacterDiffSize != int(expected["character_diff_size"].(float64)) ||
+		report.FormattingMetrics.FormattingPreservationScore != expected["score"].(float64) {
+		t.Fatalf("unexpected formatting preservation report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
