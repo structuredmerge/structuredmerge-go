@@ -196,6 +196,28 @@ type LibraryPathValidation struct {
 	Errors []string
 }
 
+type BackendAvailabilityStatus string
+
+const (
+	BackendAvailabilityAvailable   BackendAvailabilityStatus = "available"
+	BackendAvailabilityUnavailable BackendAvailabilityStatus = "unavailable"
+	BackendAvailabilityUnknown     BackendAvailabilityStatus = "unknown"
+)
+
+type BackendAvailabilityCheck struct {
+	Name        string
+	Status      BackendAvailabilityStatus
+	Required    bool
+	Diagnostics []string
+}
+
+type BackendAvailabilityReport struct {
+	BackendRef  BackendReference
+	Status      BackendAvailabilityStatus
+	Checks      []BackendAvailabilityCheck
+	Diagnostics []string
+}
+
 type OrderedSiblingEdge struct {
 	ParentID          string
 	NodeID            string
@@ -703,6 +725,27 @@ func SafeSymbolName(symbol string) bool {
 
 func SafeBackendName(name string) bool {
 	return name == "auto" || BackendReferenceByID(name) != nil
+}
+
+func BuildBackendAvailabilityReport(backendRef BackendReference, checks []BackendAvailabilityCheck) BackendAvailabilityReport {
+	if len(checks) == 0 {
+		return BackendAvailabilityReport{
+			BackendRef:  backendRef,
+			Status:      BackendAvailabilityUnknown,
+			Checks:      []BackendAvailabilityCheck{},
+			Diagnostics: []string{"backend availability unknown: no checks supplied"},
+		}
+	}
+
+	diagnostics := []string{}
+	status := BackendAvailabilityAvailable
+	for _, check := range checks {
+		if check.Required && check.Status != BackendAvailabilityAvailable {
+			status = BackendAvailabilityUnavailable
+			diagnostics = append(diagnostics, "backend unavailable: required check "+check.Name+" is "+string(check.Status))
+		}
+	}
+	return BackendAvailabilityReport{BackendRef: backendRef, Status: status, Checks: checks, Diagnostics: diagnostics}
 }
 
 func windowsAbsolutePath(libraryPath string) bool {

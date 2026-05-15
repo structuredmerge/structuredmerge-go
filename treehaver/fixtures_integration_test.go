@@ -698,6 +698,18 @@ func TestSharedFixturePathValidation(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureBackendAvailability(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-926-tree-haver-backend-availability", "backend-availability.json")
+
+	for _, name := range []string{"available_report", "unavailable_report", "unknown_report"} {
+		expected := backendAvailabilityReportFromFixture(fixture[name])
+		result := BuildBackendAvailabilityReport(expected.BackendRef, expected.Checks)
+		if !reflect.DeepEqual(result, expected) {
+			t.Fatalf("unexpected backend availability report for %s: %+v", name, result)
+		}
+	}
+}
+
 func backendCapabilityFromFixture(value any) BackendCapability {
 	capabilityFixture := value.(map[string]any)
 	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)
@@ -879,6 +891,34 @@ func parseErrorToleranceFromFixture(value any) ParseErrorTolerance {
 		ToleratesErrors: toleranceFixture["tolerates_errors"].(bool),
 		ErrorNodes:      errorNodes,
 		Diagnostics:     stringSliceFromFixture(toleranceFixture["diagnostics"]),
+	}
+}
+
+func backendAvailabilityReportFromFixture(value any) BackendAvailabilityReport {
+	fixture := value.(map[string]any)
+	checks := []BackendAvailabilityCheck{}
+	for _, rawCheck := range fixture["checks"].([]any) {
+		checkFixture := rawCheck.(map[string]any)
+		checks = append(checks, BackendAvailabilityCheck{
+			Name:        checkFixture["name"].(string),
+			Status:      BackendAvailabilityStatus(checkFixture["status"].(string)),
+			Required:    checkFixture["required"].(bool),
+			Diagnostics: stringSliceFromFixture(checkFixture["diagnostics"]),
+		})
+	}
+	return BackendAvailabilityReport{
+		BackendRef:  backendRefFromFixture(fixture["backend_ref"]),
+		Status:      BackendAvailabilityStatus(fixture["status"].(string)),
+		Checks:      checks,
+		Diagnostics: stringSliceFromFixture(fixture["diagnostics"]),
+	}
+}
+
+func backendRefFromFixture(value any) BackendReference {
+	fixture := value.(map[string]any)
+	return BackendReference{
+		ID:     fixture["id"].(string),
+		Family: fixture["family"].(string),
 	}
 }
 
