@@ -412,6 +412,26 @@ func TestSharedFixtureFallbackScopes(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureConflictCategories(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-806-conflict-categories", "conflict-categories.json"))
+	report := decodeFixtureValue[ConflictCategoryReport](t, fixture["conflicts"])
+	expected := fixture["expected"].(map[string]any)
+	parseLimitedScope := ""
+	for _, conflict := range report.Conflicts {
+		if conflict.Category == "parse_limited" {
+			parseLimitedScope = conflict.FallbackScope
+		}
+	}
+
+	if len(report.Categories) != int(expected["category_count"].(float64)) ||
+		len(report.Conflicts) != int(expected["conflict_count"].(float64)) ||
+		report.Categories[0] != expected["first_category"].(string) ||
+		report.Categories[len(report.Categories)-1] != expected["last_category"].(string) ||
+		parseLimitedScope != expected["parse_limited_fallback_scope"].(string) {
+		t.Fatalf("unexpected conflict category report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

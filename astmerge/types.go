@@ -558,6 +558,22 @@ type FallbackScopeReport struct {
 	Diagnostics  []string                  `json:"diagnostics"`
 }
 
+type MergeConflict struct {
+	ConflictID    string `json:"conflict_id"`
+	Category      string `json:"category"`
+	Path          string `json:"path"`
+	FallbackScope string `json:"fallback_scope"`
+	Message       string `json:"message"`
+}
+
+type ConflictCategoryReport struct {
+	ReportID    string          `json:"report_id"`
+	Version     string          `json:"version"`
+	Categories  []string        `json:"categories"`
+	Conflicts   []MergeConflict `json:"conflicts"`
+	Diagnostics []string        `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
