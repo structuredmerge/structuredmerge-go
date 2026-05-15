@@ -789,6 +789,16 @@ type FormattingHardGateReport struct {
 	Diagnostics []string             `json:"diagnostics"`
 }
 
+type SecondaryFormattingMetricsReport struct {
+	ReportID                string   `json:"report_id"`
+	Version                 string   `json:"version"`
+	UnchangedLineChurn      int      `json:"unchanged_line_churn"`
+	OutputDiffSize          int      `json:"output_diff_size"`
+	SourceFragmentRetention float64  `json:"source_fragment_retention"`
+	Weighted                bool     `json:"weighted"`
+	Diagnostics             []string `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

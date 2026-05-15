@@ -639,6 +639,19 @@ func TestSharedFixtureFormattingHardGates(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureSecondaryFormattingMetrics(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-818-secondary-formatting-metrics", "secondary-formatting-metrics.json"))
+	report := decodeFixtureValue[SecondaryFormattingMetricsReport](t, fixture["secondary_metrics"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.UnchangedLineChurn != int(expected["unchanged_line_churn"].(float64)) ||
+		report.OutputDiffSize != int(expected["output_diff_size"].(float64)) ||
+		report.SourceFragmentRetention != expected["source_fragment_retention"].(float64) ||
+		report.Weighted != expected["weighted"].(bool) {
+		t.Fatalf("unexpected secondary formatting metrics report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
