@@ -186,3 +186,38 @@ func TestDestinationProfileHelpersFixture(t *testing.T) {
 		}
 	}
 }
+
+func TestOperationProfileHelpersFixture(t *testing.T) {
+	fixturePath := filepath.Join(
+		"..",
+		"..",
+		"fixtures",
+		"diagnostics",
+		"slice-921-ast-crispr-operation-profile-helpers",
+		"ast-crispr-operation-profile-helpers.json",
+	)
+	source, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var fixture map[string]any
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		rawProfile := testCase["profile"].(map[string]any)
+		profile := NewOperationProfile(
+			rawProfile["operation_kind"].(string),
+			rawProfile["source_requirement"].(string),
+			rawProfile["destination_requirement"].(string),
+			rawProfile["replacement_source"].(string),
+			rawProfile["captures_source_text"].(bool),
+			rawProfile["supports_if_missing"].(bool),
+		)
+		if !reflect.DeepEqual(profile.Report(), testCase["expected"]) {
+			t.Fatalf("unexpected operation profile report for %s: %+v", testCase["name"], profile.Report())
+		}
+	}
+}

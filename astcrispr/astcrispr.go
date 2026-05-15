@@ -54,6 +54,15 @@ type DestinationProfile struct {
 	UsedIfMissing    bool
 }
 
+type OperationProfile struct {
+	OperationKind          string
+	SourceRequirement      string
+	DestinationRequirement string
+	ReplacementSource      string
+	CapturesSourceText     bool
+	SupportsIfMissing      bool
+}
+
 type profileDescriptor struct {
 	family      string
 	description string
@@ -113,6 +122,17 @@ var knownAnchorBoundaries = map[string]profileDescriptor{
 	"none":                             {family: "none", description: "No anchor boundary was used"},
 	"statement_end_plus_following_gap": {family: "gap_preserving_statement", description: "Insertion anchored after a statement and preserved its following blank-line gap"},
 }
+
+var knownOperationKinds = map[string]profileDescriptor{
+	"replace": {family: "rewrite", description: "Replace selected content with explicit replacement text"},
+	"delete":  {family: "removal", description: "Delete selected content without inserting replacement text"},
+	"insert":  {family: "insertion", description: "Insert explicit text at a destination anchor or append fallback"},
+	"move":    {family: "relocation", description: "Relocate selected content or explicit replacement text to a destination anchor"},
+}
+
+var knownRequirements = map[string]bool{"none": true, "optional": true, "required": true}
+
+var knownReplacementSources = map[string]bool{"none": true, "explicit_text": true, "captured_text_or_explicit": true}
 
 func NewLimit(spec any) (Limit, error) {
 	if spec == nil {
@@ -179,6 +199,29 @@ func NewDestinationProfile(resolutionKind, resolutionSource, anchorBoundary stri
 	}
 }
 
+func NewOperationProfile(operationKind, sourceRequirement, destinationRequirement, replacementSource string, capturesSourceText, supportsIfMissing bool) OperationProfile {
+	if operationKind == "" {
+		operationKind = "replace"
+	}
+	if sourceRequirement == "" {
+		sourceRequirement = "required"
+	}
+	if destinationRequirement == "" {
+		destinationRequirement = "none"
+	}
+	if replacementSource == "" {
+		replacementSource = "explicit_text"
+	}
+	return OperationProfile{
+		OperationKind:          operationKind,
+		SourceRequirement:      sourceRequirement,
+		DestinationRequirement: destinationRequirement,
+		ReplacementSource:      replacementSource,
+		CapturesSourceText:     capturesSourceText,
+		SupportsIfMissing:      supportsIfMissing,
+	}
+}
+
 func (profile MatchProfile) Report() map[string]any {
 	startDescriptor, knownStart := knownStartBoundaries[profile.StartBoundary]
 	endDescriptor, knownEnd := knownEndBoundaries[profile.EndBoundary]
@@ -207,6 +250,29 @@ func (profile MatchProfile) Report() map[string]any {
 		"known_payload_kind":    knownPayload,
 		"comment_anchored":      startFamily == "comment_anchor" || payloadFamily == "comment_owned",
 		"trailing_gap_extended": endFamily == "gap_extension",
+	}
+}
+
+func (profile OperationProfile) Report() map[string]any {
+	operationFamily, knownOperationKind := descriptorFamily(knownOperationKinds, profile.OperationKind)
+	return map[string]any{
+		"operation_kind":                profile.OperationKind,
+		"operation_family":              operationFamily,
+		"known_operation_kind":          knownOperationKind,
+		"source_requirement":            profile.SourceRequirement,
+		"known_source_requirement":      knownRequirements[profile.SourceRequirement],
+		"destination_requirement":       profile.DestinationRequirement,
+		"known_destination_requirement": knownRequirements[profile.DestinationRequirement],
+		"replacement_source":            profile.ReplacementSource,
+		"known_replacement_source":      knownReplacementSources[profile.ReplacementSource],
+		"captures_source_text":          profile.CapturesSourceText,
+		"supports_if_missing":           profile.SupportsIfMissing,
+		"selects_source":                profile.SourceRequirement != "none",
+		"requires_source":               profile.SourceRequirement == "required",
+		"supports_destination":          profile.DestinationRequirement != "none",
+		"requires_destination":          profile.DestinationRequirement == "required",
+		"explicit_replacement":          profile.ReplacementSource == "explicit_text",
+		"may_reuse_captured_text":       profile.ReplacementSource == "captured_text_or_explicit",
 	}
 }
 
@@ -451,9 +517,9 @@ func BoundaryReport() map[string]any {
 			"match profile helpers",
 			"selection profile helpers",
 			"destination profile helpers",
+			"operation profile helpers",
 		},
 		"future_exports": []any{
-			"operation profile helpers",
 			"replace/delete/insert/move helpers",
 			"batch operation helpers",
 		},
