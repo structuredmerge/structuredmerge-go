@@ -1312,7 +1312,7 @@ func TestSharedFixtureProfilePromotionPolicy(t *testing.T) {
 		if entry.ProfileID == "json.keyed-object" {
 			jsonPolicy = entry
 		}
-		if entry.ProfileID == "ruby.gemspec-dependencies" {
+		if entry.ProfileID == "ruby.gemspec-dependency-declarations" {
 			rubyPolicy = entry
 		}
 	}
