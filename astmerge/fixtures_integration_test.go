@@ -804,6 +804,25 @@ func TestSharedFixtureBackendParityFixtures(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProviderRichnessProjection(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-828-provider-richness-projection", "provider-richness-projection.json"))
+	projection := decodeFixtureValue[ProviderRichnessProjection](t, fixture["projection"])
+	expected := fixture["expected"].(map[string]any)
+
+	if projection.ProviderID != expected["provider_id"].(string) ||
+		len(projection.GenericRoles) != int(expected["role_count"].(float64)) ||
+		projection.GenericSignature.Kind != expected["signature_kind"].(string) ||
+		projection.GenericSignature.Name != expected["signature_name"].(string) ||
+		projection.RequiresPrivateFields != expected["requires_private_fields"].(bool) {
+		t.Fatalf("unexpected provider richness projection: %+v", projection)
+	}
+
+	namespace := expected["private_metadata_namespace"].(string)
+	if _, ok := projection.PrivateMetadata[namespace]; !ok {
+		t.Fatalf("provider richness projection missing metadata namespace %q: %+v", namespace, projection)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 

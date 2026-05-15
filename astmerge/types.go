@@ -908,6 +908,25 @@ type BackendParitySuite struct {
 	Diagnostics []string            `json:"diagnostics"`
 }
 
+type ProviderRichnessSignature struct {
+	Kind       string   `json:"kind"`
+	Name       string   `json:"name"`
+	Parameters []string `json:"parameters"`
+	Result     string   `json:"result"`
+}
+
+type ProviderRichnessProjection struct {
+	ProjectionID          string                       `json:"projection_id"`
+	Version               string                       `json:"version"`
+	ProviderID            string                       `json:"provider_id"`
+	NodePath              string                       `json:"node_path"`
+	GenericRoles          []string                     `json:"generic_roles"`
+	GenericSignature      ProviderRichnessSignature    `json:"generic_signature"`
+	PrivateMetadata       map[string]map[string]string `json:"private_metadata"`
+	RequiresPrivateFields bool                         `json:"requires_private_fields"`
+	Diagnostics           []string                     `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
