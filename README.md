@@ -35,6 +35,13 @@ The Go implementation ships the implementation-specific `smorg-go` command. Use
 that name in git configuration unless a package manager or local install has
 provided a `smorg` symlink.
 
+Package-manager formulas may expose the selected implementation as `smorg`.
+For a local user-created symlink:
+
+```sh
+ln -s "$(command -v smorg-go)" ~/.local/bin/smorg
+```
+
 ```sh
 git config merge.smorg-go.driver 'smorg-go merge-driver %O %A %B %P'
 git config diff.smorg-go.command 'smorg-go diff-driver'
