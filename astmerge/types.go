@@ -952,6 +952,25 @@ type BackendGapConformanceReport struct {
 	Diagnostics        []string                     `json:"diagnostics"`
 }
 
+type FalseTextualConflictCase struct {
+	CaseID                     string `json:"case_id"`
+	Language                   string `json:"language"`
+	Category                   string `json:"category"`
+	BasePath                   string `json:"base_path"`
+	OursPath                   string `json:"ours_path"`
+	TheirsPath                 string `json:"theirs_path"`
+	ExpectedStrategy           string `json:"expected_strategy"`
+	ExpectedUnresolvedConflict bool   `json:"expected_unresolved_conflict"`
+}
+
+type FalseTextualConflictSuite struct {
+	SuiteID     string                     `json:"suite_id"`
+	Version     string                     `json:"version"`
+	Source      string                     `json:"source"`
+	Cases       []FalseTextualConflictCase `json:"cases"`
+	Diagnostics []string                   `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

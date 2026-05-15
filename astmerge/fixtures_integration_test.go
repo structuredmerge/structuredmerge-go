@@ -839,6 +839,29 @@ func TestSharedFixtureBackendGapConformanceReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFalseTextualConflicts(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-901-false-textual-conflicts", "false-textual-conflicts.json"))
+	suite := decodeFixtureValue[FalseTextualConflictSuite](t, fixture["suite"])
+	expected := fixture["expected"].(map[string]any)
+	languages := make([]string, 0, len(suite.Cases))
+	categories := make([]string, 0, len(suite.Cases))
+	unresolvedConflictCount := 0
+	for _, conflictCase := range suite.Cases {
+		languages = append(languages, conflictCase.Language)
+		categories = append(categories, conflictCase.Category)
+		if conflictCase.ExpectedUnresolvedConflict {
+			unresolvedConflictCount++
+		}
+	}
+
+	if len(suite.Cases) != int(expected["case_count"].(float64)) ||
+		!reflect.DeepEqual(languages, decodeFixtureValue[[]string](t, expected["languages"])) ||
+		!reflect.DeepEqual(categories, decodeFixtureValue[[]string](t, expected["categories"])) ||
+		unresolvedConflictCount != int(expected["expected_unresolved_conflict_count"].(float64)) {
+		t.Fatalf("unexpected false textual conflict suite: %+v", suite)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
