@@ -927,6 +927,31 @@ type ProviderRichnessProjection struct {
 	Diagnostics           []string                     `json:"diagnostics"`
 }
 
+type BackendGapConformanceGap struct {
+	Capability         string `json:"capability"`
+	Status             string `json:"status"`
+	Impact             string `json:"impact"`
+	DiagnosticCode     string `json:"diagnostic_code"`
+	NormalizedFallback string `json:"normalized_fallback"`
+}
+
+type BackendGapConformanceSummary struct {
+	GapCount           int  `json:"gap_count"`
+	FallbackCount      int  `json:"fallback_count"`
+	SilentlyNormalized bool `json:"silently_normalized"`
+}
+
+type BackendGapConformanceReport struct {
+	ReportID           string                       `json:"report_id"`
+	Version            string                       `json:"version"`
+	Language           string                       `json:"language"`
+	ProviderID         string                       `json:"provider_id"`
+	ComparedProviderID string                       `json:"compared_provider_id"`
+	Gaps               []BackendGapConformanceGap   `json:"gaps"`
+	Summary            BackendGapConformanceSummary `json:"summary"`
+	Diagnostics        []string                     `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (

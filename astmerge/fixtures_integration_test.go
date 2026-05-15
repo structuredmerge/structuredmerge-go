@@ -823,6 +823,22 @@ func TestSharedFixtureProviderRichnessProjection(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureBackendGapConformanceReport(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-829-backend-gap-conformance-report", "backend-gap-conformance-report.json"))
+	report := decodeFixtureValue[BackendGapConformanceReport](t, fixture["report"])
+	expected := fixture["expected"].(map[string]any)
+
+	if report.Language != expected["language"].(string) ||
+		report.ProviderID != expected["provider_id"].(string) ||
+		report.ComparedProviderID != expected["compared_provider_id"].(string) ||
+		len(report.Gaps) != int(expected["gap_count"].(float64)) ||
+		report.Summary.FallbackCount != int(expected["fallback_count"].(float64)) ||
+		report.Summary.SilentlyNormalized != expected["silently_normalized"].(bool) ||
+		report.Gaps[0].DiagnosticCode != expected["first_diagnostic_code"].(string) {
+		t.Fatalf("unexpected backend gap conformance report: %+v", report)
+	}
+}
+
 func fixtureJSONEqual(t *testing.T, actual any, expected any) bool {
 	t.Helper()
 
