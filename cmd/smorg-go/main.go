@@ -45,8 +45,10 @@ type diffDriverOptions struct {
 }
 
 type pathSettings struct {
-	language           string
-	conflictMarkerSize int
+	language             string
+	conflictMarkerSize   int
+	profileID            string
+	requireProfileStatus string
 }
 
 type conflictDiffOptions struct {
@@ -104,10 +106,6 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !ok {
 		return exitUserError
 	}
-	if exitCode := reportAndEnforceProfile(options.profileID, options.profileReport, options.requireProfileStatus, stdout, stderr); exitCode != exitSuccess {
-		return exitCode
-	}
-
 	ancestorSource, err := os.ReadFile(options.ancestor)
 	if err != nil {
 		fmt.Fprintf(stderr, "read ancestor: %v\n", err)
@@ -128,6 +126,15 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	effectivePath := options.effectivePath()
 	settings := loadPathSettings(effectivePath)
+	if options.profileID == "" {
+		options.profileID = settings.profileID
+	}
+	if options.requireProfileStatus == "" {
+		options.requireProfileStatus = settings.requireProfileStatus
+	}
+	if exitCode := reportAndEnforceProfile(options.profileID, options.profileReport, options.requireProfileStatus, stdout, stderr); exitCode != exitSuccess {
+		return exitCode
+	}
 	result := mergeByPath(effectivePath, settings.language, string(otherSource), string(currentSource))
 	if !result.OK || result.Output == nil {
 		if options.strict || options.fallback == "none" {
@@ -525,6 +532,10 @@ func applyAttributes(settings *pathSettings, pathName string, source string) {
 			switch key {
 			case "smorg.language", "linguist-language":
 				settings.language = value
+			case "smorg.profile":
+				settings.profileID = value
+			case "smorg.requireProfileStatus":
+				settings.requireProfileStatus = value
 			case "conflict-marker-size":
 				if markerSize, err := strconv.Atoi(value); err == nil && markerSize > 0 {
 					settings.conflictMarkerSize = markerSize
