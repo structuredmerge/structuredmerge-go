@@ -1288,6 +1288,50 @@ func TestSharedFixtureProfilePromotionReport(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureProfilePromotionPolicy(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-912-profile-promotion-policy", "profile-promotion-policy.json"))
+	policy := decodeFixtureValue[ProfilePromotionPolicy](t, fixture["policy"])
+	expected := fixture["expected"].(map[string]any)
+
+	recommendedEligible := 0
+	defaultEligible := 0
+	sourceSubprofiles := 0
+	var jsonPolicy *ProfilePromotionPolicyEntry
+	var rubyPolicy *ProfilePromotionPolicyEntry
+	for index := range policy.Profiles {
+		entry := &policy.Profiles[index]
+		if slices.Contains(entry.EligibleStatuses, ProfilePromotionRecommended) {
+			recommendedEligible++
+		}
+		if slices.Contains(entry.EligibleStatuses, ProfilePromotionDefault) {
+			defaultEligible++
+		}
+		if entry.Scope == ProfilePromotionScopeSourceSubprofile {
+			sourceSubprofiles++
+		}
+		if entry.ProfileID == "json.keyed-object" {
+			jsonPolicy = entry
+		}
+		if entry.ProfileID == "ruby.gemspec-dependencies" {
+			rubyPolicy = entry
+		}
+	}
+
+	if policy.PolicyID != expected["policy_id"].(string) ||
+		len(policy.Profiles) != int(expected["profile_count"].(float64)) ||
+		len(policy.GlobalHardGates) != int(expected["global_hard_gate_count"].(float64)) ||
+		recommendedEligible != int(expected["recommended_eligible_count"].(float64)) ||
+		defaultEligible != int(expected["default_eligible_count"].(float64)) ||
+		sourceSubprofiles != int(expected["source_subprofile_count"].(float64)) ||
+		jsonPolicy == nil ||
+		jsonPolicy.RecommendationGate.RequiresCrossImplementationParity != expected["json_requires_cross_implementation_parity"].(bool) ||
+		rubyPolicy == nil ||
+		rubyPolicy.RecommendationGate.RequiresBackendParity != expected["ruby_requires_backend_parity"].(bool) ||
+		jsonPolicy.RecommendationGate.FormattingThreshold != expected["formatting_threshold"].(float64) {
+		t.Fatalf("unexpected profile promotion policy: %+v", policy)
+	}
+}
+
 func validationMessages(diagnostics []ProfileValidationDiagnostic) []string {
 	messages := make([]string, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {

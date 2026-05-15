@@ -1289,6 +1289,48 @@ type ProfilePromotionReport struct {
 	Diagnostics     []string                   `json:"diagnostics"`
 }
 
+type ProfilePromotionScope string
+
+const (
+	ProfilePromotionScopeDataFormat       ProfilePromotionScope = "data_format"
+	ProfilePromotionScopeSourceSubprofile ProfilePromotionScope = "source_subprofile"
+)
+
+type ProfileRecommendationGate struct {
+	RequiredFixtureCount              int     `json:"required_fixture_count"`
+	FormattingThreshold               float64 `json:"formatting_threshold"`
+	FallbackThreshold                 int     `json:"fallback_threshold"`
+	UnresolvedConflictThreshold       int     `json:"unresolved_conflict_threshold"`
+	RequiresBackendParity             bool    `json:"requires_backend_parity"`
+	RequiresCrossImplementationParity bool    `json:"requires_cross_implementation_parity"`
+}
+
+type ProfileDefaultGate struct {
+	RequiresRecommendedStatus      bool `json:"requires_recommended_status"`
+	RequiresExplicitPackageRollout bool `json:"requires_explicit_package_rollout"`
+	MinimumRecommendedDays         int  `json:"minimum_recommended_days"`
+	RequiresNarrowScope            bool `json:"requires_narrow_scope"`
+}
+
+type ProfilePromotionPolicyEntry struct {
+	ProfileID          string                    `json:"profile_id"`
+	Family             string                    `json:"family"`
+	Scope              ProfilePromotionScope     `json:"scope"`
+	EligibleStatuses   []ProfilePromotionStatus  `json:"eligible_statuses"`
+	RecommendationGate ProfileRecommendationGate `json:"recommendation_gate"`
+	DefaultGate        ProfileDefaultGate        `json:"default_gate"`
+	RequiredSuites     []string                  `json:"required_suites"`
+	Diagnostics        []string                  `json:"diagnostics"`
+}
+
+type ProfilePromotionPolicy struct {
+	PolicyID        string                        `json:"policy_id"`
+	Version         string                        `json:"version"`
+	GlobalHardGates []string                      `json:"global_hard_gates"`
+	Profiles        []ProfilePromotionPolicyEntry `json:"profiles"`
+	Diagnostics     []string                      `json:"diagnostics"`
+}
+
 type PolicySurface string
 
 const (
