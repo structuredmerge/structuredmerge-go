@@ -159,7 +159,7 @@ func ApplyEditProjection(request treehaver.EditProjectionExecutionRequest) treeh
 	}
 
 	operation := request.Operations[0]
-	if operation.Operation != "replace_node" && operation.Operation != "insert_child" {
+	if operation.Operation != "replace_node" && operation.Operation != "insert_child" && operation.Operation != "delete_node" {
 		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
 			Severity: "error",
 			Category: "unsupported_feature",
@@ -302,6 +302,11 @@ func applyGoParserNodeOperation(source string, operation treehaver.EditProjectio
 			return "", err
 		}
 		file.Decls = slices.Insert(file.Decls, index, replacementDecl)
+	case "delete_node":
+		if index < 0 || index >= len(file.Decls) {
+			return "", fmt.Errorf("target node path %s is outside declaration deletion bounds", operation.TargetNodePath)
+		}
+		file.Decls = slices.Delete(file.Decls, index, index+1)
 	default:
 		return "", fmt.Errorf("unsupported edit projection operation %s", operation.Operation)
 	}
