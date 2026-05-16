@@ -768,6 +768,17 @@ func TestSharedFixtureGoParserEditProjectionExecutionContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureEditProjectionProviderOperationMatrix(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-932-edit-projection-provider-operation-matrix", "provider-operation-matrix.json")
+
+	providers := editProjectionProviderMatrixEntriesFromFixture(fixture["providers"])
+	expected := editProjectionProviderMatrixFromFixture(fixture["expected_matrix"])
+	result := BuildEditProjectionProviderMatrix(stringSliceFromFixture(fixture["operations"]), providers, []string{})
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected edit projection provider operation matrix: %+v", result)
+	}
+}
+
 func backendCapabilityFromFixture(value any) BackendCapability {
 	capabilityFixture := value.(map[string]any)
 	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)
@@ -978,6 +989,30 @@ func backendRefFromFixture(value any) BackendReference {
 		ID:     fixture["id"].(string),
 		Family: fixture["family"].(string),
 	}
+}
+
+func editProjectionProviderMatrixEntriesFromFixture(value any) []EditProjectionProviderMatrixEntry {
+	source, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	var entries []EditProjectionProviderMatrixEntry
+	if err := json.Unmarshal(source, &entries); err != nil {
+		panic(err)
+	}
+	return entries
+}
+
+func editProjectionProviderMatrixFromFixture(value any) EditProjectionProviderMatrix {
+	source, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	var matrix EditProjectionProviderMatrix
+	if err := json.Unmarshal(source, &matrix); err != nil {
+		panic(err)
+	}
+	return matrix
 }
 
 func providerDiagnosticsReportFromFixture(value any) ProviderDiagnosticsReport {

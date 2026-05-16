@@ -265,6 +265,31 @@ type EditProjectionExecutionResult struct {
 	Diagnostics       []ProviderDiagnostic
 }
 
+type EditProjectionProviderOperation struct {
+	Operation              string   `json:"operation"`
+	Status                 string   `json:"status"`
+	NodeScope              string   `json:"node_scope"`
+	CorrelationKeys        []string `json:"correlation_keys"`
+	FixtureSlices          []string `json:"fixture_slices"`
+	FormattingPreservation string   `json:"formatting_preservation"`
+	Diagnostics            []string `json:"diagnostics"`
+}
+
+type EditProjectionProviderMatrixEntry struct {
+	ProviderID               string                            `json:"provider_id"`
+	BackendRef               BackendReference                  `json:"backend_ref"`
+	Language                 string                            `json:"language"`
+	FormattingPreservation   string                            `json:"formatting_preservation"`
+	PreservesSourceFragments bool                              `json:"preserves_source_fragments"`
+	Operations               []EditProjectionProviderOperation `json:"operations"`
+}
+
+type EditProjectionProviderMatrix struct {
+	Operations  []string                            `json:"operations"`
+	Providers   []EditProjectionProviderMatrixEntry `json:"providers"`
+	Diagnostics []string                            `json:"diagnostics"`
+}
+
 type OrderedSiblingEdge struct {
 	ParentID          string
 	NodeID            string
@@ -844,6 +869,23 @@ func BuildEditProjectionExecutionResult(source string, applied []AppliedEditProj
 		Source:            source,
 		AppliedOperations: applied,
 		Diagnostics:       diagnostics,
+	}
+}
+
+func BuildEditProjectionProviderMatrix(operations []string, providers []EditProjectionProviderMatrixEntry, diagnostics []string) EditProjectionProviderMatrix {
+	if operations == nil {
+		operations = []string{}
+	}
+	if providers == nil {
+		providers = []EditProjectionProviderMatrixEntry{}
+	}
+	if diagnostics == nil {
+		diagnostics = []string{}
+	}
+	return EditProjectionProviderMatrix{
+		Operations:  operations,
+		Providers:   providers,
+		Diagnostics: diagnostics,
 	}
 }
 
