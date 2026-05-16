@@ -779,6 +779,16 @@ func TestSharedFixtureEditProjectionProviderOperationMatrix(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureGoParserInsertChildEditProjectionContract(t *testing.T) {
+	fixture := readParserFixture(t, "diagnostics", "slice-933-go-parser-insert-child-edit-projection", "insert-child-edit-projection.json")
+
+	expected := editProjectionExecutionResultFromFixture(fixture["expected_result"])
+	result := BuildEditProjectionExecutionResult(expected.Source, expected.AppliedOperations, expected.Diagnostics)
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected go/parser insert-child edit projection execution result: %+v", result)
+	}
+}
+
 func backendCapabilityFromFixture(value any) BackendCapability {
 	capabilityFixture := value.(map[string]any)
 	backendRefFixture := capabilityFixture["backend_ref"].(map[string]any)

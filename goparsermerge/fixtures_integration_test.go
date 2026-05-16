@@ -215,6 +215,17 @@ func TestGoParserEditProjectionExecutionFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserInsertChildEditProjectionFixture(t *testing.T) {
+	fixture := readFixture(t, "diagnostics", "slice-933-go-parser-insert-child-edit-projection", "insert-child-edit-projection.json")
+
+	request := editProjectionExecutionRequestFromFixture(fixture["request"])
+	result := ApplyEditProjection(request)
+	expected := editProjectionExecutionResultFromFixture(fixture["expected_result"])
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected go/parser insert-child edit projection result:\n%#v", result)
+	}
+}
+
 func editProjectionExecutionRequestFromFixture(value any) treehaver.EditProjectionExecutionRequest {
 	fixture := value.(map[string]any)
 	operations := []treehaver.EditProjectionOperationRequest{}
