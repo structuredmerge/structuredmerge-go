@@ -1,10 +1,13 @@
 package goparsermerge
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	goparser "go/parser"
 	"go/token"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -123,6 +126,71 @@ func MergeGo(templateSource string, destinationSource string, dialect gomerge.Go
 	})
 }
 
+func ApplyEditProjection(request treehaver.EditProjectionExecutionRequest) treehaver.EditProjectionExecutionResult {
+	if request.ProviderID != BackendGoParser || request.BackendRef.ID != BackendGoParser {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "provider_edit_projection_unsupported",
+			Message:  fmt.Sprintf("provider %s does not support edit projection execution", request.ProviderID),
+			Path:     "provider_id",
+			Blocking: true,
+		}})
+	}
+	if request.Language != "go" {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "edit_projection_language_unsupported",
+			Message:  fmt.Sprintf("language %s is not supported by go/parser edit projection", request.Language),
+			Path:     "language",
+			Blocking: true,
+		}})
+	}
+	if len(request.Operations) != 1 {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "edit_projection_batch_unsupported",
+			Message:  "go/parser edit projection currently supports exactly one operation",
+			Path:     "operations",
+			Blocking: true,
+		}})
+	}
+
+	operation := request.Operations[0]
+	if operation.Operation != "replace_node" {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "unsupported_feature",
+			Code:     "edit_projection_operation_unsupported",
+			Message:  fmt.Sprintf("go/parser edit projection does not support %s", operation.Operation),
+			Path:     "operations[0].operation",
+			Blocking: true,
+		}})
+	}
+
+	output, err := replaceGoParserNode(request.Source, operation.TargetNodePath, operation.ReplacementSource)
+	if err != nil {
+		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
+			Severity: "error",
+			Category: "parse_error",
+			Code:     "edit_projection_apply_failed",
+			Message:  err.Error(),
+			Path:     "operations[0]",
+			Blocking: true,
+		}})
+	}
+
+	applied := []treehaver.AppliedEditProjectionOperation{{
+		Operation:        operation.Operation,
+		TargetNodeID:     operation.TargetNodeID,
+		CorrelationKey:   "metadata.go_parser.node_path",
+		CorrelationValue: operation.TargetNodePath,
+	}}
+	return treehaver.BuildEditProjectionExecutionResult(output, applied, nil)
+}
+
 func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	originalSource := source
 	offsetBytes := 0
@@ -201,4 +269,55 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func replaceGoParserNode(source string, targetNodePath string, replacementSource string) (string, error) {
+	index, err := declIndex(targetNodePath)
+	if err != nil {
+		return "", err
+	}
+
+	fset := token.NewFileSet()
+	file, err := goparser.ParseFile(fset, "input.go", source, goparser.ParseComments)
+	if err != nil {
+		return "", err
+	}
+	if index < 0 || index >= len(file.Decls) {
+		return "", fmt.Errorf("target node path %s is outside declaration bounds", targetNodePath)
+	}
+
+	replacementDecl, err := parseOneReplacementDecl(replacementSource)
+	if err != nil {
+		return "", err
+	}
+	file.Decls[index] = replacementDecl
+
+	var buffer bytes.Buffer
+	if err := format.Node(&buffer, fset, file); err != nil {
+		return "", err
+	}
+	return buffer.String(), nil
+}
+
+func parseOneReplacementDecl(replacementSource string) (ast.Decl, error) {
+	replacementFile, err := goparser.ParseFile(token.NewFileSet(), "replacement.go", "package replacement\n\n"+replacementSource, goparser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+	if len(replacementFile.Decls) != 1 {
+		return nil, fmt.Errorf("replacement source must contain exactly one declaration")
+	}
+	return replacementFile.Decls[0], nil
+}
+
+func declIndex(targetNodePath string) (int, error) {
+	matches := regexp.MustCompile(`^decls\[(\d+)\]$`).FindStringSubmatch(targetNodePath)
+	if matches == nil {
+		return 0, fmt.Errorf("unsupported go/parser node path %s", targetNodePath)
+	}
+	index, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+	return index, nil
 }
