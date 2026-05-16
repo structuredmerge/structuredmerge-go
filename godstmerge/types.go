@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/gomerge"
@@ -159,7 +160,7 @@ func ApplyEditProjection(request treehaver.EditProjectionExecutionRequest) treeh
 	}
 
 	operation := request.Operations[0]
-	if operation.Operation != "replace_node" && operation.Operation != "insert_child" {
+	if operation.Operation != "replace_node" && operation.Operation != "insert_child" && operation.Operation != "delete_node" {
 		return treehaver.BuildEditProjectionExecutionResult(request.Source, nil, []treehaver.ProviderDiagnostic{{
 			Severity: "error",
 			Category: "unsupported_feature",
@@ -287,24 +288,30 @@ func applyGoDSTNodeOperation(source string, operation treehaver.EditProjectionOp
 		return "", err
 	}
 
-	replacementFile, err := decorator.ParseFile(token.NewFileSet(), "replacement.go", "package replacement\n\n"+operation.ReplacementSource, goparser.ParseComments)
-	if err != nil {
-		return "", err
-	}
-	if len(replacementFile.Decls) != 1 {
-		return "", fmt.Errorf("replacement source must contain exactly one declaration")
-	}
 	switch operation.Operation {
 	case "replace_node":
 		if index < 0 || index >= len(file.Decls) {
 			return "", fmt.Errorf("target node path %s is outside declaration bounds", operation.TargetNodePath)
 		}
-		file.Decls[index] = replacementFile.Decls[0]
+		replacementDecl, err := parseOneReplacementDecl(operation.ReplacementSource)
+		if err != nil {
+			return "", err
+		}
+		file.Decls[index] = replacementDecl
+	case "delete_node":
+		if index < 0 || index >= len(file.Decls) {
+			return "", fmt.Errorf("target node path %s is outside declaration deletion bounds", operation.TargetNodePath)
+		}
+		file.Decls = slices.Delete(file.Decls, index, index+1)
 	case "insert_child":
+		replacementDecl, err := parseOneReplacementDecl(operation.ReplacementSource)
+		if err != nil {
+			return "", err
+		}
 		if index < 0 || index > len(file.Decls) {
 			return "", fmt.Errorf("target node path %s is outside declaration insertion bounds", operation.TargetNodePath)
 		}
-		file.Decls = slices.Insert(file.Decls, index, replacementFile.Decls[0])
+		file.Decls = slices.Insert(file.Decls, index, replacementDecl)
 	default:
 		return "", fmt.Errorf("unsupported edit projection operation %s", operation.Operation)
 	}
@@ -314,6 +321,17 @@ func applyGoDSTNodeOperation(source string, operation treehaver.EditProjectionOp
 		return "", err
 	}
 	return buffer.String(), nil
+}
+
+func parseOneReplacementDecl(replacementSource string) (dst.Decl, error) {
+	replacementFile, err := decorator.ParseFile(token.NewFileSet(), "replacement.go", "package replacement\n\n"+replacementSource, goparser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+	if len(replacementFile.Decls) != 1 {
+		return nil, fmt.Errorf("replacement source must contain exactly one declaration")
+	}
+	return replacementFile.Decls[0], nil
 }
 
 func declIndex(targetNodePath string) (int, error) {

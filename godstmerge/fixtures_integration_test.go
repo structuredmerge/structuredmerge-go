@@ -142,6 +142,17 @@ func TestGoDSTInsertChildEditProjectionFixture(t *testing.T) {
 	}
 }
 
+func TestGoDSTDeleteNodeEditProjectionFixture(t *testing.T) {
+	fixture := readFixture(t, "diagnostics", "slice-930-go-dst-delete-node-edit-projection", "delete-node-edit-projection.json")
+
+	request := editProjectionExecutionRequestFromFixture(fixture["request"])
+	result := ApplyEditProjection(request)
+	expected := editProjectionExecutionResultFromFixture(fixture["expected_result"])
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected delete-node edit projection result:\n%#v", result)
+	}
+}
+
 func editProjectionExecutionRequestFromFixture(value any) treehaver.EditProjectionExecutionRequest {
 	fixture := value.(map[string]any)
 	operations := []treehaver.EditProjectionOperationRequest{}
