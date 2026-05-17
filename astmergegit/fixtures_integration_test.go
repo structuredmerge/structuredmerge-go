@@ -132,6 +132,14 @@ func TestGoMerge3Fixture(t *testing.T) {
 						t.Fatalf("expected merged source to contain %q:\n%s", needle, *result.MergedSource)
 					}
 				}
+				if rawNeedles, ok := expected["must_not_contain"].([]any); ok {
+					for _, rawNeedle := range rawNeedles {
+						needle := rawNeedle.(string)
+						if strings.Contains(*result.MergedSource, needle) {
+							t.Fatalf("expected merged source not to contain %q:\n%s", needle, *result.MergedSource)
+						}
+					}
+				}
 				if expectedSource, ok := expected["expected_source"].(string); ok && *result.MergedSource != expectedSource {
 					t.Fatalf("unexpected merged source\nexpected:\n%s\nactual:\n%s", expectedSource, *result.MergedSource)
 				}

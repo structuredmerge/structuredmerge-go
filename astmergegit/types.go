@@ -298,6 +298,14 @@ func mergeGoDeclarations(base gomerge.GoAnalysis, ours gomerge.GoAnalysis, their
 		case baseOK && oursOK && !theirsOK:
 			addConflict(conflicts, "delete_edit", "/decls/"+key, "theirs deleted a declaration that ours edited")
 		case baseOK && oursOK && theirsOK:
+			if stripGoComments(baseText) == stripGoComments(oursText) && stripGoComments(baseText) == stripGoComments(theirsText) {
+				mergedText, mergedOK := mergeGoCommentOnlyChange(key, baseText, oursText, theirsText, conflicts)
+				if !mergedOK {
+					continue
+				}
+				merged = append(merged, mergedText)
+				continue
+			}
 			switch {
 			case strings.TrimSpace(oursText) == strings.TrimSpace(theirsText):
 				merged = append(merged, oursText)
@@ -315,6 +323,29 @@ func mergeGoDeclarations(base gomerge.GoAnalysis, ours gomerge.GoAnalysis, their
 		}
 	}
 	return merged, len(*conflicts) == 0
+}
+
+func mergeGoCommentOnlyChange(key string, baseText string, oursText string, theirsText string, conflicts *[]Merge3Conflict) (string, bool) {
+	baseComments := leadingGoCommentBlock(baseText)
+	oursComments := leadingGoCommentBlock(oursText)
+	theirsComments := leadingGoCommentBlock(theirsText)
+	switch {
+	case oursComments == theirsComments:
+		return oursText, true
+	case oursComments == baseComments:
+		return theirsText, true
+	case theirsComments == baseComments:
+		return oursText, true
+	case oursComments == "" && theirsComments != "":
+		addConflict(conflicts, "delete_edit", "/decls/"+key+"/comments", "ours deleted comments that theirs edited")
+		return "", false
+	case theirsComments == "" && oursComments != "":
+		addConflict(conflicts, "delete_edit", "/decls/"+key+"/comments", "theirs deleted comments that ours edited")
+		return "", false
+	default:
+		addConflict(conflicts, "edit_edit", "/decls/"+key+"/comments", "comments changed differently in ours and theirs")
+		return "", false
+	}
 }
 
 func goDeclarationMap(analysis gomerge.GoAnalysis) map[string]string {
@@ -394,6 +425,23 @@ func stripGoComments(source string) string {
 		kept = append(kept, line)
 	}
 	return strings.TrimSpace(strings.Join(kept, "\n"))
+}
+
+func leadingGoCommentBlock(source string) string {
+	lines := strings.Split(source, "\n")
+	comments := make([]string, 0)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "//") {
+			comments = append(comments, trimmed)
+			continue
+		}
+		if trimmed == "" && len(comments) == 0 {
+			continue
+		}
+		break
+	}
+	return strings.Join(comments, "\n")
 }
 
 func attachLeadingGoComments(commentSource string, declarationSource string) string {
