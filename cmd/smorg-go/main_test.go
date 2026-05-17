@@ -267,6 +267,33 @@ func TestMergeDriverStrictFailureReturnsConflictExitCode(t *testing.T) {
 	}
 }
 
+func TestMergeDriverFullFileFallbackWritesConflictMarkers(t *testing.T) {
+	dir := t.TempDir()
+	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"structuredmerge"}`)
+	current := writeTestFile(t, dir, "current.json", `{"name":`)
+	other := writeTestFile(t, dir, "other.json", `{"other":true}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", ancestor, current, other, "package.json"}, &stdout, &stderr)
+	if exitCode != exitUnresolvedConflict {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+
+	currentSource, err := os.ReadFile(current)
+	if err != nil {
+		t.Fatalf("read current file: %v", err)
+	}
+	for _, expected := range []string{"<<<<<<< ours", "||||||| base", "=======", ">>>>>>> theirs"} {
+		if !strings.Contains(string(currentSource), expected) {
+			t.Fatalf("expected full-file fallback marker %q:\n%s", expected, string(currentSource))
+		}
+	}
+	if !strings.Contains(stderr.String(), "parse_error") {
+		t.Fatalf("expected parse diagnostic, got %q", stderr.String())
+	}
+}
+
 type gitDriverJSONFixture struct {
 	Cases []gitDriverJSONCase `json:"cases"`
 }

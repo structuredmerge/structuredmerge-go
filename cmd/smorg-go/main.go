@@ -139,7 +139,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !result.OK {
 		printDiagnostics(stderr, result.Diagnostics)
 		if result.Output == nil && !options.strict && options.fallback != "none" {
-			output := string(currentSource)
+			output := fullFileConflictOutput(settings.conflictMarkerSize, string(ancestorSource), string(currentSource), string(otherSource))
 			result.Output = &output
 		}
 		if options.checkOnly {
@@ -169,6 +169,22 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	return exitSuccess
+}
+
+func fullFileConflictOutput(markerSize int, ancestorSource string, currentSource string, otherSource string) string {
+	if markerSize <= 0 {
+		markerSize = 7
+	}
+	return strings.Join([]string{
+		strings.Repeat("<", markerSize) + " ours",
+		currentSource,
+		strings.Repeat("|", markerSize) + " base",
+		ancestorSource,
+		strings.Repeat("=", markerSize),
+		otherSource,
+		strings.Repeat(">", markerSize) + " theirs",
+		"",
+	}, "\n")
 }
 
 func writeMergeOutput(options mergeDriverOptions, output string, stderr io.Writer) int {
