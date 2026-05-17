@@ -12,7 +12,6 @@ import (
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
 	"github.com/structuredmerge/structuredmerge-go/astmergegit"
-	"github.com/structuredmerge/structuredmerge-go/gomerge"
 	"github.com/structuredmerge/structuredmerge-go/jsonmerge"
 	"github.com/structuredmerge/structuredmerge-go/plainmerge"
 )
@@ -451,7 +450,17 @@ func (options mergeDriverOptions) effectivePath() string {
 func mergeByPath(pathName string, language string, ancestorSource string, currentSource string, otherSource string) astmerge.MergeResult[string] {
 	switch normalizeLanguage(language, pathName) {
 	case "go":
-		return gomerge.MergeGo(otherSource, currentSource, gomerge.DialectGo)
+		return merge3Result(astmergegit.Merge3(astmergegit.Merge3Request{
+			BaseSource:     ancestorSource,
+			OursSource:     currentSource,
+			TheirsSource:   otherSource,
+			PathName:       pathName,
+			Language:       "go",
+			Dialect:        "go",
+			ProfileID:      "go.source",
+			FallbackPolicy: "none",
+			RenderPolicy:   "canonical",
+		}))
 	case "json":
 		return merge3Result(astmergegit.Merge3(astmergegit.Merge3Request{
 			BaseSource:     ancestorSource,

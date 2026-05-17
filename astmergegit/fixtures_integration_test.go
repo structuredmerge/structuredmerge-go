@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -87,6 +88,55 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 				}
 				if !reflect.DeepEqual(paths, decodeFixtureValue[[]string](t, expected["conflict_paths"])) {
 					t.Fatalf("unexpected conflict paths: %+v", paths)
+				}
+			}
+		})
+	}
+}
+
+func TestGoMerge3Fixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-952-go-merge3", "go-merge3.json")
+	cases := fixture["cases"].([]any)
+	for _, rawCase := range cases {
+		testCase := rawCase.(map[string]any)
+		t.Run(testCase["case_id"].(string), func(t *testing.T) {
+			request := Merge3Request{
+				BaseSource:   testCase["base_source"].(string),
+				OursSource:   testCase["ours_source"].(string),
+				TheirsSource: testCase["theirs_source"].(string),
+				PathName:     testCase["path_name"].(string),
+				Language:     "go",
+				Dialect:      "go",
+				ProfileID:    "go.source",
+			}
+			result := Merge3(request)
+			expected := testCase["expected"].(map[string]any)
+			if result.OK != expected["ok"].(bool) {
+				t.Fatalf("unexpected ok=%v diagnostics=%+v conflicts=%+v", result.OK, result.Diagnostics, result.Conflicts)
+			}
+			if len(result.Conflicts) != int(expected["conflict_count"].(float64)) {
+				t.Fatalf("unexpected conflicts: %+v", result.Conflicts)
+			}
+			if result.OK {
+				if result.MergedSource == nil {
+					t.Fatal("expected merged source")
+				}
+				for _, rawNeedle := range expected["must_contain"].([]any) {
+					needle := rawNeedle.(string)
+					if !strings.Contains(*result.MergedSource, needle) {
+						t.Fatalf("expected merged source to contain %q:\n%s", needle, *result.MergedSource)
+					}
+				}
+				if result.ReparseAfterRender == nil || !*result.ReparseAfterRender {
+					t.Fatalf("expected output to reparse: %+v", result)
+				}
+			} else {
+				expectedCategories := expected["conflict_categories"].([]any)
+				expectedPaths := expected["conflict_paths"].([]any)
+				for index, conflict := range result.Conflicts {
+					if conflict.Category != expectedCategories[index].(string) || conflict.Path != expectedPaths[index].(string) {
+						t.Fatalf("unexpected conflict at %d: %+v", index, conflict)
+					}
 				}
 			}
 		})
