@@ -75,6 +75,31 @@ func TestMergeDriverNamedFormWritesOutputPath(t *testing.T) {
 	}
 }
 
+func TestMergeDriverJSONUsesAncestorForSameKeyConflicts(t *testing.T) {
+	dir := t.TempDir()
+	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"demo","enabled":true}`)
+	current := writeTestFile(t, dir, "current.json", `{"name":"demo","enabled":false}`)
+	other := writeTestFile(t, dir, "other.json", `{"name":"demo","enabled":"yes"}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", "--strict", ancestor, current, other, "package.json"}, &stdout, &stderr)
+	if exitCode != exitUnresolvedConflict {
+		t.Fatalf("expected conflict exit code, got %d stderr=%s", exitCode, stderr.String())
+	}
+
+	currentSource, err := os.ReadFile(current)
+	if err != nil {
+		t.Fatalf("read current file: %v", err)
+	}
+	if string(currentSource) != `{"name":"demo","enabled":false}` {
+		t.Fatalf("conflicted merge should not rewrite current file: %s", string(currentSource))
+	}
+	if !strings.Contains(stderr.String(), "merge_conflict") {
+		t.Fatalf("expected merge conflict diagnostic, got %q", stderr.String())
+	}
+}
+
 func TestMergeDriverStrictFailureReturnsConflictExitCode(t *testing.T) {
 	dir := t.TempDir()
 	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"structuredmerge"}`)
@@ -87,8 +112,8 @@ func TestMergeDriverStrictFailureReturnsConflictExitCode(t *testing.T) {
 	if exitCode != exitUnresolvedConflict {
 		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "destination_parse_error") {
-		t.Fatalf("expected destination parse diagnostic, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "parse_error") || !strings.Contains(stderr.String(), "ours parse error") {
+		t.Fatalf("expected ours parse diagnostic, got %q", stderr.String())
 	}
 }
 

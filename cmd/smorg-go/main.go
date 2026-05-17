@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/astmergegit"
 	"github.com/structuredmerge/structuredmerge-go/gomerge"
 	"github.com/structuredmerge/structuredmerge-go/jsonmerge"
 	"github.com/structuredmerge/structuredmerge-go/plainmerge"
@@ -135,7 +136,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	if exitCode := reportAndEnforceProfile(options.profileID, options.profileReport, options.requireProfileStatus, stdout, stderr); exitCode != exitSuccess {
 		return exitCode
 	}
-	result := mergeByPath(effectivePath, settings.language, string(otherSource), string(currentSource))
+	result := mergeByPath(effectivePath, settings.language, string(ancestorSource), string(currentSource), string(otherSource))
 	if !result.OK || result.Output == nil {
 		if options.strict || options.fallback == "none" {
 			printDiagnostics(stderr, result.Diagnostics)
@@ -447,16 +448,42 @@ func (options mergeDriverOptions) effectivePath() string {
 	return options.current
 }
 
-func mergeByPath(pathName string, language string, otherSource string, currentSource string) astmerge.MergeResult[string] {
+func mergeByPath(pathName string, language string, ancestorSource string, currentSource string, otherSource string) astmerge.MergeResult[string] {
 	switch normalizeLanguage(language, pathName) {
 	case "go":
 		return gomerge.MergeGo(otherSource, currentSource, gomerge.DialectGo)
 	case "json":
-		return jsonmerge.MergeJSON(otherSource, currentSource, jsonmerge.DialectJSON)
+		return merge3Result(astmergegit.Merge3(astmergegit.Merge3Request{
+			BaseSource:     ancestorSource,
+			OursSource:     currentSource,
+			TheirsSource:   otherSource,
+			PathName:       pathName,
+			Language:       "json",
+			Dialect:        "json",
+			ProfileID:      "json.keyed-object",
+			FallbackPolicy: "none",
+			RenderPolicy:   "canonical",
+		}))
 	case "jsonc":
 		return jsonmerge.MergeJSON(otherSource, currentSource, jsonmerge.DialectJSONC)
 	default:
 		return plainmerge.MergeText(otherSource, currentSource)
+	}
+}
+
+func merge3Result(result astmergegit.Merge3Response) astmerge.MergeResult[string] {
+	if result.OK && result.MergedSource != nil {
+		return astmerge.MergeResult[string]{
+			OK:          true,
+			Diagnostics: result.Diagnostics,
+			Output:      result.MergedSource,
+			Policies:    []astmerge.PolicyReference{},
+		}
+	}
+	return astmerge.MergeResult[string]{
+		OK:          false,
+		Diagnostics: result.Diagnostics,
+		Policies:    []astmerge.PolicyReference{},
 	}
 }
 
