@@ -94,11 +94,43 @@ func TestMergeDriverJSONUsesAncestorForSameKeyConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read current file: %v", err)
 	}
-	if string(currentSource) != `{"name":"demo","enabled":false}` {
-		t.Fatalf("conflicted merge should not rewrite current file: %s", string(currentSource))
+	if !strings.Contains(string(currentSource), "<<<<<<< ours") ||
+		!strings.Contains(string(currentSource), "||||||| base") ||
+		!strings.Contains(string(currentSource), "=======") ||
+		!strings.Contains(string(currentSource), ">>>>>>> theirs") {
+		t.Fatalf("conflicted merge should write conflict markers: %s", string(currentSource))
 	}
 	if !strings.Contains(stderr.String(), "merge_conflict") {
 		t.Fatalf("expected merge conflict diagnostic, got %q", stderr.String())
+	}
+}
+
+func TestMergeDriverConflictOutputUsesMarkerSizeAttribute(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.WriteFile(filepath.Join(dir, ".gitattributes"), []byte("*.json conflict-marker-size=9\n"), 0o644); err != nil {
+		t.Fatalf("write gitattributes: %v", err)
+	}
+	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"demo","enabled":true}`)
+	current := writeTestFile(t, dir, "package.json", `{"name":"demo","enabled":false}`)
+	other := writeTestFile(t, dir, "other.json", `{"name":"demo","enabled":"yes"}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", "--strict", ancestor, current, other, "package.json"}, &stdout, &stderr)
+	if exitCode != exitUnresolvedConflict {
+		t.Fatalf("expected conflict exit code, got %d stderr=%s", exitCode, stderr.String())
+	}
+
+	currentSource, err := os.ReadFile(current)
+	if err != nil {
+		t.Fatalf("read current file: %v", err)
+	}
+	if !strings.Contains(string(currentSource), "<<<<<<<<< ours") ||
+		!strings.Contains(string(currentSource), "||||||||| base") ||
+		!strings.Contains(string(currentSource), "=========") ||
+		!strings.Contains(string(currentSource), ">>>>>>>>> theirs") {
+		t.Fatalf("conflicted merge should use configured conflict marker size: %s", string(currentSource))
 	}
 }
 
@@ -154,6 +186,11 @@ func TestMergeDriverJSONGitRepositoryIntegrationFixture(t *testing.T) {
 			if testCase.Expected.MergedSource != "" && string(mergedSource) != testCase.Expected.MergedSource {
 				t.Fatalf("merged source mismatch\nexpected=%q\nactual=%q", testCase.Expected.MergedSource, string(mergedSource))
 			}
+			for _, expected := range testCase.Expected.ConflictedSourceContains {
+				if !strings.Contains(string(mergedSource), expected) {
+					t.Fatalf("expected conflicted source to contain %q:\n%s", expected, string(mergedSource))
+				}
+			}
 		})
 	}
 }
@@ -199,8 +236,15 @@ func TestMergeDriverGoGitRepositoryIntegrationFixture(t *testing.T) {
 				if string(mergedSource) != testCase.Expected.ExpectedSource {
 					t.Fatalf("merged source mismatch\nexpected:\n%s\nactual:\n%s", testCase.Expected.ExpectedSource, string(mergedSource))
 				}
-			} else if !strings.Contains(stderr.String(), "merge_conflict") {
-				t.Fatalf("expected merge conflict diagnostic, got %q", stderr.String())
+			} else {
+				if !strings.Contains(stderr.String(), "merge_conflict") {
+					t.Fatalf("expected merge conflict diagnostic, got %q", stderr.String())
+				}
+				for _, expected := range []string{"<<<<<<< ours", "||||||| base", "=======", ">>>>>>> theirs"} {
+					if !strings.Contains(string(mergedSource), expected) {
+						t.Fatalf("expected conflicted source to contain %q:\n%s", expected, string(mergedSource))
+					}
+				}
 			}
 		})
 	}
@@ -237,10 +281,11 @@ type gitDriverJSONCase struct {
 }
 
 type gitDriverJSONExpected struct {
-	ExitCode       int      `json:"exit_code"`
-	MergedJSON     any      `json:"merged_json"`
-	MergedSource   string   `json:"merged_source"`
-	StderrContains []string `json:"stderr_contains"`
+	ExitCode                 int      `json:"exit_code"`
+	MergedJSON               any      `json:"merged_json"`
+	MergedSource             string   `json:"merged_source"`
+	ConflictedSourceContains []string `json:"conflicted_source_contains"`
+	StderrContains           []string `json:"stderr_contains"`
 }
 
 func readGitDriverJSONFixture(t *testing.T) gitDriverJSONFixture {

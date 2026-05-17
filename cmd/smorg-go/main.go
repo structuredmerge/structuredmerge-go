@@ -135,14 +135,26 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	if exitCode := reportAndEnforceProfile(options.profileID, options.profileReport, options.requireProfileStatus, stdout, stderr); exitCode != exitSuccess {
 		return exitCode
 	}
-	result := mergeByPath(effectivePath, settings.language, string(ancestorSource), string(currentSource), string(otherSource))
-	if !result.OK || result.Output == nil {
-		if options.strict || options.fallback == "none" {
-			printDiagnostics(stderr, result.Diagnostics)
+	result := mergeByPath(effectivePath, settings.language, settings.conflictMarkerSize, string(ancestorSource), string(currentSource), string(otherSource))
+	if !result.OK {
+		printDiagnostics(stderr, result.Diagnostics)
+		if result.Output == nil && !options.strict && options.fallback != "none" {
+			output := string(currentSource)
+			result.Output = &output
+		}
+		if options.checkOnly {
 			return exitUnresolvedConflict
 		}
-		output := string(currentSource)
-		result.Output = &output
+		if result.Output != nil {
+			if exitCode := writeMergeOutput(options, *result.Output, stderr); exitCode != exitSuccess {
+				return exitCode
+			}
+		}
+		return exitUnresolvedConflict
+	}
+	if result.Output == nil {
+		fmt.Fprintln(stderr, "merge completed without output")
+		return exitInternalError
 	}
 
 	if options.checkOnly {
@@ -152,15 +164,22 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitSuccess
 	}
 
+	if exitCode := writeMergeOutput(options, *result.Output, stderr); exitCode != exitSuccess {
+		return exitCode
+	}
+
+	return exitSuccess
+}
+
+func writeMergeOutput(options mergeDriverOptions, output string, stderr io.Writer) int {
 	outputPath := options.output
 	if outputPath == "" {
 		outputPath = options.current
 	}
-	if err := os.WriteFile(outputPath, []byte(*result.Output), 0o644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(output), 0o644); err != nil {
 		fmt.Fprintf(stderr, "write output: %v\n", err)
 		return exitInternalError
 	}
-
 	return exitSuccess
 }
 
@@ -447,31 +466,33 @@ func (options mergeDriverOptions) effectivePath() string {
 	return options.current
 }
 
-func mergeByPath(pathName string, language string, ancestorSource string, currentSource string, otherSource string) astmerge.MergeResult[string] {
+func mergeByPath(pathName string, language string, conflictMarkerSize int, ancestorSource string, currentSource string, otherSource string) astmerge.MergeResult[string] {
 	switch normalizeLanguage(language, pathName) {
 	case "go":
 		return merge3Result(astmergegit.Merge3(astmergegit.Merge3Request{
-			BaseSource:     ancestorSource,
-			OursSource:     currentSource,
-			TheirsSource:   otherSource,
-			PathName:       pathName,
-			Language:       "go",
-			Dialect:        "go",
-			ProfileID:      "go.source",
-			FallbackPolicy: "none",
-			RenderPolicy:   "canonical",
+			BaseSource:         ancestorSource,
+			OursSource:         currentSource,
+			TheirsSource:       otherSource,
+			PathName:           pathName,
+			Language:           "go",
+			Dialect:            "go",
+			ProfileID:          "go.source",
+			FallbackPolicy:     "none",
+			ConflictMarkerSize: conflictMarkerSize,
+			RenderPolicy:       "canonical",
 		}))
 	case "json":
 		return merge3Result(astmergegit.Merge3(astmergegit.Merge3Request{
-			BaseSource:     ancestorSource,
-			OursSource:     currentSource,
-			TheirsSource:   otherSource,
-			PathName:       pathName,
-			Language:       "json",
-			Dialect:        "json",
-			ProfileID:      "json.keyed-object",
-			FallbackPolicy: "none",
-			RenderPolicy:   "canonical",
+			BaseSource:         ancestorSource,
+			OursSource:         currentSource,
+			TheirsSource:       otherSource,
+			PathName:           pathName,
+			Language:           "json",
+			Dialect:            "json",
+			ProfileID:          "json.keyed-object",
+			FallbackPolicy:     "none",
+			ConflictMarkerSize: conflictMarkerSize,
+			RenderPolicy:       "canonical",
 		}))
 	case "jsonc":
 		return jsonmerge.MergeJSON(otherSource, currentSource, jsonmerge.DialectJSONC)
@@ -486,6 +507,14 @@ func merge3Result(result astmergegit.Merge3Response) astmerge.MergeResult[string
 			OK:          true,
 			Diagnostics: result.Diagnostics,
 			Output:      result.MergedSource,
+			Policies:    []astmerge.PolicyReference{},
+		}
+	}
+	if !result.OK && result.ConflictedSource != nil {
+		return astmerge.MergeResult[string]{
+			OK:          false,
+			Diagnostics: result.Diagnostics,
+			Output:      result.ConflictedSource,
 			Policies:    []astmerge.PolicyReference{},
 		}
 	}

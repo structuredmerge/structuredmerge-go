@@ -44,6 +44,7 @@ type FormattingPreservationReport struct {
 type Merge3Response struct {
 	OK                     bool                         `json:"ok"`
 	MergedSource           *string                      `json:"merged_source"`
+	ConflictedSource       *string                      `json:"conflicted_source"`
 	Conflicts              []Merge3Conflict             `json:"conflicts"`
 	Diagnostics            []astmerge.Diagnostic        `json:"diagnostics"`
 	Fallbacks              []string                     `json:"fallbacks"`
@@ -104,9 +105,11 @@ func Merge3GoWithParser(
 	conflicts := []Merge3Conflict{}
 	merged, ok := mergeGoAnalyses(*base.Analysis, *ours.Analysis, *theirs.Analysis, &conflicts)
 	if !ok {
+		conflictedSource := renderConflictSource(request, conflicts)
 		return Merge3Response{
-			OK:        false,
-			Conflicts: conflicts,
+			OK:               false,
+			ConflictedSource: &conflictedSource,
+			Conflicts:        conflicts,
 			Diagnostics: []astmerge.Diagnostic{{
 				Severity: astmerge.SeverityError,
 				Category: astmerge.DiagnosticCategory("merge_conflict"),
@@ -114,7 +117,7 @@ func Merge3GoWithParser(
 			}},
 			Fallbacks:              []string{},
 			Profile:                profileReport(request),
-			RenderReport:           Merge3RenderReport{Strategy: normalizedRenderPolicy(request.RenderPolicy)},
+			RenderReport:           Merge3RenderReport{Strategy: "full_file_conflict_markers"},
 			FormattingPreservation: FormattingPreservationReport{},
 		}
 	}
@@ -153,9 +156,11 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 	conflicts := []Merge3Conflict{}
 	merged := mergeJSONValue(base, ours, theirs, "", &conflicts)
 	if len(conflicts) > 0 {
+		conflictedSource := renderConflictSource(request, conflicts)
 		return Merge3Response{
-			OK:        false,
-			Conflicts: conflicts,
+			OK:               false,
+			ConflictedSource: &conflictedSource,
+			Conflicts:        conflicts,
 			Diagnostics: []astmerge.Diagnostic{{
 				Severity: astmerge.SeverityError,
 				Category: astmerge.DiagnosticCategory("merge_conflict"),
@@ -163,7 +168,7 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			}},
 			Fallbacks:              []string{},
 			Profile:                profileReport(request),
-			RenderReport:           Merge3RenderReport{Strategy: normalizedRenderPolicy(request.RenderPolicy)},
+			RenderReport:           Merge3RenderReport{Strategy: "full_file_conflict_markers"},
 			FormattingPreservation: FormattingPreservationReport{},
 		}
 	}
@@ -204,6 +209,32 @@ func parseFailureResponse(request Merge3Request, diagnostic astmerge.Diagnostic)
 		RenderReport:           Merge3RenderReport{Strategy: normalizedRenderPolicy(request.RenderPolicy)},
 		FormattingPreservation: FormattingPreservationReport{},
 	}
+}
+
+func renderConflictSource(request Merge3Request, conflicts []Merge3Conflict) string {
+	markerSize := request.ConflictMarkerSize
+	if markerSize <= 0 {
+		markerSize = 7
+	}
+	leftMarker := strings.Repeat("<", markerSize)
+	baseMarker := strings.Repeat("|", markerSize)
+	separatorMarker := strings.Repeat("=", markerSize)
+	rightMarker := strings.Repeat(">", markerSize)
+	header := fmt.Sprintf("// smorg structured conflicts: %d unresolved", len(conflicts))
+	if normalizeLanguage(request.Language, request.PathName) == "json" {
+		header = fmt.Sprintf("/* smorg structured conflicts: %d unresolved */", len(conflicts))
+	}
+	return strings.Join([]string{
+		header,
+		leftMarker + " ours",
+		request.OursSource,
+		baseMarker + " base",
+		request.BaseSource,
+		separatorMarker,
+		request.TheirsSource,
+		rightMarker + " theirs",
+		"",
+	}, "\n")
 }
 
 func roleDiagnostic(role string, diagnostics []astmerge.Diagnostic) astmerge.Diagnostic {

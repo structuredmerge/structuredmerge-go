@@ -94,6 +94,15 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 				if !reflect.DeepEqual(paths, decodeFixtureValue[[]string](t, expected["conflict_paths"])) {
 					t.Fatalf("unexpected conflict paths: %+v", paths)
 				}
+				for _, rawNeedle := range decodeFixtureValue[[]string](t, expected["conflicted_source_contains"]) {
+					if result.ConflictedSource == nil || !strings.Contains(*result.ConflictedSource, rawNeedle) {
+						source := "<nil>"
+						if result.ConflictedSource != nil {
+							source = *result.ConflictedSource
+						}
+						t.Fatalf("expected conflicted source to contain %q:\n%s", rawNeedle, source)
+					}
+				}
 			}
 		})
 	}
@@ -152,6 +161,15 @@ func TestGoMerge3Fixture(t *testing.T) {
 				for index, conflict := range result.Conflicts {
 					if conflict.Category != expectedCategories[index].(string) || conflict.Path != expectedPaths[index].(string) {
 						t.Fatalf("unexpected conflict at %d: %+v", index, conflict)
+					}
+				}
+				for _, rawNeedle := range []string{"<<<<<<< ours", "||||||| base", "=======", ">>>>>>> theirs"} {
+					if result.ConflictedSource == nil || !strings.Contains(*result.ConflictedSource, rawNeedle) {
+						source := "<nil>"
+						if result.ConflictedSource != nil {
+							source = *result.ConflictedSource
+						}
+						t.Fatalf("expected conflicted source to contain %q:\n%s", rawNeedle, source)
 					}
 				}
 			}
