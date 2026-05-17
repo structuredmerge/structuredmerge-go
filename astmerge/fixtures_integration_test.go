@@ -99,6 +99,20 @@ func decodeFixtureValueUntyped[T any](raw any) T {
 	return decoded
 }
 
+func stringPtrValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func stringValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	return value.(string)
+}
+
 func TestSharedFixtureGenericMergeIR(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-790-generic-merge-ir", "generic-merge-ir.json"))
 	mergeIR := decodeFixtureValue[MergeIR](t, fixture["merge_ir"])
@@ -117,6 +131,84 @@ func TestSharedFixtureGenericMergeIR(t *testing.T) {
 		mergeIR.Changes[1].ClassID == nil ||
 		*mergeIR.Changes[1].ClassID != "class-import-strings" {
 		t.Fatalf("unexpected generic merge IR: %+v", mergeIR)
+	}
+}
+
+func TestSharedFixtureCommentTriviaAttachmentContract(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-955-comment-trivia-attachment-contract", "comment-trivia-attachment-contract.json"))
+	owners := decodeFixtureValue[[]CommentOwnerNode](t, fixture["owner_nodes"])
+	styles := decodeFixtureValue[[]CommentStyleDefinition](t, fixture["comment_styles"])
+	regions := decodeFixtureValue[[]CommentRegion](t, fixture["comment_regions"])
+	gaps := decodeFixtureValue[[]LayoutGap](t, fixture["layout_gaps"])
+	attachments := decodeFixtureValue[[]CommentAttachment](t, fixture["attachments"])
+	expected := fixture["expected"].(map[string]any)
+
+	regionsByID := map[string]CommentRegion{}
+	for _, region := range regions {
+		regionsByID[region.ID] = region
+	}
+	gapsByID := map[string]LayoutGap{}
+	for _, gap := range gaps {
+		gapsByID[gap.ID] = gap
+	}
+
+	if len(owners) != int(expected["owner_count"].(float64)) ||
+		len(regions) != int(expected["comment_region_count"].(float64)) ||
+		len(gaps) != int(expected["layout_gap_count"].(float64)) ||
+		len(attachments) != int(expected["attachment_count"].(float64)) {
+		t.Fatalf("unexpected fixture counts")
+	}
+	if styles[0].Style != "hash_comment" || *styles[0].LinePrefix != "#" {
+		t.Fatalf("unexpected comment style fixture: %+v", styles[0])
+	}
+
+	for _, raw := range fixture["comment_regions"].([]any) {
+		regionFixture := raw.(map[string]any)
+		region := regionsByID[regionFixture["id"].(string)]
+		regionExpected := regionFixture["expected"].(map[string]any)
+		if region.StartLine() != int(regionExpected["start_line"].(float64)) ||
+			region.EndLine() != int(regionExpected["end_line"].(float64)) ||
+			region.Text() != regionExpected["text"].(string) ||
+			region.NormalizedContent() != regionExpected["normalized_content"].(string) ||
+			!reflect.DeepEqual(region.Signature(), decodeFixtureValue[[]string](t, regionExpected["signature"])) ||
+			!reflect.DeepEqual(region.FreezeActions("smorg"), decodeFixtureValue[[]string](t, regionExpected["freeze_actions"])) {
+			t.Fatalf("unexpected comment region projection: %+v", region)
+		}
+	}
+
+	for _, raw := range fixture["layout_gaps"].([]any) {
+		gapFixture := raw.(map[string]any)
+		gap := gapsByID[gapFixture["id"].(string)]
+		gapExpected := gapFixture["expected"].(map[string]any)
+		if gap.LineCount() != int(gapExpected["line_count"].(float64)) ||
+			gap.BlankLineCount() != int(gapExpected["blank_line_count"].(float64)) ||
+			stringPtrValue(gap.ControllerOwnerID()) != stringValue(gapExpected["controller_owner_id"]) ||
+			stringPtrValue(gap.FallbackOwnerID()) != stringValue(gapExpected["fallback_owner_id"]) {
+			t.Fatalf("unexpected layout gap projection: %+v", gap)
+		}
+		if expectedFallback, ok := gapExpected["effective_controller_with_after_removed"].(string); ok {
+			if stringPtrValue(gap.EffectiveControllerOwnerID(map[string]bool{*gap.AfterOwnerID: true})) != expectedFallback {
+				t.Fatalf("unexpected effective controller fallback: %+v", gap)
+			}
+		}
+	}
+
+	for index, raw := range fixture["attachments"].([]any) {
+		attachmentFixture := raw.(map[string]any)
+		attachmentExpected := attachmentFixture["expected"].(map[string]any)
+		attachment := attachments[index]
+		if attachment.RegionCount(regionsByID) != int(attachmentExpected["region_count"].(float64)) ||
+			attachment.LayoutGapCount(gapsByID) != int(attachmentExpected["layout_gap_count"].(float64)) ||
+			attachment.Empty(regionsByID) != attachmentExpected["empty"].(bool) ||
+			attachment.LeadingRegionLayoutOwned(regionsByID, gapsByID) != attachmentExpected["leading_region_layout_owned"].(bool) ||
+			attachment.TrailingRegionLayoutOwned(regionsByID, gapsByID) != attachmentExpected["trailing_region_layout_owned"].(bool) ||
+			attachment.FreezeMarker(regionsByID, "smorg") != attachmentExpected["freeze_marker"].(bool) {
+			t.Fatalf("unexpected comment attachment projection: %+v", attachment)
+		}
+	}
+
+	if !slices.Contains(decodeFixtureValue[[]string](t, fixture["contract_rules"]), "comment regions are passive data and do not decide git or template merge outcomes") {
+		t.Fatalf("missing passive contract rule")
 	}
 }
 

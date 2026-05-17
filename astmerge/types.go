@@ -195,6 +195,262 @@ type MergeIR struct {
 	Diagnostics  []string             `json:"diagnostics"`
 }
 
+type LineRange struct {
+	StartLine int `json:"start_line"`
+	EndLine   int `json:"end_line"`
+}
+
+type CommentOwnerNode struct {
+	ID            string    `json:"id"`
+	Kind          string    `json:"kind"`
+	SemanticRoles []string  `json:"semantic_roles"`
+	LineRange     LineRange `json:"line_range"`
+}
+
+type CommentStyleDefinition struct {
+	Style       string  `json:"style"`
+	LinePrefix  *string `json:"line_prefix"`
+	BlockPrefix *string `json:"block_prefix"`
+	BlockSuffix *string `json:"block_suffix"`
+}
+
+type CommentLine struct {
+	Text              string `json:"text"`
+	LineNumber        int    `json:"line_number"`
+	NormalizedContent string `json:"normalized_content"`
+}
+
+type CommentRegion struct {
+	ID       string        `json:"id"`
+	Kind     string        `json:"kind"`
+	Style    string        `json:"style"`
+	OwnerID  string        `json:"owner_id"`
+	Floating bool          `json:"floating"`
+	Nodes    []CommentLine `json:"nodes"`
+}
+
+func (region CommentRegion) StartLine() int {
+	if len(region.Nodes) == 0 {
+		return 0
+	}
+	start := region.Nodes[0].LineNumber
+	for _, node := range region.Nodes[1:] {
+		if node.LineNumber < start {
+			start = node.LineNumber
+		}
+	}
+	return start
+}
+
+func (region CommentRegion) EndLine() int {
+	end := 0
+	for _, node := range region.Nodes {
+		if node.LineNumber > end {
+			end = node.LineNumber
+		}
+	}
+	return end
+}
+
+func (region CommentRegion) Text() string {
+	lines := make([]string, 0, len(region.Nodes))
+	for _, node := range region.Nodes {
+		lines = append(lines, node.Text)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (region CommentRegion) NormalizedContent() string {
+	lines := make([]string, 0, len(region.Nodes))
+	for _, node := range region.Nodes {
+		lines = append(lines, node.NormalizedContent)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (region CommentRegion) Signature() []string {
+	content := region.NormalizedContent()
+	if len(content) > 121 {
+		content = content[:121]
+	}
+	return []string{"comment_region", region.Kind, content}
+}
+
+func (region CommentRegion) FreezeActions(token string) []string {
+	if token == "" {
+		return nil
+	}
+	actions := []string{}
+	for _, node := range region.Nodes {
+		lower := strings.ToLower(node.Text)
+		prefix := strings.ToLower(token) + ":"
+		if strings.Contains(lower, prefix+"freeze") {
+			actions = append(actions, "freeze")
+		} else if strings.Contains(lower, prefix+"unfreeze") {
+			actions = append(actions, "unfreeze")
+		}
+	}
+	return actions
+}
+
+type LayoutGap struct {
+	ID             string         `json:"id"`
+	Kind           string         `json:"kind"`
+	StartLine      int            `json:"start_line"`
+	EndLine        int            `json:"end_line"`
+	Lines          []string       `json:"lines"`
+	BeforeOwnerID  *string        `json:"before_owner_id"`
+	AfterOwnerID   *string        `json:"after_owner_id"`
+	ControllerSide string         `json:"controller_side"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
+}
+
+func (gap LayoutGap) LineCount() int {
+	return gap.EndLine - gap.StartLine + 1
+}
+
+func (gap LayoutGap) BlankLineCount() int {
+	count := 0
+	for _, line := range gap.Lines {
+		if strings.TrimSpace(line) == "" {
+			count++
+		}
+	}
+	return count
+}
+
+func (gap LayoutGap) OwnerIDFor(side string) *string {
+	switch side {
+	case "before":
+		return gap.BeforeOwnerID
+	case "after":
+		return gap.AfterOwnerID
+	default:
+		return nil
+	}
+}
+
+func (gap LayoutGap) ControllerOwnerID() *string {
+	return gap.OwnerIDFor(gap.ControllerSide)
+}
+
+func (gap LayoutGap) FallbackOwnerID() *string {
+	switch gap.ControllerSide {
+	case "before":
+		return gap.AfterOwnerID
+	case "after":
+		return gap.BeforeOwnerID
+	default:
+		return nil
+	}
+}
+
+func (gap LayoutGap) EffectiveControllerOwnerID(removedOwners map[string]bool) *string {
+	controller := gap.ControllerOwnerID()
+	if controller != nil && !removedOwners[*controller] {
+		return controller
+	}
+	fallback := gap.FallbackOwnerID()
+	if fallback != nil && !removedOwners[*fallback] {
+		return fallback
+	}
+	return nil
+}
+
+func (gap LayoutGap) LeadingFor(ownerID string) bool {
+	return gap.AfterOwnerID != nil && *gap.AfterOwnerID == ownerID
+}
+
+func (gap LayoutGap) TrailingFor(ownerID string) bool {
+	return gap.BeforeOwnerID != nil && *gap.BeforeOwnerID == ownerID
+}
+
+func (gap LayoutGap) ControlsOutputFor(ownerID string) bool {
+	controller := gap.ControllerOwnerID()
+	return controller != nil && *controller == ownerID
+}
+
+type CommentAttachment struct {
+	OwnerID          string         `json:"owner_id"`
+	LeadingRegionID  *string        `json:"leading_region_id"`
+	InlineRegionID   *string        `json:"inline_region_id"`
+	TrailingRegionID *string        `json:"trailing_region_id"`
+	OrphanRegionIDs  []string       `json:"orphan_region_ids"`
+	LeadingGapID     *string        `json:"leading_gap_id"`
+	TrailingGapID    *string        `json:"trailing_gap_id"`
+	Metadata         map[string]any `json:"metadata"`
+}
+
+func (attachment CommentAttachment) RegionCount(regions map[string]CommentRegion) int {
+	count := 0
+	for _, id := range []*string{attachment.LeadingRegionID, attachment.InlineRegionID, attachment.TrailingRegionID} {
+		if id != nil {
+			if _, ok := regions[*id]; ok {
+				count++
+			}
+		}
+	}
+	for _, id := range attachment.OrphanRegionIDs {
+		if _, ok := regions[id]; ok {
+			count++
+		}
+	}
+	return count
+}
+
+func (attachment CommentAttachment) LayoutGapCount(gaps map[string]LayoutGap) int {
+	seen := map[string]bool{}
+	for _, id := range []*string{attachment.LeadingGapID, attachment.TrailingGapID} {
+		if id != nil {
+			if _, ok := gaps[*id]; ok {
+				seen[*id] = true
+			}
+		}
+	}
+	return len(seen)
+}
+
+func (attachment CommentAttachment) Empty(regions map[string]CommentRegion) bool {
+	return attachment.RegionCount(regions) == 0
+}
+
+func (attachment CommentAttachment) LeadingRegionLayoutOwned(regions map[string]CommentRegion, gaps map[string]LayoutGap) bool {
+	if attachment.LeadingRegionID == nil || attachment.LeadingGapID == nil {
+		return false
+	}
+	region, regionOK := regions[*attachment.LeadingRegionID]
+	gap, gapOK := gaps[*attachment.LeadingGapID]
+	return regionOK && gapOK && region.Floating && gap.LeadingFor(attachment.OwnerID) && gap.ControlsOutputFor(attachment.OwnerID)
+}
+
+func (attachment CommentAttachment) TrailingRegionLayoutOwned(regions map[string]CommentRegion, gaps map[string]LayoutGap) bool {
+	if attachment.TrailingRegionID == nil || attachment.TrailingGapID == nil {
+		return false
+	}
+	region, regionOK := regions[*attachment.TrailingRegionID]
+	gap, gapOK := gaps[*attachment.TrailingGapID]
+	return regionOK && gapOK && region.Floating && gap.TrailingFor(attachment.OwnerID) && gap.ControlsOutputFor(attachment.OwnerID)
+}
+
+func (attachment CommentAttachment) FreezeMarker(regions map[string]CommentRegion, token string) bool {
+	for _, id := range []*string{attachment.LeadingRegionID, attachment.InlineRegionID, attachment.TrailingRegionID} {
+		if id == nil {
+			continue
+		}
+		actions := regions[*id].FreezeActions(token)
+		if slices.Contains(actions, "freeze") || slices.Contains(actions, "unfreeze") {
+			return true
+		}
+	}
+	for _, id := range attachment.OrphanRegionIDs {
+		actions := regions[id].FreezeActions(token)
+		if slices.Contains(actions, "freeze") || slices.Contains(actions, "unfreeze") {
+			return true
+		}
+	}
+	return false
+}
+
 type PairwiseNodeMatch struct {
 	FromNodeID  string   `json:"from_node_id"`
 	ToNodeID    string   `json:"to_node_id"`
