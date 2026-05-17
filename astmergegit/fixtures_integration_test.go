@@ -132,6 +132,9 @@ func TestGoMerge3Fixture(t *testing.T) {
 						t.Fatalf("expected merged source to contain %q:\n%s", needle, *result.MergedSource)
 					}
 				}
+				if expectedSource, ok := expected["expected_source"].(string); ok && *result.MergedSource != expectedSource {
+					t.Fatalf("unexpected merged source\nexpected:\n%s\nactual:\n%s", expectedSource, *result.MergedSource)
+				}
 				if result.ReparseAfterRender == nil || !*result.ReparseAfterRender {
 					t.Fatalf("expected output to reparse: %+v", result)
 				}
@@ -192,6 +195,19 @@ func TestGoMerge3FixtureAcrossNativeBackends(t *testing.T) {
 							source = *result.MergedSource
 						}
 						t.Fatalf("expected output to reparse: %+v\n%s", result, source)
+					}
+					if result.OK {
+						expectedSource, hasExpectedSource := expected["expected_source"].(string)
+						if hasExpectedSource && (result.MergedSource == nil || *result.MergedSource != expectedSource) {
+							source := "<nil>"
+							if result.MergedSource != nil {
+								source = *result.MergedSource
+							}
+							t.Fatalf("unexpected merged source\nexpected:\n%s\nactual:\n%s", expectedSource, source)
+						}
+						if result.FormattingPreservation.LineDiffScore < 0.95 || result.FormattingPreservation.CharacterDiffScore < 0.95 {
+							t.Fatalf("formatting preservation below gate: %+v", result.FormattingPreservation)
+						}
 					}
 				})
 			}
