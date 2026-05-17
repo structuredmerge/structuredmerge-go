@@ -294,6 +294,50 @@ func TestMergeDriverFullFileFallbackWritesConflictMarkers(t *testing.T) {
 	}
 }
 
+func TestMergeDriverFallbackFixture(t *testing.T) {
+	fixture := readGitDriverFallbackFixture(t)
+	for _, testCase := range fixture.Cases {
+		t.Run(testCase.CaseID, func(t *testing.T) {
+			dir := t.TempDir()
+			ancestor := writeTestFile(t, dir, "ancestor.json", testCase.BaseSource)
+			current := writeTestFile(t, dir, "current.json", testCase.OursSource)
+			other := writeTestFile(t, dir, "other.json", testCase.TheirsSource)
+			args := []string{"merge-driver"}
+			if testCase.Options.Strict {
+				args = append(args, "--strict")
+			}
+			if testCase.Options.Fallback != "" && testCase.Options.Fallback != "full-file" {
+				args = append(args, "--fallback", testCase.Options.Fallback)
+			}
+			args = append(args, ancestor, current, other, testCase.PathName)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			exitCode := run(args, &stdout, &stderr)
+			if exitCode != testCase.Expected.ExitCode {
+				t.Fatalf("expected exit %d, got %d stderr=%s", testCase.Expected.ExitCode, exitCode, stderr.String())
+			}
+			currentSource, err := os.ReadFile(current)
+			if err != nil {
+				t.Fatalf("read current file: %v", err)
+			}
+			if testCase.Expected.MergedSource != "" && string(currentSource) != testCase.Expected.MergedSource {
+				t.Fatalf("merged source mismatch\nexpected=%q\nactual=%q", testCase.Expected.MergedSource, string(currentSource))
+			}
+			for _, expected := range testCase.Expected.SourceContains {
+				if !strings.Contains(string(currentSource), expected) {
+					t.Fatalf("expected source to contain %q:\n%s", expected, string(currentSource))
+				}
+			}
+			for _, expected := range testCase.Expected.StderrContains {
+				if !strings.Contains(stderr.String(), expected) {
+					t.Fatalf("expected stderr to contain %q, got %q", expected, stderr.String())
+				}
+			}
+		})
+	}
+}
+
 type gitDriverJSONFixture struct {
 	Cases []gitDriverJSONCase `json:"cases"`
 }
@@ -324,6 +368,45 @@ func readGitDriverJSONFixture(t *testing.T) gitDriverJSONFixture {
 	var fixture gitDriverJSONFixture
 	if err := json.Unmarshal(source, &fixture); err != nil {
 		t.Fatalf("parse git driver fixture: %v", err)
+	}
+	return fixture
+}
+
+type gitDriverFallbackFixture struct {
+	Cases []gitDriverFallbackCase `json:"cases"`
+}
+
+type gitDriverFallbackCase struct {
+	CaseID       string                    `json:"case_id"`
+	PathName     string                    `json:"path_name"`
+	BaseSource   string                    `json:"base_source"`
+	OursSource   string                    `json:"ours_source"`
+	TheirsSource string                    `json:"theirs_source"`
+	Options      gitDriverFallbackOptions  `json:"options"`
+	Expected     gitDriverFallbackExpected `json:"expected"`
+}
+
+type gitDriverFallbackOptions struct {
+	Strict   bool   `json:"strict"`
+	Fallback string `json:"fallback"`
+}
+
+type gitDriverFallbackExpected struct {
+	ExitCode       int      `json:"exit_code"`
+	MergedSource   string   `json:"merged_source"`
+	SourceContains []string `json:"source_contains"`
+	StderrContains []string `json:"stderr_contains"`
+}
+
+func readGitDriverFallbackFixture(t *testing.T) gitDriverFallbackFixture {
+	t.Helper()
+	source, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "diagnostics", "slice-954-git-driver-fallback", "git-driver-fallback.json"))
+	if err != nil {
+		t.Fatalf("read git driver fallback fixture: %v", err)
+	}
+	var fixture gitDriverFallbackFixture
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse git driver fallback fixture: %v", err)
 	}
 	return fixture
 }
