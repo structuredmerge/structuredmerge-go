@@ -158,6 +158,54 @@ func TestMergeDriverJSONGitRepositoryIntegrationFixture(t *testing.T) {
 	}
 }
 
+func TestMergeDriverGoGitRepositoryIntegrationFixture(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is required for repository integration fixture")
+	}
+	fixture := readGoMerge3Fixture(t)
+	for _, testCase := range fixture.Cases {
+		t.Run(testCase.CaseID, func(t *testing.T) {
+			dir := t.TempDir()
+			runGit(t, dir, "init")
+			runGit(t, dir, "config", "user.email", "smorg-go@example.invalid")
+			runGit(t, dir, "config", "user.name", "smorg-go test")
+			writeTestFile(t, dir, ".gitattributes", "*.go merge=smorg-go smorg.language=go\n")
+			writeTestFile(t, dir, testCase.PathName, testCase.BaseSource)
+			runGit(t, dir, "add", ".")
+			runGit(t, dir, "commit", "-m", "base")
+
+			ancestor := writeTestFile(t, dir, "ancestor.tmp", testCase.BaseSource)
+			current := writeTestFile(t, dir, testCase.PathName, testCase.OursSource)
+			other := writeTestFile(t, dir, "other.tmp", testCase.TheirsSource)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			exitCode := run(
+				[]string{"merge-driver", "--strict", ancestor, current, other, testCase.PathName},
+				&stdout,
+				&stderr,
+			)
+			if testCase.Expected.OK && exitCode != exitSuccess {
+				t.Fatalf("expected success, got %d stderr=%s", exitCode, stderr.String())
+			}
+			if !testCase.Expected.OK && exitCode != exitUnresolvedConflict {
+				t.Fatalf("expected conflict, got %d stderr=%s", exitCode, stderr.String())
+			}
+			mergedSource, err := os.ReadFile(current)
+			if err != nil {
+				t.Fatalf("read current file: %v", err)
+			}
+			if testCase.Expected.OK {
+				if string(mergedSource) != testCase.Expected.ExpectedSource {
+					t.Fatalf("merged source mismatch\nexpected:\n%s\nactual:\n%s", testCase.Expected.ExpectedSource, string(mergedSource))
+				}
+			} else if !strings.Contains(stderr.String(), "merge_conflict") {
+				t.Fatalf("expected merge conflict diagnostic, got %q", stderr.String())
+			}
+		})
+	}
+}
+
 func TestMergeDriverStrictFailureReturnsConflictExitCode(t *testing.T) {
 	dir := t.TempDir()
 	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"structuredmerge"}`)
@@ -204,6 +252,37 @@ func readGitDriverJSONFixture(t *testing.T) gitDriverJSONFixture {
 	var fixture gitDriverJSONFixture
 	if err := json.Unmarshal(source, &fixture); err != nil {
 		t.Fatalf("parse git driver fixture: %v", err)
+	}
+	return fixture
+}
+
+type goMerge3Fixture struct {
+	Cases []goMerge3Case `json:"cases"`
+}
+
+type goMerge3Case struct {
+	CaseID       string           `json:"case_id"`
+	PathName     string           `json:"path_name"`
+	BaseSource   string           `json:"base_source"`
+	OursSource   string           `json:"ours_source"`
+	TheirsSource string           `json:"theirs_source"`
+	Expected     goMerge3Expected `json:"expected"`
+}
+
+type goMerge3Expected struct {
+	OK             bool   `json:"ok"`
+	ExpectedSource string `json:"expected_source"`
+}
+
+func readGoMerge3Fixture(t *testing.T) goMerge3Fixture {
+	t.Helper()
+	source, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "go", "slice-952-go-merge3", "go-merge3.json"))
+	if err != nil {
+		t.Fatalf("read go merge3 fixture: %v", err)
+	}
+	var fixture goMerge3Fixture
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse go merge3 fixture: %v", err)
 	}
 	return fixture
 }
