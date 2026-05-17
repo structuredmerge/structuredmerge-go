@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -100,6 +102,62 @@ func TestMergeDriverJSONUsesAncestorForSameKeyConflicts(t *testing.T) {
 	}
 }
 
+func TestMergeDriverJSONGitRepositoryIntegrationFixture(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is required for repository integration fixture")
+	}
+	fixture := readGitDriverJSONFixture(t)
+	for _, testCase := range fixture.Cases {
+		t.Run(testCase.CaseID, func(t *testing.T) {
+			dir := t.TempDir()
+			runGit(t, dir, "init")
+			runGit(t, dir, "config", "user.email", "smorg-go@example.invalid")
+			runGit(t, dir, "config", "user.name", "smorg-go test")
+			writeTestFile(t, dir, ".gitattributes", "*.json merge=smorg-go smorg.language=json\n")
+			writeTestFile(t, dir, testCase.PathName, testCase.BaseSource)
+			runGit(t, dir, "add", ".")
+			runGit(t, dir, "commit", "-m", "base")
+
+			ancestor := writeTestFile(t, dir, "ancestor.tmp", testCase.BaseSource)
+			current := writeTestFile(t, dir, testCase.PathName, testCase.OursSource)
+			other := writeTestFile(t, dir, "other.tmp", testCase.TheirsSource)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			exitCode := run(
+				[]string{"merge-driver", "--strict", ancestor, current, other, testCase.PathName},
+				&stdout,
+				&stderr,
+			)
+			if exitCode != testCase.Expected.ExitCode {
+				t.Fatalf("expected exit %d, got %d stderr=%s", testCase.Expected.ExitCode, exitCode, stderr.String())
+			}
+			for _, expected := range testCase.Expected.StderrContains {
+				if !strings.Contains(stderr.String(), expected) {
+					t.Fatalf("expected stderr to contain %q, got %q", expected, stderr.String())
+				}
+			}
+
+			mergedSource, err := os.ReadFile(current)
+			if err != nil {
+				t.Fatalf("read current file: %v", err)
+			}
+			if testCase.Expected.MergedJSON != nil {
+				var merged any
+				if err := json.Unmarshal(mergedSource, &merged); err != nil {
+					t.Fatalf("merged output should parse as JSON: %v source=%s", err, string(mergedSource))
+				}
+				if !jsonEqual(merged, testCase.Expected.MergedJSON) {
+					t.Fatalf("merged JSON mismatch\nexpected=%v\nactual=%v", testCase.Expected.MergedJSON, merged)
+				}
+			}
+			if testCase.Expected.MergedSource != "" && string(mergedSource) != testCase.Expected.MergedSource {
+				t.Fatalf("merged source mismatch\nexpected=%q\nactual=%q", testCase.Expected.MergedSource, string(mergedSource))
+			}
+		})
+	}
+}
+
 func TestMergeDriverStrictFailureReturnsConflictExitCode(t *testing.T) {
 	dir := t.TempDir()
 	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"structuredmerge"}`)
@@ -115,6 +173,60 @@ func TestMergeDriverStrictFailureReturnsConflictExitCode(t *testing.T) {
 	if !strings.Contains(stderr.String(), "parse_error") || !strings.Contains(stderr.String(), "ours parse error") {
 		t.Fatalf("expected ours parse diagnostic, got %q", stderr.String())
 	}
+}
+
+type gitDriverJSONFixture struct {
+	Cases []gitDriverJSONCase `json:"cases"`
+}
+
+type gitDriverJSONCase struct {
+	CaseID       string                `json:"case_id"`
+	PathName     string                `json:"path_name"`
+	BaseSource   string                `json:"base_source"`
+	OursSource   string                `json:"ours_source"`
+	TheirsSource string                `json:"theirs_source"`
+	Expected     gitDriverJSONExpected `json:"expected"`
+}
+
+type gitDriverJSONExpected struct {
+	ExitCode       int      `json:"exit_code"`
+	MergedJSON     any      `json:"merged_json"`
+	MergedSource   string   `json:"merged_source"`
+	StderrContains []string `json:"stderr_contains"`
+}
+
+func readGitDriverJSONFixture(t *testing.T) gitDriverJSONFixture {
+	t.Helper()
+	source, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "diagnostics", "slice-951-git-driver-json-integration", "git-driver-json-integration.json"))
+	if err != nil {
+		t.Fatalf("read git driver fixture: %v", err)
+	}
+	var fixture gitDriverJSONFixture
+	if err := json.Unmarshal(source, &fixture); err != nil {
+		t.Fatalf("parse git driver fixture: %v", err)
+	}
+	return fixture
+}
+
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	command := exec.Command("git", args...)
+	command.Dir = dir
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
+	}
+}
+
+func jsonEqual(left any, right any) bool {
+	leftSource, err := json.Marshal(left)
+	if err != nil {
+		return false
+	}
+	rightSource, err := json.Marshal(right)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(leftSource, rightSource)
 }
 
 func TestMergeDriverUsesSmorgLanguageAttribute(t *testing.T) {
