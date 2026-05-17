@@ -7,6 +7,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/godstmerge"
+	"github.com/structuredmerge/structuredmerge-go/gomerge"
+	"github.com/structuredmerge/structuredmerge-go/goparsermerge"
 )
 
 func readFixture(t *testing.T, parts ...string) map[string]any {
@@ -138,6 +143,57 @@ func TestGoMerge3Fixture(t *testing.T) {
 						t.Fatalf("unexpected conflict at %d: %+v", index, conflict)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestGoMerge3FixtureAcrossNativeBackends(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-952-go-merge3", "go-merge3.json")
+	cases := fixture["cases"].([]any)
+	backends := map[string]func(Merge3Request) Merge3Response{
+		"tree-sitter": Merge3Go,
+		"go-parser": func(request Merge3Request) Merge3Response {
+			return Merge3GoWithParser(request, func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis] {
+				return goparsermerge.ParseGo(source, dialect)
+			})
+		},
+		"go-dst": func(request Merge3Request) Merge3Response {
+			return Merge3GoWithParser(request, func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis] {
+				return godstmerge.ParseGo(source, dialect)
+			})
+		},
+	}
+	for backend, merge := range backends {
+		t.Run(backend, func(t *testing.T) {
+			for _, rawCase := range cases {
+				testCase := rawCase.(map[string]any)
+				t.Run(testCase["case_id"].(string), func(t *testing.T) {
+					request := Merge3Request{
+						BaseSource:   testCase["base_source"].(string),
+						OursSource:   testCase["ours_source"].(string),
+						TheirsSource: testCase["theirs_source"].(string),
+						PathName:     testCase["path_name"].(string),
+						Language:     "go",
+						Dialect:      "go",
+						ProfileID:    "go.source",
+					}
+					result := merge(request)
+					expected := testCase["expected"].(map[string]any)
+					if result.OK != expected["ok"].(bool) {
+						t.Fatalf("unexpected ok=%v diagnostics=%+v conflicts=%+v", result.OK, result.Diagnostics, result.Conflicts)
+					}
+					if len(result.Conflicts) != int(expected["conflict_count"].(float64)) {
+						t.Fatalf("unexpected conflicts: %+v", result.Conflicts)
+					}
+					if result.OK && (result.ReparseAfterRender == nil || !*result.ReparseAfterRender) {
+						source := "<nil>"
+						if result.MergedSource != nil {
+							source = *result.MergedSource
+						}
+						t.Fatalf("expected output to reparse: %+v\n%s", result, source)
+					}
+				})
 			}
 		})
 	}

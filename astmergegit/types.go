@@ -81,15 +81,22 @@ func Merge3(request Merge3Request) Merge3Response {
 }
 
 func Merge3Go(request Merge3Request) Merge3Response {
-	base := gomerge.ParseGo(request.BaseSource, gomerge.DialectGo)
+	return Merge3GoWithParser(request, gomerge.ParseGo)
+}
+
+func Merge3GoWithParser(
+	request Merge3Request,
+	parser func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis],
+) Merge3Response {
+	base := parser(request.BaseSource, gomerge.DialectGo)
 	if !base.OK || base.Analysis == nil {
 		return parseFailureResponse(request, roleDiagnostic("base", base.Diagnostics))
 	}
-	ours := gomerge.ParseGo(request.OursSource, gomerge.DialectGo)
+	ours := parser(request.OursSource, gomerge.DialectGo)
 	if !ours.OK || ours.Analysis == nil {
 		return parseFailureResponse(request, roleDiagnostic("ours", ours.Diagnostics))
 	}
-	theirs := gomerge.ParseGo(request.TheirsSource, gomerge.DialectGo)
+	theirs := parser(request.TheirsSource, gomerge.DialectGo)
 	if !theirs.OK || theirs.Analysis == nil {
 		return parseFailureResponse(request, roleDiagnostic("theirs", theirs.Diagnostics))
 	}

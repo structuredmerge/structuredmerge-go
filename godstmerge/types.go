@@ -236,22 +236,31 @@ func parseGoDST(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		}
 		start := restoredFset.Position(funcDecl.Pos()).Offset - offsetBytes
 		end := restoredFset.Position(funcDecl.End()).Offset - offsetBytes
+		text := ""
 		if start < 0 || end > len(originalSource) || start > end {
+			text = extractFunctionText(originalSource, funcDecl.Name.Name)
+		} else {
+			lineStart := strings.LastIndex(originalSource[:start], "\n")
+			if lineStart >= 0 {
+				lineStart++
+			} else {
+				lineStart = 0
+			}
+			text = strings.TrimSpace(originalSource[lineStart:end]) + "\n"
+			if !hasBalancedBraces(text) {
+				text = extractFunctionText(originalSource, funcDecl.Name.Name)
+			}
+		}
+		if strings.TrimSpace(text) == "" {
 			return astmerge.ParseResult[gomerge.GoAnalysis]{
 				OK:          false,
 				Diagnostics: []astmerge.Diagnostic{parseError("restored dave/dst declaration span is outside source bounds")},
 			}
 		}
-		lineStart := strings.LastIndex(originalSource[:start], "\n")
-		if lineStart >= 0 {
-			lineStart++
-		} else {
-			lineStart = 0
-		}
 		declarations = append(declarations, gomerge.GoModuleDeclaration{
 			Path:     "/declarations/" + funcDecl.Name.Name,
 			MatchKey: funcDecl.Name.Name,
-			Text:     strings.TrimSpace(originalSource[lineStart:end]) + "\n",
+			Text:     text,
 		})
 	}
 	slices.SortFunc(declarations, func(left, right gomerge.GoModuleDeclaration) int {
@@ -274,6 +283,53 @@ func parseGoDST(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func hasBalancedBraces(source string) bool {
+	depth := 0
+	seen := false
+	for index := 0; index < len(source); index++ {
+		switch source[index] {
+		case '{':
+			depth++
+			seen = true
+		case '}':
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	return seen && depth == 0
+}
+
+func extractFunctionText(source string, name string) string {
+	start := strings.Index(source, "func "+name+"(")
+	if start < 0 {
+		return ""
+	}
+	lineStart := strings.LastIndex(source[:start], "\n")
+	if lineStart >= 0 {
+		lineStart++
+	} else {
+		lineStart = 0
+	}
+	depth := 0
+	seenBody := false
+	for index := start; index < len(source); index++ {
+		switch source[index] {
+		case '{':
+			depth++
+			seenBody = true
+		case '}':
+			if depth > 0 {
+				depth--
+			}
+			if seenBody && depth == 0 {
+				return strings.TrimSpace(source[lineStart:index+1]) + "\n"
+			}
+		}
+	}
+	return ""
 }
 
 func applyGoDSTNodeOperation(source string, operation treehaver.EditProjectionOperationRequest) (string, error) {
