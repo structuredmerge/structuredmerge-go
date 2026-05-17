@@ -212,6 +212,31 @@ func TestSharedFixtureCommentTriviaAttachmentContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureMergeResultDecisionContract(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-956-merge-result-decision-contract", "merge-result-decision-contract.json"))
+	decisions := decodeFixtureValue[[]MergeDecisionRecord](t, fixture["decisions"])
+	expected := fixture["expected"].(map[string]any)
+
+	orderedIDs := make([]string, 0, len(decisions))
+	unresolvedCount := 0
+	for _, decision := range decisions {
+		orderedIDs = append(orderedIDs, decision.ID)
+		if decision.Decision == "unresolved" {
+			unresolvedCount++
+		}
+	}
+
+	if len(decisions) != int(expected["decision_count"].(float64)) ||
+		!reflect.DeepEqual(orderedIDs, decodeFixtureValue[[]string](t, expected["ordered_decision_ids"])) ||
+		!reflect.DeepEqual(MergeDecisionSummary(decisions), decodeFixtureValue[map[string]int](t, expected["decision_summary"])) ||
+		!reflect.DeepEqual(MergeDecisionSourceSummary(decisions), decodeFixtureValue[map[string]int](t, expected["source_summary"])) ||
+		unresolvedCount != int(expected["unresolved_count"].(float64)) ||
+		MergeDecisionReviewRequired(decisions) != expected["review_required"].(bool) ||
+		len(decisions) != int(expected["line_count"].(float64)) {
+		t.Fatalf("unexpected merge result decision projection: %+v", decisions)
+	}
+}
+
 func TestSharedFixtureMergeEngineSuiteSetting(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-906-merge-engine-suite-setting", "merge-engine-suite-setting.json"))
 	settings := fixture["settings"].(map[string]any)

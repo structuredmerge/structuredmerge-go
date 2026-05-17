@@ -158,6 +158,41 @@ type MergeResult[T any] struct {
 	Policies    []PolicyReference
 }
 
+type MergeDecisionRecord struct {
+	ID       string         `json:"id"`
+	Decision string         `json:"decision"`
+	Source   string         `json:"source"`
+	Line     int            `json:"line"`
+	OwnerID  string         `json:"owner_id"`
+	Reason   string         `json:"reason"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+func MergeDecisionSummary(decisions []MergeDecisionRecord) map[string]int {
+	summary := map[string]int{}
+	for _, decision := range decisions {
+		summary[decision.Decision]++
+	}
+	return summary
+}
+
+func MergeDecisionSourceSummary(decisions []MergeDecisionRecord) map[string]int {
+	summary := map[string]int{}
+	for _, decision := range decisions {
+		summary[decision.Source]++
+	}
+	return summary
+}
+
+func MergeDecisionReviewRequired(decisions []MergeDecisionRecord) bool {
+	for _, decision := range decisions {
+		if decision.Decision == "unresolved" {
+			return true
+		}
+	}
+	return false
+}
+
 type MergeIRNodeClass struct {
 	ClassID   string            `json:"class_id"`
 	Signature string            `json:"signature"`
