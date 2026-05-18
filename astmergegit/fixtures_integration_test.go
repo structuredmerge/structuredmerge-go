@@ -307,6 +307,69 @@ func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
 	}
 }
 
+func TestOwnedRegionConflictPlacementAcrossGoBackends(t *testing.T) {
+	fixture := readFixture(t, "diagnostics", "slice-958-owned-region-conflict-placement", "owned-region-conflict-placement.json")
+	backends := map[string]func(Merge3Request) Merge3Response{
+		"tree-sitter": Merge3Go,
+		"go-parser": func(request Merge3Request) Merge3Response {
+			return Merge3GoWithParser(request, func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis] {
+				return goparsermerge.ParseGo(source, dialect)
+			})
+		},
+		"go-dst": func(request Merge3Request) Merge3Response {
+			return merge3GoWithParserReport(request, func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis] {
+				return godstmerge.ParseGo(source, dialect)
+			}, godstmerge.BackendGoDST, "github.com/dave/dst")
+		},
+	}
+	expectedBackendReports := map[string]Merge3RenderReport{
+		"tree-sitter": {BackendID: string(gomerge.BackendTreeSitter), ParserIdentity: "tree-sitter-go"},
+		"go-parser":   {BackendID: goparsermerge.BackendGoParser, ParserIdentity: "go/parser"},
+		"go-dst":      {BackendID: godstmerge.BackendGoDST, ParserIdentity: "github.com/dave/dst"},
+	}
+	cases := fixture["cases"].([]any)
+	for backend, merge := range backends {
+		t.Run(backend, func(t *testing.T) {
+			for _, rawCase := range cases {
+				testCase := rawCase.(map[string]any)
+				if testCase["language"] != "go" || testCase["force_unsafe_region"] == true {
+					continue
+				}
+				t.Run(testCase["case_id"].(string), func(t *testing.T) {
+					request := Merge3Request{
+						BaseSource:         testCase["base_source"].(string),
+						OursSource:         testCase["ours_source"].(string),
+						TheirsSource:       testCase["theirs_source"].(string),
+						PathName:           testCase["path_name"].(string),
+						Language:           "go",
+						Dialect:            "go",
+						ProfileID:          "go.source",
+						ConflictMarkerSize: 7,
+					}
+					result := merge(request)
+					expected := testCase["expected"].(map[string]any)
+					if result.OK != expected["ok"].(bool) {
+						t.Fatalf("unexpected ok=%v diagnostics=%+v conflicts=%+v", result.OK, result.Diagnostics, result.Conflicts)
+					}
+					expectedRegions := expected["owned_regions"].([]any)
+					if len(result.OwnedRegions) != len(expectedRegions) {
+						t.Fatalf("unexpected owned regions: %+v expected %+v", result.OwnedRegions, expectedRegions)
+					}
+					expectedBackend := expectedBackendReports[backend]
+					for index, rawRegion := range expectedRegions {
+						expectedRegion := rawRegion.(map[string]any)
+						assertOwnedRegionMatches(t, result.OwnedRegions[index], expectedRegion)
+						if result.OwnedRegions[index].BackendID != expectedBackend.BackendID ||
+							result.OwnedRegions[index].ParserIdentity != expectedBackend.ParserIdentity {
+							t.Fatalf("unexpected owned-region backend for %s: %+v expected %+v", backend, result.OwnedRegions[index], expectedBackend)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func assertOwnedRegionMatches(t *testing.T, region OwnedRegionReport, expected map[string]any) {
 	t.Helper()
 	if region.OwnerPath != expected["owner_path"].(string) ||
