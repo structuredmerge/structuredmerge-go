@@ -527,6 +527,9 @@ type jsonMemberRegion struct {
 }
 
 func jsonMemberSource(source string, key string) (jsonMemberRegion, bool) {
+	if !strings.Contains(source, `"`+key+`"`) {
+		return jsonMemberRegion{}, false
+	}
 	byteRange := jsonKeyByteRange(source, key)
 	if byteRange.End <= byteRange.Start || byteRange.End > len(source) {
 		return jsonMemberRegion{}, false
@@ -736,12 +739,22 @@ func jsonOwnedRegionsForConflicts(request Merge3Request, conflicts []Merge3Confl
 		if !strings.HasPrefix(conflict.Path, "/") || strings.Count(conflict.Path, "/") != 1 {
 			continue
 		}
-		byteRange := jsonKeyByteRange(request.BaseSource, strings.TrimPrefix(conflict.Path, "/"))
+		key := strings.TrimPrefix(conflict.Path, "/")
+		baseRegion, baseOK := jsonMemberSource(request.BaseSource, key)
+		if !baseOK {
+			continue
+		}
+		if _, ok := jsonMemberSource(request.OursSource, key); !ok {
+			continue
+		}
+		if _, ok := jsonMemberSource(request.TheirsSource, key); !ok {
+			continue
+		}
 		regions = append(regions, OwnedRegionReport{
 			OwnerPath:       conflict.Path,
-			NodeID:          "json:key:" + strings.TrimPrefix(conflict.Path, "/"),
+			NodeID:          "json:key:" + key,
 			RegionKind:      "node",
-			ByteRange:       byteRange,
+			ByteRange:       baseRegion.byteRange,
 			LineRange:       SourceRange{Start: 1, End: 1},
 			AttachedSpans:   []AttachedSpan{},
 			BackendID:       "native-json",
