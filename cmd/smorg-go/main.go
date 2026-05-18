@@ -65,26 +65,34 @@ type conflictRegion struct {
 }
 
 type mergeDriverResult struct {
-	OK           bool
-	Diagnostics  []astmerge.Diagnostic
-	Output       *string
-	Fallbacks    []mergeDriverFallback
-	OwnedRegions []astmergegit.OwnedRegionReport
-	RenderReport *astmergegit.Merge3RenderReport
-	Profile      map[string]string
+	OK                         bool
+	Diagnostics                []astmerge.Diagnostic
+	Output                     *string
+	Fallbacks                  []mergeDriverFallback
+	OwnedRegions               []astmergegit.OwnedRegionReport
+	RenderReport               *astmergegit.Merge3RenderReport
+	Profile                    map[string]string
+	ReparseAfterRender         *bool
+	FormattingPreservation     *astmergegit.FormattingPreservationReport
+	SecondaryFormattingMetrics *astmergegit.SecondaryFormattingMetricsReport
+	DefaultDriverEvaluation    *astmergegit.DefaultDriverEvaluation
 }
 
 type mergeDriverMachineReport struct {
-	Command      string                          `json:"command"`
-	PathName     string                          `json:"path_name"`
-	OK           bool                            `json:"ok"`
-	ExitCode     int                             `json:"exit_code"`
-	Fallbacks    []mergeDriverFallback           `json:"fallbacks"`
-	OwnedRegions []astmergegit.OwnedRegionReport `json:"owned_regions"`
-	RenderReport *astmergegit.Merge3RenderReport `json:"render_report,omitempty"`
-	Diagnostics  []astmerge.Diagnostic           `json:"diagnostics"`
-	Profile      map[string]string               `json:"profile,omitempty"`
-	Metadata     map[string]interface{}          `json:"metadata,omitempty"`
+	Command                    string                                        `json:"command"`
+	PathName                   string                                        `json:"path_name"`
+	OK                         bool                                          `json:"ok"`
+	ExitCode                   int                                           `json:"exit_code"`
+	Fallbacks                  []mergeDriverFallback                         `json:"fallbacks"`
+	OwnedRegions               []astmergegit.OwnedRegionReport               `json:"owned_regions"`
+	RenderReport               *astmergegit.Merge3RenderReport               `json:"render_report,omitempty"`
+	ReparseAfterRender         *bool                                         `json:"reparse_after_render,omitempty"`
+	FormattingPreservation     *astmergegit.FormattingPreservationReport     `json:"formatting_preservation,omitempty"`
+	SecondaryFormattingMetrics *astmergegit.SecondaryFormattingMetricsReport `json:"secondary_formatting_metrics,omitempty"`
+	DefaultDriverEvaluation    *astmergegit.DefaultDriverEvaluation          `json:"default_driver_evaluation,omitempty"`
+	Diagnostics                []astmerge.Diagnostic                         `json:"diagnostics"`
+	Profile                    map[string]string                             `json:"profile,omitempty"`
+	Metadata                   map[string]interface{}                        `json:"metadata,omitempty"`
 }
 
 type mergeDriverFallback struct {
@@ -185,7 +193,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 			})
 		}
 		if options.checkOnly {
-			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
+			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result, stderr); reportExit != exitSuccess {
 				return reportExit
 			}
 			return exitUnresolvedConflict
@@ -195,7 +203,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 				return exitCode
 			}
 		}
-		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
+		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result, stderr); reportExit != exitSuccess {
 			return reportExit
 		}
 		return exitUnresolvedConflict
@@ -207,12 +215,12 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if options.checkOnly {
 		if options.exitCode && *result.Output != string(currentSource) {
-			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitUnresolvedConflict, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
+			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitUnresolvedConflict, result.Fallbacks, result, stderr); reportExit != exitSuccess {
 				return reportExit
 			}
 			return exitUnresolvedConflict
 		}
-		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
+		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result, stderr); reportExit != exitSuccess {
 			return reportExit
 		}
 		return exitSuccess
@@ -222,32 +230,36 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitCode
 	}
 
-	if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
+	if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result, stderr); reportExit != exitSuccess {
 		return reportExit
 	}
 	return exitSuccess
 }
 
-func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, exitCode int, fallbacks []mergeDriverFallback, ownedRegions []astmergegit.OwnedRegionReport, renderReport *astmergegit.Merge3RenderReport, profile map[string]string, diagnostics []astmerge.Diagnostic, stderr io.Writer) int {
+func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, exitCode int, fallbacks []mergeDriverFallback, result mergeDriverResult, stderr io.Writer) int {
 	if reportPath == "" {
 		return exitSuccess
 	}
 	if fallbacks == nil {
 		fallbacks = []mergeDriverFallback{}
 	}
-	if ownedRegions == nil {
-		ownedRegions = []astmergegit.OwnedRegionReport{}
+	if result.OwnedRegions == nil {
+		result.OwnedRegions = []astmergegit.OwnedRegionReport{}
 	}
 	report := mergeDriverMachineReport{
-		Command:      "merge-driver",
-		PathName:     pathName,
-		OK:           ok,
-		ExitCode:     exitCode,
-		Fallbacks:    fallbacks,
-		OwnedRegions: ownedRegions,
-		RenderReport: renderReport,
-		Profile:      profile,
-		Diagnostics:  diagnostics,
+		Command:                    "merge-driver",
+		PathName:                   pathName,
+		OK:                         ok,
+		ExitCode:                   exitCode,
+		Fallbacks:                  fallbacks,
+		OwnedRegions:               result.OwnedRegions,
+		RenderReport:               result.RenderReport,
+		ReparseAfterRender:         result.ReparseAfterRender,
+		FormattingPreservation:     result.FormattingPreservation,
+		SecondaryFormattingMetrics: result.SecondaryFormattingMetrics,
+		DefaultDriverEvaluation:    result.DefaultDriverEvaluation,
+		Profile:                    result.Profile,
+		Diagnostics:                result.Diagnostics,
 	}
 	source, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -626,35 +638,50 @@ func mergeResult(result astmerge.MergeResult[string]) mergeDriverResult {
 
 func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 	fallbacks := merge3Fallbacks(result.Fallbacks)
+	formattingPreservation := result.FormattingPreservation
+	secondaryFormattingMetrics := result.SecondaryFormattingMetrics
+	defaultDriverEvaluation := result.DefaultDriverEvaluation
 	if result.OK && result.MergedSource != nil {
 		return mergeDriverResult{
-			OK:           true,
-			Diagnostics:  result.Diagnostics,
-			Output:       result.MergedSource,
-			Fallbacks:    fallbacks,
-			OwnedRegions: result.OwnedRegions,
-			RenderReport: &result.RenderReport,
-			Profile:      result.Profile,
+			OK:                         true,
+			Diagnostics:                result.Diagnostics,
+			Output:                     result.MergedSource,
+			Fallbacks:                  fallbacks,
+			OwnedRegions:               result.OwnedRegions,
+			RenderReport:               &result.RenderReport,
+			Profile:                    result.Profile,
+			ReparseAfterRender:         result.ReparseAfterRender,
+			FormattingPreservation:     &formattingPreservation,
+			SecondaryFormattingMetrics: &secondaryFormattingMetrics,
+			DefaultDriverEvaluation:    &defaultDriverEvaluation,
 		}
 	}
 	if !result.OK && result.ConflictedSource != nil {
 		return mergeDriverResult{
-			OK:           false,
-			Diagnostics:  result.Diagnostics,
-			Output:       result.ConflictedSource,
-			Fallbacks:    fallbacks,
-			OwnedRegions: result.OwnedRegions,
-			RenderReport: &result.RenderReport,
-			Profile:      result.Profile,
+			OK:                         false,
+			Diagnostics:                result.Diagnostics,
+			Output:                     result.ConflictedSource,
+			Fallbacks:                  fallbacks,
+			OwnedRegions:               result.OwnedRegions,
+			RenderReport:               &result.RenderReport,
+			Profile:                    result.Profile,
+			ReparseAfterRender:         result.ReparseAfterRender,
+			FormattingPreservation:     &formattingPreservation,
+			SecondaryFormattingMetrics: &secondaryFormattingMetrics,
+			DefaultDriverEvaluation:    &defaultDriverEvaluation,
 		}
 	}
 	return mergeDriverResult{
-		OK:           false,
-		Diagnostics:  result.Diagnostics,
-		Fallbacks:    fallbacks,
-		OwnedRegions: result.OwnedRegions,
-		RenderReport: &result.RenderReport,
-		Profile:      result.Profile,
+		OK:                         false,
+		Diagnostics:                result.Diagnostics,
+		Fallbacks:                  fallbacks,
+		OwnedRegions:               result.OwnedRegions,
+		RenderReport:               &result.RenderReport,
+		Profile:                    result.Profile,
+		ReparseAfterRender:         result.ReparseAfterRender,
+		FormattingPreservation:     &formattingPreservation,
+		SecondaryFormattingMetrics: &secondaryFormattingMetrics,
+		DefaultDriverEvaluation:    &defaultDriverEvaluation,
 	}
 }
 

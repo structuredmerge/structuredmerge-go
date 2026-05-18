@@ -315,9 +315,11 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 		t.Fatalf("read report: %v", err)
 	}
 	var report struct {
-		OwnedRegions []astmergegit.OwnedRegionReport `json:"owned_regions"`
-		RenderReport astmergegit.Merge3RenderReport  `json:"render_report"`
-		Profile      map[string]string               `json:"profile"`
+		OwnedRegions            []astmergegit.OwnedRegionReport           `json:"owned_regions"`
+		RenderReport            astmergegit.Merge3RenderReport            `json:"render_report"`
+		Profile                 map[string]string                         `json:"profile"`
+		FormattingPreservation  *astmergegit.FormattingPreservationReport `json:"formatting_preservation"`
+		DefaultDriverEvaluation astmergegit.DefaultDriverEvaluation       `json:"default_driver_evaluation"`
 	}
 	if err := json.Unmarshal(source, &report); err != nil {
 		t.Fatalf("parse report: %v", err)
@@ -330,6 +332,12 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 	}
 	if report.Profile["profile_id"] != "go.source" || report.Profile["language"] != "go" {
 		t.Fatalf("unexpected profile: %+v", report.Profile)
+	}
+	if report.FormattingPreservation == nil {
+		t.Fatalf("expected formatting preservation in report: %+v", report.FormattingPreservation)
+	}
+	if report.DefaultDriverEvaluation.Status == "" {
+		t.Fatalf("expected default-driver evaluation in report: %+v", report.DefaultDriverEvaluation)
 	}
 }
 
