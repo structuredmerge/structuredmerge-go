@@ -93,6 +93,15 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 					t.Fatalf("unexpected default driver evaluation: got=%+v expected=%+v", result.DefaultDriverEvaluation, expectedDefaultDriverEvaluation)
 				}
 			}
+			if rawOwnedRegions, ok := expected["owned_regions"].([]any); ok {
+				if len(result.OwnedRegions) != len(rawOwnedRegions) {
+					t.Fatalf("unexpected owned regions: %+v expected %+v", result.OwnedRegions, rawOwnedRegions)
+				}
+				for index, rawRegion := range rawOwnedRegions {
+					expectedRegion := rawRegion.(map[string]any)
+					assertOwnedRegionMatches(t, result.OwnedRegions[index], expectedRegion)
+				}
+			}
 
 			if result.OK {
 				if result.MergedSource == nil {
@@ -391,9 +400,8 @@ func assertOwnedRegionMatches(t *testing.T, region OwnedRegionReport, expected m
 		region.RequiresReparse != expected["requires_reparse"].(bool) {
 		t.Fatalf("unexpected owned region: %+v expected %+v", region, expected)
 	}
-	expectedLineRange := expected["line_range"].([]any)
-	if region.LineRange.Start != int(expectedLineRange[0].(float64)) ||
-		region.LineRange.End != int(expectedLineRange[1].(float64)) {
+	expectedLineRange := expectedSourceRange(expected["line_range"])
+	if region.LineRange != expectedLineRange {
 		t.Fatalf("unexpected line range: %+v expected %+v", region.LineRange, expectedLineRange)
 	}
 	expectedAttachedSpans := expected["attached_spans"].([]any)
@@ -405,9 +413,8 @@ func assertOwnedRegionMatches(t *testing.T, region OwnedRegionReport, expected m
 		if region.AttachedSpans[index].Kind != expectedSpan["kind"].(string) {
 			t.Fatalf("unexpected attached span: %+v expected %+v", region.AttachedSpans[index], expectedSpan)
 		}
-		expectedSpanLineRange := expectedSpan["line_range"].([]any)
-		if region.AttachedSpans[index].LineRange.Start != int(expectedSpanLineRange[0].(float64)) ||
-			region.AttachedSpans[index].LineRange.End != int(expectedSpanLineRange[1].(float64)) {
+		expectedSpanLineRange := expectedSourceRange(expectedSpan["line_range"])
+		if region.AttachedSpans[index].LineRange != expectedSpanLineRange {
 			t.Fatalf("unexpected attached span line range: %+v expected %+v", region.AttachedSpans[index], expectedSpan)
 		}
 	}
@@ -416,6 +423,17 @@ func assertOwnedRegionMatches(t *testing.T, region OwnedRegionReport, expected m
 	}
 	if region.ByteRange.Start < 0 || region.ByteRange.End <= region.ByteRange.Start {
 		t.Fatalf("owned region byte range is invalid: %+v", region)
+	}
+}
+
+func expectedSourceRange(raw any) SourceRange {
+	switch value := raw.(type) {
+	case []any:
+		return SourceRange{Start: int(value[0].(float64)), End: int(value[1].(float64))}
+	case map[string]any:
+		return SourceRange{Start: int(value["start"].(float64)), End: int(value["end"].(float64))}
+	default:
+		return SourceRange{}
 	}
 }
 
