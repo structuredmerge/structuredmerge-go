@@ -338,6 +338,11 @@ func TestMergeDriverFallbackFixture(t *testing.T) {
 					t.Fatalf("expected stderr to contain %q, got %q", expected, stderr.String())
 				}
 			}
+			for _, unexpected := range testCase.Expected.StderrNotContains {
+				if strings.Contains(stderr.String(), unexpected) {
+					t.Fatalf("expected stderr not to contain %q, got %q", unexpected, stderr.String())
+				}
+			}
 			assertFallbackMachineReport(t, reportPath, testCase.Expected.MachineReport)
 		})
 	}
@@ -397,11 +402,12 @@ type gitDriverFallbackOptions struct {
 }
 
 type gitDriverFallbackExpected struct {
-	ExitCode       int                            `json:"exit_code"`
-	MergedSource   string                         `json:"merged_source"`
-	SourceContains []string                       `json:"source_contains"`
-	StderrContains []string                       `json:"stderr_contains"`
-	MachineReport  gitDriverFallbackMachineReport `json:"machine_report"`
+	ExitCode          int                            `json:"exit_code"`
+	MergedSource      string                         `json:"merged_source"`
+	SourceContains    []string                       `json:"source_contains"`
+	StderrContains    []string                       `json:"stderr_contains"`
+	StderrNotContains []string                       `json:"stderr_not_contains"`
+	MachineReport     gitDriverFallbackMachineReport `json:"machine_report"`
 }
 
 type gitDriverFallbackMachineReport struct {
