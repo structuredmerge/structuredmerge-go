@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/structuredmerge/structuredmerge-go/astmerge"
 )
 
 func writeTestFile(t *testing.T, dir string, name string, source string) string {
@@ -302,6 +304,7 @@ func TestMergeDriverFallbackFixture(t *testing.T) {
 			ancestor := writeTestFile(t, dir, "ancestor.json", testCase.BaseSource)
 			current := writeTestFile(t, dir, "current.json", testCase.OursSource)
 			other := writeTestFile(t, dir, "other.json", testCase.TheirsSource)
+			reportPath := filepath.Join(dir, "merge-report.json")
 			args := []string{"merge-driver"}
 			if testCase.Options.Strict {
 				args = append(args, "--strict")
@@ -309,6 +312,7 @@ func TestMergeDriverFallbackFixture(t *testing.T) {
 			if testCase.Options.Fallback != "" && testCase.Options.Fallback != "full-file" {
 				args = append(args, "--fallback", testCase.Options.Fallback)
 			}
+			args = append(args, "--report", reportPath)
 			args = append(args, ancestor, current, other, testCase.PathName)
 
 			var stdout bytes.Buffer
@@ -334,6 +338,7 @@ func TestMergeDriverFallbackFixture(t *testing.T) {
 					t.Fatalf("expected stderr to contain %q, got %q", expected, stderr.String())
 				}
 			}
+			assertFallbackMachineReport(t, reportPath, testCase.Expected.MachineReport)
 		})
 	}
 }
@@ -392,10 +397,25 @@ type gitDriverFallbackOptions struct {
 }
 
 type gitDriverFallbackExpected struct {
-	ExitCode       int      `json:"exit_code"`
-	MergedSource   string   `json:"merged_source"`
-	SourceContains []string `json:"source_contains"`
-	StderrContains []string `json:"stderr_contains"`
+	ExitCode       int                            `json:"exit_code"`
+	MergedSource   string                         `json:"merged_source"`
+	SourceContains []string                       `json:"source_contains"`
+	StderrContains []string                       `json:"stderr_contains"`
+	MachineReport  gitDriverFallbackMachineReport `json:"machine_report"`
+}
+
+type gitDriverFallbackMachineReport struct {
+	OK                 bool                           `json:"ok"`
+	ExitCode           int                            `json:"exit_code"`
+	Fallbacks          []gitDriverFallbackReportEntry `json:"fallbacks"`
+	DiagnosticsContain []string                       `json:"diagnostics_contain"`
+}
+
+type gitDriverFallbackReportEntry struct {
+	Mode          string `json:"mode"`
+	RequestedMode string `json:"requested_mode"`
+	Reason        string `json:"reason"`
+	Applied       bool   `json:"applied"`
 }
 
 func readGitDriverFallbackFixture(t *testing.T) gitDriverFallbackFixture {
@@ -409,6 +429,43 @@ func readGitDriverFallbackFixture(t *testing.T) gitDriverFallbackFixture {
 		t.Fatalf("parse git driver fallback fixture: %v", err)
 	}
 	return fixture
+}
+
+func assertFallbackMachineReport(t *testing.T, reportPath string, expected gitDriverFallbackMachineReport) {
+	t.Helper()
+	source, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read machine report: %v", err)
+	}
+	var report struct {
+		OK          bool                           `json:"ok"`
+		ExitCode    int                            `json:"exit_code"`
+		Fallbacks   []gitDriverFallbackReportEntry `json:"fallbacks"`
+		Diagnostics []astmerge.Diagnostic          `json:"diagnostics"`
+	}
+	if err := json.Unmarshal(source, &report); err != nil {
+		t.Fatalf("parse machine report: %v", err)
+	}
+	if report.OK != expected.OK || report.ExitCode != expected.ExitCode {
+		t.Fatalf("unexpected report status: %+v expected ok=%v exit=%d", report, expected.OK, expected.ExitCode)
+	}
+	if len(report.Fallbacks) != len(expected.Fallbacks) {
+		t.Fatalf("unexpected fallbacks: %+v expected %+v", report.Fallbacks, expected.Fallbacks)
+	}
+	for index, expectedFallback := range expected.Fallbacks {
+		if report.Fallbacks[index] != expectedFallback {
+			t.Fatalf("unexpected fallback %d: %+v expected %+v", index, report.Fallbacks[index], expectedFallback)
+		}
+	}
+	diagnosticsJSON, err := json.Marshal(report.Diagnostics)
+	if err != nil {
+		t.Fatalf("marshal diagnostics: %v", err)
+	}
+	for _, needle := range expected.DiagnosticsContain {
+		if !strings.Contains(string(diagnosticsJSON), needle) {
+			t.Fatalf("expected diagnostics to contain %q: %s", needle, string(diagnosticsJSON))
+		}
+	}
 }
 
 type goMerge3Fixture struct {

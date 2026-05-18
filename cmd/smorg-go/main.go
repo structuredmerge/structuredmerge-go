@@ -33,6 +33,7 @@ type mergeDriverOptions struct {
 	fallback             string
 	checkOnly            bool
 	exitCode             bool
+	reportPath           string
 	profileID            string
 	profileReport        bool
 	requireProfileStatus string
@@ -61,6 +62,24 @@ type conflictRegion struct {
 	startLine     int
 	separatorLine int
 	endLine       int
+}
+
+type mergeDriverMachineReport struct {
+	Command     string                 `json:"command"`
+	PathName    string                 `json:"path_name"`
+	OK          bool                   `json:"ok"`
+	ExitCode    int                    `json:"exit_code"`
+	Fallbacks   []mergeDriverFallback  `json:"fallbacks"`
+	Diagnostics []astmerge.Diagnostic  `json:"diagnostics"`
+	Profile     map[string]string      `json:"profile,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type mergeDriverFallback struct {
+	Mode          string `json:"mode"`
+	RequestedMode string `json:"requested_mode"`
+	Reason        string `json:"reason"`
+	Applied       bool   `json:"applied"`
 }
 
 func main() {
@@ -93,7 +112,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 func printUsage(out io.Writer) {
-	fmt.Fprintln(out, "usage: smorg-go merge-driver [--path-name PATH] [--output PATH] [--strict] [--fallback=none|line|local|full-file] %O %A %B [%P]")
+	fmt.Fprintln(out, "usage: smorg-go merge-driver [--path-name PATH] [--output PATH] [--report PATH] [--strict] [--fallback=none|line|local|full-file] %O %A %B [%P]")
 	fmt.Fprintln(out, "       smorg-go merge-driver --ancestor %O --current %A --other %B --path-name %P")
 	fmt.Fprintln(out, "       smorg-go diff-driver [--path-name PATH] OLD NEW")
 	fmt.Fprintln(out, "       smorg-go diff-driver PATH OLD-FILE OLD-HEX OLD-MODE NEW-FILE NEW-HEX NEW-MODE [OLD-PREFIX NEW-PREFIX]")
@@ -138,17 +157,30 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	result := mergeByPath(effectivePath, settings.language, settings.conflictMarkerSize, string(ancestorSource), string(currentSource), string(otherSource))
 	if !result.OK {
 		printDiagnostics(stderr, result.Diagnostics)
+		fallbacks := []mergeDriverFallback{}
 		if result.Output == nil && !options.strict && options.fallback != "none" {
 			output := fullFileConflictOutput(settings.conflictMarkerSize, string(ancestorSource), string(currentSource), string(otherSource))
 			result.Output = &output
+			fallbacks = append(fallbacks, mergeDriverFallback{
+				Mode:          "full_file",
+				RequestedMode: options.fallback,
+				Reason:        fallbackReason(result.Diagnostics),
+				Applied:       true,
+			})
 		}
 		if options.checkOnly {
+			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.Diagnostics, stderr); reportExit != exitSuccess {
+				return reportExit
+			}
 			return exitUnresolvedConflict
 		}
 		if result.Output != nil {
 			if exitCode := writeMergeOutput(options, *result.Output, stderr); exitCode != exitSuccess {
 				return exitCode
 			}
+		}
+		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.Diagnostics, stderr); reportExit != exitSuccess {
+			return reportExit
 		}
 		return exitUnresolvedConflict
 	}
@@ -159,7 +191,13 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if options.checkOnly {
 		if options.exitCode && *result.Output != string(currentSource) {
+			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitUnresolvedConflict, nil, result.Diagnostics, stderr); reportExit != exitSuccess {
+				return reportExit
+			}
 			return exitUnresolvedConflict
+		}
+		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, nil, result.Diagnostics, stderr); reportExit != exitSuccess {
+			return reportExit
 		}
 		return exitSuccess
 	}
@@ -168,7 +206,45 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitCode
 	}
 
+	if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, nil, result.Diagnostics, stderr); reportExit != exitSuccess {
+		return reportExit
+	}
 	return exitSuccess
+}
+
+func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, exitCode int, fallbacks []mergeDriverFallback, diagnostics []astmerge.Diagnostic, stderr io.Writer) int {
+	if reportPath == "" {
+		return exitSuccess
+	}
+	if fallbacks == nil {
+		fallbacks = []mergeDriverFallback{}
+	}
+	report := mergeDriverMachineReport{
+		Command:     "merge-driver",
+		PathName:    pathName,
+		OK:          ok,
+		ExitCode:    exitCode,
+		Fallbacks:   fallbacks,
+		Diagnostics: diagnostics,
+	}
+	source, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		fmt.Fprintf(stderr, "write report: %v\n", err)
+		return exitInternalError
+	}
+	source = append(source, '\n')
+	if err := os.WriteFile(reportPath, source, 0o644); err != nil {
+		fmt.Fprintf(stderr, "write report: %v\n", err)
+		return exitInternalError
+	}
+	return exitSuccess
+}
+
+func fallbackReason(diagnostics []astmerge.Diagnostic) string {
+	if len(diagnostics) == 0 {
+		return "structured_merge_failed"
+	}
+	return string(diagnostics[0].Category)
 }
 
 func fullFileConflictOutput(markerSize int, ancestorSource string, currentSource string, otherSource string) string {
@@ -212,6 +288,7 @@ func parseMergeDriverOptions(args []string, stderr io.Writer) (mergeDriverOption
 	flags.StringVar(&options.fallback, "fallback", "full-file", "fallback mode: none, line, local, full-file")
 	flags.BoolVar(&options.checkOnly, "check-only", false, "validate merge without writing")
 	flags.BoolVar(&options.exitCode, "exit-code", false, "use exit code to report result")
+	flags.StringVar(&options.reportPath, "report", "", "write machine-readable merge report to path")
 	flags.StringVar(&options.profileID, "profile", "", "select merge profile")
 	flags.BoolVar(&options.profileReport, "profile-report", false, "write selected profile promotion report to stdout")
 	flags.StringVar(&options.requireProfileStatus, "require-profile-status", "", "require profile status: available, recommended, default")
