@@ -81,6 +81,12 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 					t.Fatalf("unexpected formatting preservation: got=%+v expected=%+v", result.FormattingPreservation, expectedFormattingPreservation)
 				}
 			}
+			if rawSecondaryMetrics, ok := expected["secondary_formatting_metrics"]; ok {
+				expectedSecondaryMetrics := decodeFixtureValue[SecondaryFormattingMetricsReport](t, rawSecondaryMetrics)
+				if !reflect.DeepEqual(result.SecondaryFormattingMetrics, expectedSecondaryMetrics) {
+					t.Fatalf("unexpected secondary formatting metrics: got=%+v expected=%+v", result.SecondaryFormattingMetrics, expectedSecondaryMetrics)
+				}
+			}
 
 			if result.OK {
 				if result.MergedSource == nil {

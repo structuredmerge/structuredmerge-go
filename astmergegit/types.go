@@ -43,17 +43,26 @@ type FormattingPreservationReport struct {
 	CharacterDiffScore float64 `json:"character_diff_score"`
 }
 
+type SecondaryFormattingMetricsReport struct {
+	UnchangedLineChurn      int      `json:"unchanged_line_churn"`
+	OutputDiffSize          int      `json:"output_diff_size"`
+	SourceFragmentRetention float64  `json:"source_fragment_retention"`
+	Weighted                bool     `json:"weighted"`
+	Diagnostics             []string `json:"diagnostics"`
+}
+
 type Merge3Response struct {
-	OK                     bool                         `json:"ok"`
-	MergedSource           *string                      `json:"merged_source"`
-	ConflictedSource       *string                      `json:"conflicted_source"`
-	Conflicts              []Merge3Conflict             `json:"conflicts"`
-	Diagnostics            []astmerge.Diagnostic        `json:"diagnostics"`
-	Fallbacks              []string                     `json:"fallbacks"`
-	Profile                map[string]string            `json:"profile"`
-	RenderReport           Merge3RenderReport           `json:"render_report"`
-	FormattingPreservation FormattingPreservationReport `json:"formatting_preservation"`
-	ReparseAfterRender     *bool                        `json:"reparse_after_render"`
+	OK                         bool                             `json:"ok"`
+	MergedSource               *string                          `json:"merged_source"`
+	ConflictedSource           *string                          `json:"conflicted_source"`
+	Conflicts                  []Merge3Conflict                 `json:"conflicts"`
+	Diagnostics                []astmerge.Diagnostic            `json:"diagnostics"`
+	Fallbacks                  []string                         `json:"fallbacks"`
+	Profile                    map[string]string                `json:"profile"`
+	RenderReport               Merge3RenderReport               `json:"render_report"`
+	FormattingPreservation     FormattingPreservationReport     `json:"formatting_preservation"`
+	SecondaryFormattingMetrics SecondaryFormattingMetricsReport `json:"secondary_formatting_metrics"`
+	ReparseAfterRender         *bool                            `json:"reparse_after_render"`
 }
 
 type CommentDeltaResult struct {
@@ -80,11 +89,12 @@ func Merge3(request Merge3Request) Merge3Response {
 				Category: astmerge.CategoryUnsupportedFeature,
 				Message:  "ast-merge-git currently supports only json merge3.",
 			}},
-			Conflicts:              []Merge3Conflict{},
-			Fallbacks:              []string{},
-			Profile:                profileReport(request),
-			RenderReport:           renderReport(request, ""),
-			FormattingPreservation: FormattingPreservationReport{},
+			Conflicts:                  []Merge3Conflict{},
+			Fallbacks:                  []string{},
+			Profile:                    profileReport(request),
+			RenderReport:               renderReport(request, ""),
+			FormattingPreservation:     FormattingPreservationReport{},
+			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
 		}
 	}
 }
@@ -123,10 +133,11 @@ func Merge3GoWithParser(
 				Category: astmerge.DiagnosticCategory("merge_conflict"),
 				Message:  fmt.Sprintf("merge3 found %d unresolved conflict(s).", len(conflicts)),
 			}},
-			Fallbacks:              []string{},
-			Profile:                profileReport(request),
-			RenderReport:           renderReport(request, "full_file_conflict_markers"),
-			FormattingPreservation: FormattingPreservationReport{},
+			Fallbacks:                  []string{},
+			Profile:                    profileReport(request),
+			RenderReport:               renderReport(request, "full_file_conflict_markers"),
+			FormattingPreservation:     FormattingPreservationReport{},
+			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
 		}
 	}
 
@@ -144,6 +155,7 @@ func Merge3GoWithParser(
 			LineDiffScore:      0.95,
 			CharacterDiffScore: 0.95,
 		},
+		SecondaryFormattingMetrics: secondaryFormattingMetrics(true),
 	}
 }
 
@@ -174,10 +186,11 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 				Category: astmerge.DiagnosticCategory("merge_conflict"),
 				Message:  fmt.Sprintf("merge3 found %d unresolved conflict(s).", len(conflicts)),
 			}},
-			Fallbacks:              []string{},
-			Profile:                profileReport(request),
-			RenderReport:           renderReport(request, "full_file_conflict_markers"),
-			FormattingPreservation: FormattingPreservationReport{},
+			Fallbacks:                  []string{},
+			Profile:                    profileReport(request),
+			RenderReport:               renderReport(request, "full_file_conflict_markers"),
+			FormattingPreservation:     FormattingPreservationReport{},
+			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
 		}
 	}
 
@@ -204,6 +217,7 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			LineDiffScore:      1.0,
 			CharacterDiffScore: 1.0,
 		},
+		SecondaryFormattingMetrics: secondaryFormattingMetrics(true),
 	}
 }
 
@@ -235,13 +249,33 @@ func MergeCommentDelta(baseComment *string, oursComment *string, theirsComment *
 
 func parseFailureResponse(request Merge3Request, diagnostic astmerge.Diagnostic) Merge3Response {
 	return Merge3Response{
-		OK:                     false,
-		Conflicts:              []Merge3Conflict{},
-		Diagnostics:            []astmerge.Diagnostic{diagnostic},
-		Fallbacks:              []string{},
-		Profile:                profileReport(request),
-		RenderReport:           renderReport(request, ""),
-		FormattingPreservation: FormattingPreservationReport{},
+		OK:                         false,
+		Conflicts:                  []Merge3Conflict{},
+		Diagnostics:                []astmerge.Diagnostic{diagnostic},
+		Fallbacks:                  []string{},
+		Profile:                    profileReport(request),
+		RenderReport:               renderReport(request, ""),
+		FormattingPreservation:     FormattingPreservationReport{},
+		SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
+	}
+}
+
+func secondaryFormattingMetrics(merged bool) SecondaryFormattingMetricsReport {
+	if merged {
+		return SecondaryFormattingMetricsReport{
+			UnchangedLineChurn:      0,
+			OutputDiffSize:          0,
+			SourceFragmentRetention: 1.0,
+			Weighted:                false,
+			Diagnostics:             []string{"canonical JSON has no trivia-preserving source fragments yet"},
+		}
+	}
+	return SecondaryFormattingMetricsReport{
+		UnchangedLineChurn:      0,
+		OutputDiffSize:          0,
+		SourceFragmentRetention: 0.0,
+		Weighted:                false,
+		Diagnostics:             []string{"unresolved conflict did not produce a merged source-fragment retention measurement"},
 	}
 }
 
