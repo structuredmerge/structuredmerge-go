@@ -279,11 +279,14 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 	conflicts := []Merge3Conflict{}
 	merged := mergeJSONValue(base, ours, theirs, "", &conflicts)
 	if len(conflicts) > 0 {
-		conflictedSource := renderConflictSource(request, conflicts)
 		ownedRegions := jsonOwnedRegionsForConflicts(request, conflicts)
 		report := renderReport(request, "full_file_conflict_markers")
+		conflictedSource := renderConflictSource(request, conflicts)
 		if len(ownedRegions) > 0 {
 			report = renderReport(request, "owned_region_conflict_markers")
+			if rendered, ok := renderJSONOwnedRegionConflictSource(request, ownedRegions[0]); ok {
+				conflictedSource = rendered
+			}
 		}
 		return Merge3Response{
 			OK:               false,
@@ -483,6 +486,52 @@ func renderConflictSource(request Merge3Request, conflicts []Merge3Conflict) str
 		rightMarker + " theirs",
 		"",
 	}, "\n")
+}
+
+func renderJSONOwnedRegionConflictSource(request Merge3Request, region OwnedRegionReport) (string, bool) {
+	if region.RegionKind != "node" {
+		return "", false
+	}
+	key := strings.TrimPrefix(region.OwnerPath, "/")
+	oursRegion, ok := jsonMemberSource(request.OursSource, key)
+	if !ok {
+		return "", false
+	}
+	baseRegion, ok := jsonMemberSource(request.BaseSource, key)
+	if !ok {
+		return "", false
+	}
+	theirsRegion, ok := jsonMemberSource(request.TheirsSource, key)
+	if !ok {
+		return "", false
+	}
+	markerSize := request.ConflictMarkerSize
+	if markerSize <= 0 {
+		markerSize = 7
+	}
+	replacement := strings.Join([]string{
+		strings.Repeat("<", markerSize) + " ours",
+		oursRegion.text,
+		strings.Repeat("|", markerSize) + " base",
+		baseRegion.text,
+		strings.Repeat("=", markerSize),
+		theirsRegion.text,
+		strings.Repeat(">", markerSize) + " theirs",
+	}, "\n")
+	return request.OursSource[:oursRegion.byteRange.Start] + replacement + request.OursSource[oursRegion.byteRange.End:], true
+}
+
+type jsonMemberRegion struct {
+	byteRange SourceRange
+	text      string
+}
+
+func jsonMemberSource(source string, key string) (jsonMemberRegion, bool) {
+	byteRange := jsonKeyByteRange(source, key)
+	if byteRange.End <= byteRange.Start || byteRange.End > len(source) {
+		return jsonMemberRegion{}, false
+	}
+	return jsonMemberRegion{byteRange: byteRange, text: source[byteRange.Start:byteRange.End]}, true
 }
 
 func goOwnedRegionsForConflicts(request Merge3Request, baseSource string, conflicts []Merge3Conflict, backendID string, parserIdentity string) []OwnedRegionReport {

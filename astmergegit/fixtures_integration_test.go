@@ -136,6 +136,11 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 						t.Fatalf("expected conflicted source to contain %q:\n%s", rawNeedle, source)
 					}
 				}
+				for _, rawNeedle := range decodeFixtureValue[[]string](t, expected["conflicted_source_not_contains"]) {
+					if result.ConflictedSource != nil && strings.Contains(*result.ConflictedSource, rawNeedle) {
+						t.Fatalf("expected conflicted source not to contain %q:\n%s", rawNeedle, *result.ConflictedSource)
+					}
+				}
 			}
 		})
 	}
