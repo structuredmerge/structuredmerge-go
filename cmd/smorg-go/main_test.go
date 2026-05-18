@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
+	"github.com/structuredmerge/structuredmerge-go/astmergegit"
 )
 
 func writeTestFile(t *testing.T, dir string, name string, source string) string {
@@ -293,6 +294,38 @@ func TestMergeDriverFullFileFallbackWritesConflictMarkers(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "parse_error") {
 		t.Fatalf("expected parse diagnostic, got %q", stderr.String())
+	}
+}
+
+func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
+	dir := t.TempDir()
+	ancestor := writeTestFile(t, dir, "ancestor.go", "package main\n\nfunc value() string {\n\treturn \"base\"\n}\n\nfunc stable() {}\n")
+	current := writeTestFile(t, dir, "current.go", "package main\n\nfunc value() string {\n\treturn \"ours\"\n}\n\nfunc stable() {}\n")
+	other := writeTestFile(t, dir, "other.go", "package main\n\nfunc value() string {\n\treturn \"theirs\"\n}\n\nfunc stable() {}\n")
+	reportPath := filepath.Join(dir, "merge-report.json")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", "--report", reportPath, ancestor, current, other, "main.go"}, &stdout, &stderr)
+	if exitCode != exitUnresolvedConflict {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+	source, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	var report struct {
+		OwnedRegions []astmergegit.OwnedRegionReport `json:"owned_regions"`
+		RenderReport astmergegit.Merge3RenderReport  `json:"render_report"`
+	}
+	if err := json.Unmarshal(source, &report); err != nil {
+		t.Fatalf("parse report: %v", err)
+	}
+	if report.RenderReport.Strategy != "owned_region_conflict_markers" {
+		t.Fatalf("unexpected render report: %+v", report.RenderReport)
+	}
+	if len(report.OwnedRegions) != 1 || report.OwnedRegions[0].OwnerPath != "/decls/value" {
+		t.Fatalf("unexpected owned regions: %+v", report.OwnedRegions)
 	}
 }
 
