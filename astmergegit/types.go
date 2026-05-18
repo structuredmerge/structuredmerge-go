@@ -117,12 +117,21 @@ func Merge3(request Merge3Request) Merge3Response {
 }
 
 func Merge3Go(request Merge3Request) Merge3Response {
-	return Merge3GoWithParser(request, gomerge.ParseGo)
+	return merge3GoWithParserReport(request, gomerge.ParseGo, string(gomerge.BackendTreeSitter), "tree-sitter-go")
 }
 
 func Merge3GoWithParser(
 	request Merge3Request,
 	parser func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis],
+) Merge3Response {
+	return merge3GoWithParserReport(request, parser, "go-parser", "go/parser")
+}
+
+func merge3GoWithParserReport(
+	request Merge3Request,
+	parser func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis],
+	backendID string,
+	parserIdentity string,
 ) Merge3Response {
 	base := parser(request.BaseSource, gomerge.DialectGo)
 	if !base.OK || base.Analysis == nil {
@@ -141,6 +150,7 @@ func Merge3GoWithParser(
 	merged, ok := mergeGoAnalyses(*base.Analysis, *ours.Analysis, *theirs.Analysis, &conflicts)
 	if !ok {
 		conflictedSource := renderConflictSource(request, conflicts)
+		renderReport := renderReportWithBackend(request, "full_file_conflict_markers", backendID, parserIdentity)
 		return Merge3Response{
 			OK:               false,
 			ConflictedSource: &conflictedSource,
@@ -152,14 +162,15 @@ func Merge3GoWithParser(
 			}},
 			Fallbacks:                  []string{},
 			Profile:                    profileReport(request),
-			RenderReport:               renderReport(request, "full_file_conflict_markers"),
+			RenderReport:               renderReport,
 			FormattingPreservation:     FormattingPreservationReport{},
 			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
-			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport(request, "full_file_conflict_markers")),
+			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport),
 		}
 	}
 
 	reparse := gomerge.ParseGo(merged, gomerge.DialectGo).OK
+	renderReport := renderReportWithBackend(request, "", backendID, parserIdentity)
 	return Merge3Response{
 		OK:                 true,
 		MergedSource:       &merged,
@@ -167,7 +178,7 @@ func Merge3GoWithParser(
 		Diagnostics:        []astmerge.Diagnostic{},
 		Fallbacks:          []string{},
 		Profile:            profileReport(request),
-		RenderReport:       renderReport(request, ""),
+		RenderReport:       renderReport,
 		ReparseAfterRender: &reparse,
 		FormattingPreservation: FormattingPreservationReport{
 			LineDiffScore:      0.95,
@@ -177,7 +188,7 @@ func Merge3GoWithParser(
 		DefaultDriverEvaluation: defaultDriverEvaluation(FormattingPreservationReport{
 			LineDiffScore:      0.95,
 			CharacterDiffScore: 0.95,
-		}, &reparse, renderReport(request, "")),
+		}, &reparse, renderReport),
 	}
 }
 
@@ -357,6 +368,17 @@ func renderReport(request Merge3Request, strategy string) Merge3RenderReport {
 	case "go":
 		report.BackendID = "go-parser"
 		report.ParserIdentity = "go/parser"
+	}
+	return report
+}
+
+func renderReportWithBackend(request Merge3Request, strategy string, backendID string, parserIdentity string) Merge3RenderReport {
+	report := renderReport(request, strategy)
+	if backendID != "" {
+		report.BackendID = backendID
+	}
+	if parserIdentity != "" {
+		report.ParserIdentity = parserIdentity
 	}
 	return report
 }

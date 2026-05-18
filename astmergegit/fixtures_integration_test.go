@@ -201,6 +201,7 @@ func TestGoMerge3Fixture(t *testing.T) {
 			if len(result.Conflicts) != int(expected["conflict_count"].(float64)) {
 				t.Fatalf("unexpected conflicts: %+v", result.Conflicts)
 			}
+			assertGoMerge3ReportExpectations(t, result, expected)
 			if result.OK {
 				if result.MergedSource == nil {
 					t.Fatal("expected merged source")
@@ -255,6 +256,32 @@ func optionalString(raw any) *string {
 	return &value
 }
 
+func assertGoMerge3ReportExpectations(t *testing.T, result Merge3Response, expected map[string]any) {
+	t.Helper()
+	if rawRenderReport, ok := expected["render_report"].(map[string]any); ok {
+		if result.RenderReport.Strategy != rawRenderReport["strategy"].(string) {
+			t.Fatalf("unexpected render strategy: %+v expected %+v", result.RenderReport, rawRenderReport)
+		}
+	}
+	if rawFormatting, ok := expected["formatting_preservation"].(map[string]any); ok {
+		if result.FormattingPreservation.LineDiffScore != rawFormatting["line_diff_score"].(float64) ||
+			result.FormattingPreservation.CharacterDiffScore != rawFormatting["character_diff_score"].(float64) {
+			t.Fatalf("unexpected formatting preservation: %+v expected %+v", result.FormattingPreservation, rawFormatting)
+		}
+	}
+	if rawSecondary, ok := expected["secondary_formatting_metrics"].(map[string]any); ok {
+		if result.SecondaryFormattingMetrics.SourceFragmentRetention != rawSecondary["source_fragment_retention"].(float64) {
+			t.Fatalf("unexpected secondary metrics: %+v expected %+v", result.SecondaryFormattingMetrics, rawSecondary)
+		}
+	}
+	if rawEvaluation, ok := expected["default_driver_evaluation"].(map[string]any); ok {
+		if result.DefaultDriverEvaluation.Status != rawEvaluation["status"].(string) ||
+			result.DefaultDriverEvaluation.FormattingThreshold != rawEvaluation["formatting_threshold"].(float64) {
+			t.Fatalf("unexpected default driver evaluation: %+v expected %+v", result.DefaultDriverEvaluation, rawEvaluation)
+		}
+	}
+}
+
 func TestGoMerge3FixtureAcrossNativeBackends(t *testing.T) {
 	fixture := readFixture(t, "go", "slice-952-go-merge3", "go-merge3.json")
 	cases := fixture["cases"].([]any)
@@ -266,10 +293,15 @@ func TestGoMerge3FixtureAcrossNativeBackends(t *testing.T) {
 			})
 		},
 		"go-dst": func(request Merge3Request) Merge3Response {
-			return Merge3GoWithParser(request, func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis] {
+			return merge3GoWithParserReport(request, func(source string, dialect gomerge.GoDialect) astmerge.ParseResult[gomerge.GoAnalysis] {
 				return godstmerge.ParseGo(source, dialect)
-			})
+			}, godstmerge.BackendGoDST, "github.com/dave/dst")
 		},
+	}
+	expectedBackendReports := map[string]Merge3RenderReport{
+		"tree-sitter": {BackendID: string(gomerge.BackendTreeSitter), ParserIdentity: "tree-sitter-go"},
+		"go-parser":   {BackendID: goparsermerge.BackendGoParser, ParserIdentity: "go/parser"},
+		"go-dst":      {BackendID: godstmerge.BackendGoDST, ParserIdentity: "github.com/dave/dst"},
 	}
 	for backend, merge := range backends {
 		t.Run(backend, func(t *testing.T) {
@@ -301,6 +333,11 @@ func TestGoMerge3FixtureAcrossNativeBackends(t *testing.T) {
 						t.Fatalf("expected output to reparse: %+v\n%s", result, source)
 					}
 					if result.OK {
+						expectedBackend := expectedBackendReports[backend]
+						if result.RenderReport.BackendID != expectedBackend.BackendID ||
+							result.RenderReport.ParserIdentity != expectedBackend.ParserIdentity {
+							t.Fatalf("unexpected backend report for %s: %+v expected %+v", backend, result.RenderReport, expectedBackend)
+						}
 						expectedSource, hasExpectedSource := expected["expected_source"].(string)
 						if hasExpectedSource && (result.MergedSource == nil || *result.MergedSource != expectedSource) {
 							source := "<nil>"
@@ -312,6 +349,7 @@ func TestGoMerge3FixtureAcrossNativeBackends(t *testing.T) {
 						if result.FormattingPreservation.LineDiffScore < 0.95 || result.FormattingPreservation.CharacterDiffScore < 0.95 {
 							t.Fatalf("formatting preservation below gate: %+v", result.FormattingPreservation)
 						}
+						assertGoMerge3ReportExpectations(t, result, expected)
 					}
 				})
 			}
