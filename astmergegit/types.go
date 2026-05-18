@@ -175,7 +175,20 @@ func merge3GoWithParserReport(
 	conflicts := []Merge3Conflict{}
 	merged, ok := mergeGoAnalyses(*base.Analysis, *ours.Analysis, *theirs.Analysis, &conflicts)
 	if !ok {
+		diagnostics := []astmerge.Diagnostic{{
+			Severity: astmerge.SeverityError,
+			Category: astmerge.DiagnosticCategory("merge_conflict"),
+			Message:  fmt.Sprintf("merge3 found %d unresolved conflict(s).", len(conflicts)),
+		}}
 		ownedRegions := goOwnedRegionsForConflicts(request, base.Analysis.Source, conflicts, backendID, parserIdentity)
+		if request.RenderPolicy == "force_unsafe_region" {
+			ownedRegions = []OwnedRegionReport{}
+			diagnostics = append(diagnostics, astmerge.Diagnostic{
+				Severity: astmerge.SeverityWarning,
+				Category: astmerge.DiagnosticCategory("unsafe_region"),
+				Message:  "unsafe owned region requested; using full-file conflict markers",
+			})
+		}
 		conflictedSource := ""
 		renderStrategy := "full_file_conflict_markers"
 		if len(ownedRegions) > 0 {
@@ -190,14 +203,10 @@ func merge3GoWithParserReport(
 		}
 		renderReport := renderReportWithBackend(request, renderStrategy, backendID, parserIdentity)
 		return Merge3Response{
-			OK:               false,
-			ConflictedSource: &conflictedSource,
-			Conflicts:        conflicts,
-			Diagnostics: []astmerge.Diagnostic{{
-				Severity: astmerge.SeverityError,
-				Category: astmerge.DiagnosticCategory("merge_conflict"),
-				Message:  fmt.Sprintf("merge3 found %d unresolved conflict(s).", len(conflicts)),
-			}},
+			OK:                         false,
+			ConflictedSource:           &conflictedSource,
+			Conflicts:                  conflicts,
+			Diagnostics:                diagnostics,
 			Fallbacks:                  []string{},
 			Profile:                    profileReport(request),
 			RenderReport:               renderReport,

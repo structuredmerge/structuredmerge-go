@@ -254,9 +254,6 @@ func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
 	for _, rawCase := range cases {
 		testCase := rawCase.(map[string]any)
 		t.Run(testCase["case_id"].(string), func(t *testing.T) {
-			if testCase["force_unsafe_region"] == true {
-				t.Skip("unsafe-region forcing is a fixture target for the renderer policy layer")
-			}
 			request := Merge3Request{
 				BaseSource:         testCase["base_source"].(string),
 				OursSource:         testCase["ours_source"].(string),
@@ -266,6 +263,9 @@ func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
 				Dialect:            testCase["language"].(string),
 				ProfileID:          testCase["language"].(string) + ".source",
 				ConflictMarkerSize: 7,
+			}
+			if testCase["force_unsafe_region"] == true {
+				request.RenderPolicy = "force_unsafe_region"
 			}
 			result := Merge3(request)
 			expected := testCase["expected"].(map[string]any)
@@ -283,6 +283,18 @@ func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
 			if rawRenderReport, ok := expected["render_report"].(map[string]any); ok {
 				if result.RenderReport.Strategy != rawRenderReport["strategy"].(string) {
 					t.Fatalf("unexpected render report: %+v expected %+v", result.RenderReport, rawRenderReport)
+				}
+			}
+			if rawNeedles, ok := expected["diagnostics_contain"].([]any); ok {
+				diagnosticsJSON, err := json.Marshal(result.Diagnostics)
+				if err != nil {
+					t.Fatalf("marshal diagnostics: %v", err)
+				}
+				for _, rawNeedle := range rawNeedles {
+					needle := rawNeedle.(string)
+					if !strings.Contains(string(diagnosticsJSON), needle) {
+						t.Fatalf("expected diagnostics to contain %q: %s", needle, string(diagnosticsJSON))
+					}
 				}
 			}
 			if result.ConflictedSource != nil {
