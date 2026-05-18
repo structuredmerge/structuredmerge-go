@@ -54,6 +54,12 @@ type Merge3Response struct {
 	ReparseAfterRender     *bool                        `json:"reparse_after_render"`
 }
 
+type CommentDeltaResult struct {
+	OK            bool             `json:"ok"`
+	MergedComment *string          `json:"merged_comment"`
+	Conflicts     []Merge3Conflict `json:"conflicts"`
+}
+
 type absentValue struct{}
 
 var absent = absentValue{}
@@ -196,6 +202,32 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			LineDiffScore:      1.0,
 			CharacterDiffScore: 1.0,
 		},
+	}
+}
+
+func MergeCommentDelta(baseComment *string, oursComment *string, theirsComment *string, ownerPath string) CommentDeltaResult {
+	conflicts := []Merge3Conflict{}
+	var mergedComment *string
+
+	switch {
+	case stringPointersEqual(oursComment, theirsComment):
+		mergedComment = cloneStringPointer(oursComment)
+	case stringPointersEqual(baseComment, oursComment):
+		mergedComment = cloneStringPointer(theirsComment)
+	case stringPointersEqual(baseComment, theirsComment):
+		mergedComment = cloneStringPointer(oursComment)
+	case oursComment == nil:
+		conflicts = append(conflicts, commentConflict("delete_edit", ownerPath, "ours deleted a comment that theirs edited"))
+	case theirsComment == nil:
+		conflicts = append(conflicts, commentConflict("delete_edit", ownerPath, "theirs deleted a comment that ours edited"))
+	default:
+		conflicts = append(conflicts, commentConflict("edit_edit", ownerPath, "comment changed differently in ours and theirs"))
+	}
+
+	return CommentDeltaResult{
+		OK:            len(conflicts) == 0,
+		MergedComment: mergedComment,
+		Conflicts:     conflicts,
 	}
 }
 
@@ -638,6 +670,33 @@ func addConflict(conflicts *[]Merge3Conflict, category string, path string, mess
 		Path:       path,
 		Message:    message,
 	})
+}
+
+func commentConflict(category string, path string, message string) Merge3Conflict {
+	if path == "" {
+		path = "/"
+	}
+	return Merge3Conflict{
+		ConflictID: "comment-conflict-1",
+		Category:   category,
+		Path:       path,
+		Message:    message,
+	}
+}
+
+func stringPointersEqual(left *string, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
+func cloneStringPointer(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func jsonPointerJoin(parent string, token string) string {

@@ -108,6 +108,52 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 	}
 }
 
+func TestGitCommentDeltaSemanticsFixture(t *testing.T) {
+	fixture := readFixture(t, "diagnostics", "slice-953-git-comment-delta-semantics", "git-comment-delta-semantics.json")
+	contract := fixture["contract"].(map[string]any)
+	if contract["package"] != "ast-merge-git" || contract["operation"] != "comment_delta_semantics" {
+		t.Fatalf("unexpected contract metadata: %+v", contract)
+	}
+	owner := fixture["owner"].(map[string]any)
+
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		t.Run(testCase["case_id"].(string), func(t *testing.T) {
+			result := MergeCommentDelta(
+				optionalString(testCase["base_comment"]),
+				optionalString(testCase["ours_comment"]),
+				optionalString(testCase["theirs_comment"]),
+				owner["path"].(string),
+			)
+			expected := testCase["expected"].(map[string]any)
+			if result.OK != expected["ok"].(bool) {
+				t.Fatalf("unexpected ok: %+v", result)
+			}
+			if len(result.Conflicts) != int(expected["conflict_count"].(float64)) {
+				t.Fatalf("unexpected conflicts: %+v", result.Conflicts)
+			}
+			if rawMerged, ok := expected["merged_comment"]; ok {
+				expectedComment := optionalString(rawMerged)
+				if !stringPointersEqual(result.MergedComment, expectedComment) {
+					t.Fatalf("unexpected merged comment: got=%+v expected=%+v", result.MergedComment, expectedComment)
+				}
+			}
+			if rawCategories, ok := expected["conflict_categories"]; ok {
+				categories := make([]string, 0, len(result.Conflicts))
+				for _, conflict := range result.Conflicts {
+					categories = append(categories, conflict.Category)
+				}
+				if !reflect.DeepEqual(categories, decodeFixtureValue[[]string](t, rawCategories)) {
+					t.Fatalf("unexpected comment conflict categories: %+v", categories)
+				}
+			}
+			if rawOwnerPath, ok := expected["comment_owner_path"]; ok && owner["path"] != rawOwnerPath {
+				t.Fatalf("unexpected owner path: %s", owner["path"])
+			}
+		})
+	}
+}
+
 func TestGoMerge3Fixture(t *testing.T) {
 	fixture := readFixture(t, "go", "slice-952-go-merge3", "go-merge3.json")
 	cases := fixture["cases"].([]any)
@@ -175,6 +221,14 @@ func TestGoMerge3Fixture(t *testing.T) {
 			}
 		})
 	}
+}
+
+func optionalString(raw any) *string {
+	if raw == nil {
+		return nil
+	}
+	value := raw.(string)
+	return &value
 }
 
 func TestGoMerge3FixtureAcrossNativeBackends(t *testing.T) {
