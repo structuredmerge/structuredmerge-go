@@ -69,6 +69,12 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 			} else if result.ReparseAfterRender == nil || *result.ReparseAfterRender != expected["reparse_after_render"].(bool) {
 				t.Fatalf("unexpected reparse result: %+v", result.ReparseAfterRender)
 			}
+			if rawRenderReport, ok := expected["render_report"]; ok {
+				expectedRenderReport := decodeFixtureValue[Merge3RenderReport](t, rawRenderReport)
+				if result.RenderReport != expectedRenderReport {
+					t.Fatalf("unexpected render report: got=%+v expected=%+v", result.RenderReport, expectedRenderReport)
+				}
+			}
 
 			if result.OK {
 				if result.MergedSource == nil {

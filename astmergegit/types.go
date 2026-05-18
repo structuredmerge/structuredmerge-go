@@ -33,7 +33,9 @@ type Merge3Conflict struct {
 }
 
 type Merge3RenderReport struct {
-	Strategy string `json:"strategy"`
+	Strategy       string `json:"strategy"`
+	BackendID      string `json:"backend_id,omitempty"`
+	ParserIdentity string `json:"parser_identity,omitempty"`
 }
 
 type FormattingPreservationReport struct {
@@ -81,7 +83,7 @@ func Merge3(request Merge3Request) Merge3Response {
 			Conflicts:              []Merge3Conflict{},
 			Fallbacks:              []string{},
 			Profile:                profileReport(request),
-			RenderReport:           Merge3RenderReport{Strategy: normalizedRenderPolicy(request.RenderPolicy)},
+			RenderReport:           renderReport(request, ""),
 			FormattingPreservation: FormattingPreservationReport{},
 		}
 	}
@@ -123,7 +125,7 @@ func Merge3GoWithParser(
 			}},
 			Fallbacks:              []string{},
 			Profile:                profileReport(request),
-			RenderReport:           Merge3RenderReport{Strategy: "full_file_conflict_markers"},
+			RenderReport:           renderReport(request, "full_file_conflict_markers"),
 			FormattingPreservation: FormattingPreservationReport{},
 		}
 	}
@@ -136,7 +138,7 @@ func Merge3GoWithParser(
 		Diagnostics:        []astmerge.Diagnostic{},
 		Fallbacks:          []string{},
 		Profile:            profileReport(request),
-		RenderReport:       Merge3RenderReport{Strategy: normalizedRenderPolicy(request.RenderPolicy)},
+		RenderReport:       renderReport(request, ""),
 		ReparseAfterRender: &reparse,
 		FormattingPreservation: FormattingPreservationReport{
 			LineDiffScore:      0.95,
@@ -174,7 +176,7 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			}},
 			Fallbacks:              []string{},
 			Profile:                profileReport(request),
-			RenderReport:           Merge3RenderReport{Strategy: "full_file_conflict_markers"},
+			RenderReport:           renderReport(request, "full_file_conflict_markers"),
 			FormattingPreservation: FormattingPreservationReport{},
 		}
 	}
@@ -196,7 +198,7 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 		Diagnostics:        []astmerge.Diagnostic{},
 		Fallbacks:          []string{},
 		Profile:            profileReport(request),
-		RenderReport:       Merge3RenderReport{Strategy: normalizedRenderPolicy(request.RenderPolicy)},
+		RenderReport:       renderReport(request, ""),
 		ReparseAfterRender: &reparse,
 		FormattingPreservation: FormattingPreservationReport{
 			LineDiffScore:      1.0,
@@ -238,9 +240,25 @@ func parseFailureResponse(request Merge3Request, diagnostic astmerge.Diagnostic)
 		Diagnostics:            []astmerge.Diagnostic{diagnostic},
 		Fallbacks:              []string{},
 		Profile:                profileReport(request),
-		RenderReport:           Merge3RenderReport{Strategy: normalizedRenderPolicy(request.RenderPolicy)},
+		RenderReport:           renderReport(request, ""),
 		FormattingPreservation: FormattingPreservationReport{},
 	}
+}
+
+func renderReport(request Merge3Request, strategy string) Merge3RenderReport {
+	if strategy == "" {
+		strategy = normalizedRenderPolicy(request.RenderPolicy)
+	}
+	report := Merge3RenderReport{Strategy: strategy}
+	switch normalizeLanguage(request.Language, request.PathName) {
+	case "json":
+		report.BackendID = "native-json"
+		report.ParserIdentity = "standard-json"
+	case "go":
+		report.BackendID = "go-parser"
+		report.ParserIdentity = "go/parser"
+	}
+	return report
 }
 
 func renderConflictSource(request Merge3Request, conflicts []Merge3Conflict) string {
