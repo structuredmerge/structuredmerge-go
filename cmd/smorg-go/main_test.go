@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -338,6 +339,38 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 	}
 	if report.DefaultDriverEvaluation.Status == "" {
 		t.Fatalf("expected default-driver evaluation in report: %+v", report.DefaultDriverEvaluation)
+	}
+}
+
+func TestMergeDriverReportIncludesChangeClassifications(t *testing.T) {
+	dir := t.TempDir()
+	ancestor := writeTestFile(t, dir, "ancestor.json", `{"name":"demo"}`)
+	current := writeTestFile(t, dir, "current.json", `{"name":"demo","ours":true}`)
+	other := writeTestFile(t, dir, "other.json", `{"name":"demo","theirs":true}`)
+	reportPath := filepath.Join(dir, "merge-report.json")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := run([]string{"merge-driver", "--report", reportPath, ancestor, current, other, "package.json"}, &stdout, &stderr)
+	if exitCode != exitSuccess {
+		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+	}
+	source, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	var report struct {
+		ChangeClassifications []astmergegit.ChangeClassification `json:"change_classifications"`
+	}
+	if err := json.Unmarshal(source, &report); err != nil {
+		t.Fatalf("parse report: %v", err)
+	}
+	expected := []astmergegit.ChangeClassification{
+		{Path: "/ours", Ours: "added", Theirs: "unchanged"},
+		{Path: "/theirs", Ours: "unchanged", Theirs: "added"},
+	}
+	if !reflect.DeepEqual(report.ChangeClassifications, expected) {
+		t.Fatalf("unexpected change classifications: got=%+v expected=%+v", report.ChangeClassifications, expected)
 	}
 }
 

@@ -69,6 +69,7 @@ type mergeDriverResult struct {
 	Diagnostics                []astmerge.Diagnostic
 	Output                     *string
 	Fallbacks                  []mergeDriverFallback
+	ChangeClassifications      []astmergegit.ChangeClassification
 	OwnedRegions               []astmergegit.OwnedRegionReport
 	RenderReport               *astmergegit.Merge3RenderReport
 	Profile                    map[string]string
@@ -84,6 +85,7 @@ type mergeDriverMachineReport struct {
 	OK                         bool                                          `json:"ok"`
 	ExitCode                   int                                           `json:"exit_code"`
 	Fallbacks                  []mergeDriverFallback                         `json:"fallbacks"`
+	ChangeClassifications      []astmergegit.ChangeClassification            `json:"change_classifications"`
 	OwnedRegions               []astmergegit.OwnedRegionReport               `json:"owned_regions"`
 	RenderReport               *astmergegit.Merge3RenderReport               `json:"render_report,omitempty"`
 	ReparseAfterRender         *bool                                         `json:"reparse_after_render,omitempty"`
@@ -246,12 +248,16 @@ func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, 
 	if result.OwnedRegions == nil {
 		result.OwnedRegions = []astmergegit.OwnedRegionReport{}
 	}
+	if result.ChangeClassifications == nil {
+		result.ChangeClassifications = []astmergegit.ChangeClassification{}
+	}
 	report := mergeDriverMachineReport{
 		Command:                    "merge-driver",
 		PathName:                   pathName,
 		OK:                         ok,
 		ExitCode:                   exitCode,
 		Fallbacks:                  fallbacks,
+		ChangeClassifications:      result.ChangeClassifications,
 		OwnedRegions:               result.OwnedRegions,
 		RenderReport:               result.RenderReport,
 		ReparseAfterRender:         result.ReparseAfterRender,
@@ -647,6 +653,7 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 			Diagnostics:                result.Diagnostics,
 			Output:                     result.MergedSource,
 			Fallbacks:                  fallbacks,
+			ChangeClassifications:      result.ChangeClassifications,
 			OwnedRegions:               result.OwnedRegions,
 			RenderReport:               &result.RenderReport,
 			Profile:                    result.Profile,
@@ -662,6 +669,7 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 			Diagnostics:                result.Diagnostics,
 			Output:                     result.ConflictedSource,
 			Fallbacks:                  fallbacks,
+			ChangeClassifications:      result.ChangeClassifications,
 			OwnedRegions:               result.OwnedRegions,
 			RenderReport:               &result.RenderReport,
 			Profile:                    result.Profile,
@@ -675,6 +683,7 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 		OK:                         false,
 		Diagnostics:                result.Diagnostics,
 		Fallbacks:                  fallbacks,
+		ChangeClassifications:      result.ChangeClassifications,
 		OwnedRegions:               result.OwnedRegions,
 		RenderReport:               &result.RenderReport,
 		Profile:                    result.Profile,
