@@ -659,7 +659,8 @@ func classifyJSONValueChange(base any, baseOK bool, value any, valueOK bool) str
 func classifyGoChanges(base gomerge.GoAnalysis, ours gomerge.GoAnalysis, theirs gomerge.GoAnalysis) []ChangeClassification {
 	changes := []ChangeClassification{}
 	changes = append(changes, classifyGoTextMapChanges("/imports/", goImportMap(base), goImportMap(ours), goImportMap(theirs))...)
-	changes = append(changes, classifyGoTextMapChanges("/decls/", goDeclarationMap(base), goDeclarationMap(ours), goDeclarationMap(theirs))...)
+	changes = append(changes, classifyGoTextMapChanges("/decls/", goDeclarationBodyMap(base), goDeclarationBodyMap(ours), goDeclarationBodyMap(theirs))...)
+	changes = append(changes, classifyGoTextMapChanges("/decls/", goDeclarationCommentMap(base), goDeclarationCommentMap(ours), goDeclarationCommentMap(theirs))...)
 	return changes
 }
 
@@ -676,7 +677,7 @@ func classifyGoTextMapChanges(prefix string, base map[string]string, ours map[st
 			continue
 		}
 		changes = append(changes, ChangeClassification{
-			Path:   prefix + key,
+			Path:   goChangePath(prefix, key),
 			Ours:   oursChange,
 			Theirs: theirsChange,
 		})
@@ -697,6 +698,13 @@ func classifyGoTextChange(base string, baseOK bool, value string, valueOK bool) 
 	default:
 		return "edited"
 	}
+}
+
+func goChangePath(prefix string, key string) string {
+	if strings.HasSuffix(key, "/comments") {
+		return prefix + strings.TrimSuffix(key, "/comments") + "/comments"
+	}
+	return prefix + key
 }
 
 func mapKeysAny(maps ...map[string]any) []string {
@@ -1136,6 +1144,27 @@ func goDeclarationMap(analysis gomerge.GoAnalysis) map[string]string {
 		decls[item.MatchKey] = text
 	}
 	return decls
+}
+
+func goDeclarationBodyMap(analysis gomerge.GoAnalysis) map[string]string {
+	declarations := goDeclarationMap(analysis)
+	bodies := make(map[string]string, len(declarations))
+	for key, declaration := range declarations {
+		bodies[key] = removeLeadingGoCommentBlock(declaration)
+	}
+	return bodies
+}
+
+func goDeclarationCommentMap(analysis gomerge.GoAnalysis) map[string]string {
+	declarations := goDeclarationMap(analysis)
+	comments := make(map[string]string, len(declarations))
+	for key, declaration := range declarations {
+		comment := leadingGoCommentBlock(declaration)
+		if strings.TrimSpace(comment) != "" {
+			comments[key+"/comments"] = comment
+		}
+	}
+	return comments
 }
 
 func leadingGoCommentsForDeclaration(source string, name string) string {
