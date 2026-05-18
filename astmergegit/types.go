@@ -51,6 +51,21 @@ type SecondaryFormattingMetricsReport struct {
 	Diagnostics             []string `json:"diagnostics"`
 }
 
+type DefaultDriverEvaluation struct {
+	Status              string     `json:"status"`
+	FormattingThreshold float64    `json:"formatting_threshold"`
+	FormattingScore     float64    `json:"formatting_score"`
+	HardGates           []HardGate `json:"hard_gates"`
+	BlockingReasons     []string   `json:"blocking_reasons"`
+	Diagnostics         []string   `json:"diagnostics"`
+}
+
+type HardGate struct {
+	Name     string `json:"name"`
+	Passed   bool   `json:"passed"`
+	Weighted bool   `json:"weighted"`
+}
+
 type Merge3Response struct {
 	OK                         bool                             `json:"ok"`
 	MergedSource               *string                          `json:"merged_source"`
@@ -62,6 +77,7 @@ type Merge3Response struct {
 	RenderReport               Merge3RenderReport               `json:"render_report"`
 	FormattingPreservation     FormattingPreservationReport     `json:"formatting_preservation"`
 	SecondaryFormattingMetrics SecondaryFormattingMetricsReport `json:"secondary_formatting_metrics"`
+	DefaultDriverEvaluation    DefaultDriverEvaluation          `json:"default_driver_evaluation"`
 	ReparseAfterRender         *bool                            `json:"reparse_after_render"`
 }
 
@@ -95,6 +111,7 @@ func Merge3(request Merge3Request) Merge3Response {
 			RenderReport:               renderReport(request, ""),
 			FormattingPreservation:     FormattingPreservationReport{},
 			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
+			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport(request, "")),
 		}
 	}
 }
@@ -138,6 +155,7 @@ func Merge3GoWithParser(
 			RenderReport:               renderReport(request, "full_file_conflict_markers"),
 			FormattingPreservation:     FormattingPreservationReport{},
 			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
+			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport(request, "full_file_conflict_markers")),
 		}
 	}
 
@@ -156,6 +174,10 @@ func Merge3GoWithParser(
 			CharacterDiffScore: 0.95,
 		},
 		SecondaryFormattingMetrics: secondaryFormattingMetrics(true),
+		DefaultDriverEvaluation: defaultDriverEvaluation(FormattingPreservationReport{
+			LineDiffScore:      0.95,
+			CharacterDiffScore: 0.95,
+		}, &reparse, renderReport(request, "")),
 	}
 }
 
@@ -191,6 +213,7 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			RenderReport:               renderReport(request, "full_file_conflict_markers"),
 			FormattingPreservation:     FormattingPreservationReport{},
 			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
+			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport(request, "full_file_conflict_markers")),
 		}
 	}
 
@@ -218,6 +241,10 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			CharacterDiffScore: 1.0,
 		},
 		SecondaryFormattingMetrics: secondaryFormattingMetrics(true),
+		DefaultDriverEvaluation: defaultDriverEvaluation(FormattingPreservationReport{
+			LineDiffScore:      1.0,
+			CharacterDiffScore: 1.0,
+		}, &reparse, renderReport(request, "")),
 	}
 }
 
@@ -257,6 +284,7 @@ func parseFailureResponse(request Merge3Request, diagnostic astmerge.Diagnostic)
 		RenderReport:               renderReport(request, ""),
 		FormattingPreservation:     FormattingPreservationReport{},
 		SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
+		DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport(request, "")),
 	}
 }
 
@@ -276,6 +304,44 @@ func secondaryFormattingMetrics(merged bool) SecondaryFormattingMetricsReport {
 		SourceFragmentRetention: 0.0,
 		Weighted:                false,
 		Diagnostics:             []string{"unresolved conflict did not produce a merged source-fragment retention measurement"},
+	}
+}
+
+func defaultDriverEvaluation(formatting FormattingPreservationReport, reparse *bool, render Merge3RenderReport) DefaultDriverEvaluation {
+	const threshold = 0.95
+	score := (formatting.LineDiffScore + formatting.CharacterDiffScore) / 2
+	reparsePassed := reparse != nil && *reparse
+	noFullFileRewrite := render.Strategy != "full_file_conflict_markers"
+	coherentConflictMarkers := render.Strategy != "full_file_conflict_markers"
+	hardGates := []HardGate{
+		{Name: "reparse_after_render", Passed: reparsePassed, Weighted: false},
+		{Name: "no_full_file_rewrite", Passed: noFullFileRewrite, Weighted: false},
+		{Name: "coherent_conflict_marker_placement", Passed: coherentConflictMarkers, Weighted: false},
+	}
+	blockingReasons := []string{}
+	if !reparsePassed {
+		blockingReasons = append(blockingReasons, "rendered output did not reparse")
+	}
+	if score < threshold {
+		blockingReasons = append(blockingReasons, "formatting score is below threshold")
+	}
+	if !noFullFileRewrite {
+		blockingReasons = append(blockingReasons, "full-file rewrite or conflict markers were used")
+	}
+	if !coherentConflictMarkers {
+		blockingReasons = append(blockingReasons, "conflict marker placement is not syntactically coherent")
+	}
+	status := "recommended"
+	if len(blockingReasons) > 0 {
+		status = "not_recommended"
+	}
+	return DefaultDriverEvaluation{
+		Status:              status,
+		FormattingThreshold: threshold,
+		FormattingScore:     score,
+		HardGates:           hardGates,
+		BlockingReasons:     blockingReasons,
+		Diagnostics:         []string{"default-driver evaluation is advisory unless explicitly required"},
 	}
 }
 

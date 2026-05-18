@@ -87,6 +87,12 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 					t.Fatalf("unexpected secondary formatting metrics: got=%+v expected=%+v", result.SecondaryFormattingMetrics, expectedSecondaryMetrics)
 				}
 			}
+			if rawDefaultDriverEvaluation, ok := expected["default_driver_evaluation"]; ok {
+				expectedDefaultDriverEvaluation := decodeFixtureValue[DefaultDriverEvaluation](t, rawDefaultDriverEvaluation)
+				if !reflect.DeepEqual(result.DefaultDriverEvaluation, expectedDefaultDriverEvaluation) {
+					t.Fatalf("unexpected default driver evaluation: got=%+v expected=%+v", result.DefaultDriverEvaluation, expectedDefaultDriverEvaluation)
+				}
+			}
 
 			if result.OK {
 				if result.MergedSource == nil {
