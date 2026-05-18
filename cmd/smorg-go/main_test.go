@@ -317,6 +317,7 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 	var report struct {
 		OwnedRegions []astmergegit.OwnedRegionReport `json:"owned_regions"`
 		RenderReport astmergegit.Merge3RenderReport  `json:"render_report"`
+		Profile      map[string]string               `json:"profile"`
 	}
 	if err := json.Unmarshal(source, &report); err != nil {
 		t.Fatalf("parse report: %v", err)
@@ -326,6 +327,9 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 	}
 	if len(report.OwnedRegions) != 1 || report.OwnedRegions[0].OwnerPath != "/decls/value" {
 		t.Fatalf("unexpected owned regions: %+v", report.OwnedRegions)
+	}
+	if report.Profile["profile_id"] != "go.source" || report.Profile["language"] != "go" {
+		t.Fatalf("unexpected profile: %+v", report.Profile)
 	}
 }
 

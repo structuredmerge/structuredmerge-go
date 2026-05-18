@@ -71,6 +71,7 @@ type mergeDriverResult struct {
 	Fallbacks    []mergeDriverFallback
 	OwnedRegions []astmergegit.OwnedRegionReport
 	RenderReport *astmergegit.Merge3RenderReport
+	Profile      map[string]string
 }
 
 type mergeDriverMachineReport struct {
@@ -184,7 +185,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 			})
 		}
 		if options.checkOnly {
-			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
 				return reportExit
 			}
 			return exitUnresolvedConflict
@@ -194,7 +195,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 				return exitCode
 			}
 		}
-		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, false, exitUnresolvedConflict, fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
 			return reportExit
 		}
 		return exitUnresolvedConflict
@@ -206,12 +207,12 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if options.checkOnly {
 		if options.exitCode && *result.Output != string(currentSource) {
-			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitUnresolvedConflict, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitUnresolvedConflict, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
 				return reportExit
 			}
 			return exitUnresolvedConflict
 		}
-		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
 			return reportExit
 		}
 		return exitSuccess
@@ -221,13 +222,13 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitCode
 	}
 
-	if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+	if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Profile, result.Diagnostics, stderr); reportExit != exitSuccess {
 		return reportExit
 	}
 	return exitSuccess
 }
 
-func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, exitCode int, fallbacks []mergeDriverFallback, ownedRegions []astmergegit.OwnedRegionReport, renderReport *astmergegit.Merge3RenderReport, diagnostics []astmerge.Diagnostic, stderr io.Writer) int {
+func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, exitCode int, fallbacks []mergeDriverFallback, ownedRegions []astmergegit.OwnedRegionReport, renderReport *astmergegit.Merge3RenderReport, profile map[string]string, diagnostics []astmerge.Diagnostic, stderr io.Writer) int {
 	if reportPath == "" {
 		return exitSuccess
 	}
@@ -245,6 +246,7 @@ func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, 
 		Fallbacks:    fallbacks,
 		OwnedRegions: ownedRegions,
 		RenderReport: renderReport,
+		Profile:      profile,
 		Diagnostics:  diagnostics,
 	}
 	source, err := json.MarshalIndent(report, "", "  ")
@@ -632,6 +634,7 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 			Fallbacks:    fallbacks,
 			OwnedRegions: result.OwnedRegions,
 			RenderReport: &result.RenderReport,
+			Profile:      result.Profile,
 		}
 	}
 	if !result.OK && result.ConflictedSource != nil {
@@ -642,6 +645,7 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 			Fallbacks:    fallbacks,
 			OwnedRegions: result.OwnedRegions,
 			RenderReport: &result.RenderReport,
+			Profile:      result.Profile,
 		}
 	}
 	return mergeDriverResult{
@@ -650,6 +654,7 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 		Fallbacks:    fallbacks,
 		OwnedRegions: result.OwnedRegions,
 		RenderReport: &result.RenderReport,
+		Profile:      result.Profile,
 	}
 }
 
