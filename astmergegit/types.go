@@ -181,6 +181,7 @@ func merge3GoWithParserReport(
 	}
 
 	conflicts := []Merge3Conflict{}
+	changeClassifications := classifyGoChanges(*base.Analysis, *ours.Analysis, *theirs.Analysis)
 	merged, ok := mergeGoAnalyses(*base.Analysis, *ours.Analysis, *theirs.Analysis, &conflicts)
 	if !ok {
 		diagnostics := []astmerge.Diagnostic{{
@@ -208,7 +209,7 @@ func merge3GoWithParserReport(
 						OK:                         true,
 						MergedSource:               &mergedSource,
 						Conflicts:                  []Merge3Conflict{},
-						ChangeClassifications:      []ChangeClassification{},
+						ChangeClassifications:      changeClassifications,
 						Diagnostics:                []astmerge.Diagnostic{},
 						Fallbacks:                  []string{fallbackPolicy},
 						Profile:                    profileReport(request),
@@ -239,7 +240,7 @@ func merge3GoWithParserReport(
 			OK:                         false,
 			ConflictedSource:           &conflictedSource,
 			Conflicts:                  conflicts,
-			ChangeClassifications:      []ChangeClassification{},
+			ChangeClassifications:      changeClassifications,
 			Diagnostics:                diagnostics,
 			Fallbacks:                  []string{},
 			Profile:                    profileReport(request),
@@ -258,7 +259,7 @@ func merge3GoWithParserReport(
 		OK:                         true,
 		MergedSource:               &merged,
 		Conflicts:                  []Merge3Conflict{},
-		ChangeClassifications:      []ChangeClassification{},
+		ChangeClassifications:      changeClassifications,
 		Diagnostics:                []astmerge.Diagnostic{},
 		Fallbacks:                  []string{},
 		Profile:                    profileReport(request),
@@ -655,6 +656,49 @@ func classifyJSONValueChange(base any, baseOK bool, value any, valueOK bool) str
 	}
 }
 
+func classifyGoChanges(base gomerge.GoAnalysis, ours gomerge.GoAnalysis, theirs gomerge.GoAnalysis) []ChangeClassification {
+	changes := []ChangeClassification{}
+	changes = append(changes, classifyGoTextMapChanges("/imports/", goImportMap(base), goImportMap(ours), goImportMap(theirs))...)
+	changes = append(changes, classifyGoTextMapChanges("/decls/", goDeclarationMap(base), goDeclarationMap(ours), goDeclarationMap(theirs))...)
+	return changes
+}
+
+func classifyGoTextMapChanges(prefix string, base map[string]string, ours map[string]string, theirs map[string]string) []ChangeClassification {
+	keys := mapKeys(base, ours, theirs)
+	changes := make([]ChangeClassification, 0, len(keys))
+	for _, key := range keys {
+		baseText, baseOK := base[key]
+		oursText, oursOK := ours[key]
+		theirsText, theirsOK := theirs[key]
+		oursChange := classifyGoTextChange(baseText, baseOK, oursText, oursOK)
+		theirsChange := classifyGoTextChange(baseText, baseOK, theirsText, theirsOK)
+		if oursChange == "unchanged" && theirsChange == "unchanged" {
+			continue
+		}
+		changes = append(changes, ChangeClassification{
+			Path:   prefix + key,
+			Ours:   oursChange,
+			Theirs: theirsChange,
+		})
+	}
+	return changes
+}
+
+func classifyGoTextChange(base string, baseOK bool, value string, valueOK bool) string {
+	switch {
+	case !baseOK && !valueOK:
+		return "unchanged"
+	case !baseOK && valueOK:
+		return "added"
+	case baseOK && !valueOK:
+		return "deleted"
+	case strings.TrimSpace(base) == strings.TrimSpace(value):
+		return "unchanged"
+	default:
+		return "edited"
+	}
+}
+
 func mapKeysAny(maps ...map[string]any) []string {
 	seen := map[string]struct{}{}
 	for _, itemMap := range maps {
@@ -993,6 +1037,14 @@ func goImportSet(analysis gomerge.GoAnalysis) map[string]struct{} {
 		set[item.MatchKey] = struct{}{}
 	}
 	return set
+}
+
+func goImportMap(analysis gomerge.GoAnalysis) map[string]string {
+	imports := make(map[string]string, len(analysis.Imports))
+	for _, item := range analysis.Imports {
+		imports[item.MatchKey] = item.Text
+	}
+	return imports
 }
 
 func mergeGoDeclarations(base gomerge.GoAnalysis, ours gomerge.GoAnalysis, theirs gomerge.GoAnalysis, conflicts *[]Merge3Conflict) ([]string, bool) {

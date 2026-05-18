@@ -316,6 +316,7 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 		t.Fatalf("read report: %v", err)
 	}
 	var report struct {
+		ChangeClassifications   []astmergegit.ChangeClassification        `json:"change_classifications"`
 		OwnedRegions            []astmergegit.OwnedRegionReport           `json:"owned_regions"`
 		RenderReport            astmergegit.Merge3RenderReport            `json:"render_report"`
 		Profile                 map[string]string                         `json:"profile"`
@@ -327,6 +328,12 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 	}
 	if report.RenderReport.Strategy != "owned_region_conflict_markers" {
 		t.Fatalf("unexpected render report: %+v", report.RenderReport)
+	}
+	expectedClassifications := []astmergegit.ChangeClassification{
+		{Path: "/decls/value", Ours: "edited", Theirs: "edited"},
+	}
+	if !reflect.DeepEqual(report.ChangeClassifications, expectedClassifications) {
+		t.Fatalf("unexpected change classifications: got=%+v expected=%+v", report.ChangeClassifications, expectedClassifications)
 	}
 	if len(report.OwnedRegions) != 1 || report.OwnedRegions[0].OwnerPath != "/decls/value" {
 		t.Fatalf("unexpected owned regions: %+v", report.OwnedRegions)
