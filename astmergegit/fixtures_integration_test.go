@@ -75,6 +75,12 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 					t.Fatalf("unexpected render report: got=%+v expected=%+v", result.RenderReport, expectedRenderReport)
 				}
 			}
+			if rawFormattingPreservation, ok := expected["formatting_preservation"]; ok {
+				expectedFormattingPreservation := decodeFixtureValue[FormattingPreservationReport](t, rawFormattingPreservation)
+				if result.FormattingPreservation != expectedFormattingPreservation {
+					t.Fatalf("unexpected formatting preservation: got=%+v expected=%+v", result.FormattingPreservation, expectedFormattingPreservation)
+				}
+			}
 
 			if result.OK {
 				if result.MergedSource == nil {
