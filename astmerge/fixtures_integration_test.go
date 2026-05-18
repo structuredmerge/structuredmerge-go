@@ -237,6 +237,59 @@ func TestSharedFixtureMergeResultDecisionContract(t *testing.T) {
 	}
 }
 
+func TestSharedFixtureFreezeDirectiveExecutionContract(t *testing.T) {
+	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-957-freeze-directive-execution-contract", "freeze-directive-execution-contract.json"))
+	cases := fixture["cases"].([]any)
+	expected := fixture["expected"].(map[string]any)
+	validCount := 0
+	invalidCount := 0
+
+	for _, rawCase := range cases {
+		testCase := rawCase.(map[string]any)
+		caseExpected := testCase["expected"].(map[string]any)
+		lines := decodeFixtureValue[[]string](t, testCase["lines"])
+		blocks, diagnostics := DetectFreezeDirectiveBlocks(testCase["id"].(string), lines, testCase["token"].(string), testCase["style"].(string))
+
+		if caseExpected["valid"].(bool) {
+			validCount++
+		} else {
+			invalidCount++
+		}
+		if len(blocks) != int(caseExpected["block_count"].(float64)) ||
+			len(diagnostics) != int(caseExpected["diagnostic_count"].(float64)) ||
+			(len(diagnostics) == 0) != caseExpected["valid"].(bool) {
+			t.Fatalf("unexpected freeze execution counts for %s: blocks=%+v diagnostics=%+v", testCase["id"], blocks, diagnostics)
+		}
+		if len(blocks) > 0 && !reflect.DeepEqual(blocks, decodeFixtureValue[[]FreezeDirectiveBlock](t, caseExpected["blocks"])) {
+			t.Fatalf("unexpected freeze blocks for %s: %+v", testCase["id"], blocks)
+		}
+		if len(diagnostics) > 0 {
+			expectedDiagnostics := decodeFixtureValue[[]FreezeDirectiveDiagnostic](t, caseExpected["diagnostics"])
+			for index, diagnostic := range diagnostics {
+				if diagnostic.Category != expectedDiagnostics[index].Category ||
+					diagnostic.Severity != expectedDiagnostics[index].Severity ||
+					diagnostic.Line != expectedDiagnostics[index].Line {
+					t.Fatalf("unexpected freeze diagnostic for %s: %+v", testCase["id"], diagnostics)
+				}
+			}
+		}
+		for _, rawQuery := range caseExpected["line_queries"].([]any) {
+			query := rawQuery.(map[string]any)
+			block := FreezeDirectiveBlockForLine(blocks, int(query["line"].(float64)))
+			if (block != nil) != query["in_freeze"].(bool) ||
+				(block != nil && block.ID != query["block_id"].(string)) {
+				t.Fatalf("unexpected freeze line query for %s: %+v block=%+v", testCase["id"], query, block)
+			}
+		}
+	}
+
+	if len(cases) != int(expected["case_count"].(float64)) ||
+		validCount != int(expected["valid_case_count"].(float64)) ||
+		invalidCount != int(expected["invalid_case_count"].(float64)) {
+		t.Fatalf("unexpected freeze fixture case counts")
+	}
+}
+
 func TestSharedFixtureMergeEngineSuiteSetting(t *testing.T) {
 	fixture := readDiagnosticFixtureFromPath(t, filepath.Join("..", "..", "fixtures", "diagnostics", "slice-906-merge-engine-suite-setting", "merge-engine-suite-setting.json"))
 	settings := fixture["settings"].(map[string]any)

@@ -193,6 +193,148 @@ func MergeDecisionReviewRequired(decisions []MergeDecisionRecord) bool {
 	return false
 }
 
+type FreezeDirectiveBlock struct {
+	ID           string   `json:"id"`
+	Style        string   `json:"style,omitempty"`
+	Token        string   `json:"token,omitempty"`
+	StartLine    int      `json:"start_line"`
+	EndLine      int      `json:"end_line"`
+	Reason       string   `json:"reason"`
+	ContentLines []string `json:"content_lines"`
+	MergePolicy  string   `json:"merge_policy"`
+	Decision     string   `json:"decision"`
+	Signature    []string `json:"signature"`
+}
+
+type FreezeDirectiveDiagnostic struct {
+	Category string `json:"category"`
+	Severity string `json:"severity"`
+	Message  string `json:"message,omitempty"`
+	Line     int    `json:"line"`
+}
+
+func DetectFreezeDirectiveBlocks(caseID string, lines []string, token string, style string) ([]FreezeDirectiveBlock, []FreezeDirectiveDiagnostic) {
+	blocks := []FreezeDirectiveBlock{}
+	diagnostics := []FreezeDirectiveDiagnostic{}
+	var openLine int
+	var reason string
+
+	for index, line := range lines {
+		lineNumber := index + 1
+		action, markerReason, ok := freezeDirectiveAction(line, token, style)
+		if !ok {
+			continue
+		}
+
+		switch action {
+		case "freeze":
+			if openLine != 0 {
+				diagnostics = append(diagnostics, FreezeDirectiveDiagnostic{
+					Category: "nested_freeze_open",
+					Severity: "error",
+					Line:     lineNumber,
+				})
+				continue
+			}
+			openLine = lineNumber
+			reason = markerReason
+		case "unfreeze":
+			if openLine == 0 {
+				diagnostics = append(diagnostics, FreezeDirectiveDiagnostic{
+					Category: "unmatched_freeze_close",
+					Severity: "error",
+					Line:     lineNumber,
+				})
+				continue
+			}
+			start := openLine
+			end := lineNumber
+			blocks = append(blocks, FreezeDirectiveBlock{
+				ID:           "freeze:" + caseID + ":" + strconv.Itoa(start) + "-" + strconv.Itoa(end),
+				Style:        style,
+				Token:        token,
+				StartLine:    start,
+				EndLine:      end,
+				Reason:       reason,
+				ContentLines: lines[start-1 : end],
+				MergePolicy:  "destination",
+				Decision:     "freeze_block",
+				Signature:    []string{"freeze_block", strconv.Itoa(start), strconv.Itoa(end)},
+			})
+			openLine = 0
+			reason = ""
+		}
+	}
+
+	if openLine != 0 {
+		diagnostics = append(diagnostics, FreezeDirectiveDiagnostic{
+			Category: "unclosed_freeze_open",
+			Severity: "error",
+			Line:     openLine,
+		})
+		return []FreezeDirectiveBlock{}, diagnostics
+	}
+	if len(diagnostics) > 0 {
+		return []FreezeDirectiveBlock{}, diagnostics
+	}
+	return blocks, diagnostics
+}
+
+func FreezeDirectiveBlockForLine(blocks []FreezeDirectiveBlock, line int) *FreezeDirectiveBlock {
+	for index := range blocks {
+		block := &blocks[index]
+		if line >= block.StartLine && line <= block.EndLine {
+			return block
+		}
+	}
+	return nil
+}
+
+func freezeDirectiveAction(line string, token string, style string) (string, string, bool) {
+	content, ok := freezeDirectiveCommentContent(line, style)
+	if !ok {
+		return "", "", false
+	}
+	prefix := strings.ToLower(token) + ":"
+	lower := strings.ToLower(content)
+	if !strings.HasPrefix(lower, prefix) {
+		return "", "", false
+	}
+	remainder := strings.TrimSpace(content[len(prefix):])
+	lowerRemainder := strings.ToLower(remainder)
+	switch {
+	case strings.HasPrefix(lowerRemainder, "unfreeze"):
+		return "unfreeze", strings.TrimSpace(remainder[len("unfreeze"):]), true
+	case strings.HasPrefix(lowerRemainder, "freeze"):
+		return "freeze", strings.TrimSpace(remainder[len("freeze"):]), true
+	default:
+		return "", "", false
+	}
+}
+
+func freezeDirectiveCommentContent(line string, style string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	switch style {
+	case "hash_comment":
+		if strings.HasPrefix(trimmed, "#") {
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, "#")), true
+		}
+	case "c_style_line":
+		if strings.HasPrefix(trimmed, "//") {
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, "//")), true
+		}
+	case "html_comment":
+		if strings.HasPrefix(trimmed, "<!--") && strings.HasSuffix(trimmed, "-->") {
+			return strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "<!--"), "-->")), true
+		}
+	case "c_style_block":
+		if strings.HasPrefix(trimmed, "/*") && strings.HasSuffix(trimmed, "*/") {
+			return strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "/*"), "*/")), true
+		}
+	}
+	return "", false
+}
+
 type MergeIRNodeClass struct {
 	ClassID   string            `json:"class_id"`
 	Signature string            `json:"signature"`
