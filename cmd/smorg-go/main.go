@@ -68,6 +68,7 @@ type mergeDriverResult struct {
 	OK           bool
 	Diagnostics  []astmerge.Diagnostic
 	Output       *string
+	Fallbacks    []mergeDriverFallback
 	OwnedRegions []astmergegit.OwnedRegionReport
 	RenderReport *astmergegit.Merge3RenderReport
 }
@@ -164,10 +165,14 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	if exitCode := reportAndEnforceProfile(options.profileID, options.profileReport, options.requireProfileStatus, stdout, stderr); exitCode != exitSuccess {
 		return exitCode
 	}
-	result := mergeByPath(effectivePath, settings.language, settings.conflictMarkerSize, string(ancestorSource), string(currentSource), string(otherSource))
+	fallbackPolicy := options.fallback
+	if options.strict {
+		fallbackPolicy = "none"
+	}
+	result := mergeByPath(effectivePath, settings.language, settings.conflictMarkerSize, fallbackPolicy, string(ancestorSource), string(currentSource), string(otherSource))
 	if !result.OK {
 		printDiagnostics(stderr, result.Diagnostics)
-		fallbacks := []mergeDriverFallback{}
+		fallbacks := append([]mergeDriverFallback{}, result.Fallbacks...)
 		if result.Output == nil && !options.strict && options.fallback != "none" {
 			output := fullFileConflictOutput(settings.conflictMarkerSize, string(ancestorSource), string(currentSource), string(otherSource))
 			result.Output = &output
@@ -201,12 +206,12 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if options.checkOnly {
 		if options.exitCode && *result.Output != string(currentSource) {
-			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitUnresolvedConflict, nil, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+			if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitUnresolvedConflict, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
 				return reportExit
 			}
 			return exitUnresolvedConflict
 		}
-		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, nil, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+		if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
 			return reportExit
 		}
 		return exitSuccess
@@ -216,7 +221,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitCode
 	}
 
-	if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, nil, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
+	if reportExit := writeMergeDriverMachineReport(options.reportPath, effectivePath, true, exitSuccess, result.Fallbacks, result.OwnedRegions, result.RenderReport, result.Diagnostics, stderr); reportExit != exitSuccess {
 		return reportExit
 	}
 	return exitSuccess
@@ -574,7 +579,7 @@ func (options mergeDriverOptions) effectivePath() string {
 	return options.current
 }
 
-func mergeByPath(pathName string, language string, conflictMarkerSize int, ancestorSource string, currentSource string, otherSource string) mergeDriverResult {
+func mergeByPath(pathName string, language string, conflictMarkerSize int, fallbackPolicy string, ancestorSource string, currentSource string, otherSource string) mergeDriverResult {
 	switch normalizeLanguage(language, pathName) {
 	case "go":
 		return merge3Result(astmergegit.Merge3(astmergegit.Merge3Request{
@@ -585,7 +590,7 @@ func mergeByPath(pathName string, language string, conflictMarkerSize int, ances
 			Language:           "go",
 			Dialect:            "go",
 			ProfileID:          "go.source",
-			FallbackPolicy:     "none",
+			FallbackPolicy:     fallbackPolicy,
 			ConflictMarkerSize: conflictMarkerSize,
 			RenderPolicy:       "canonical",
 		}))
@@ -598,7 +603,7 @@ func mergeByPath(pathName string, language string, conflictMarkerSize int, ances
 			Language:           "json",
 			Dialect:            "json",
 			ProfileID:          "json.keyed-object",
-			FallbackPolicy:     "none",
+			FallbackPolicy:     fallbackPolicy,
 			ConflictMarkerSize: conflictMarkerSize,
 			RenderPolicy:       "canonical",
 		}))
@@ -618,11 +623,13 @@ func mergeResult(result astmerge.MergeResult[string]) mergeDriverResult {
 }
 
 func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
+	fallbacks := merge3Fallbacks(result.Fallbacks)
 	if result.OK && result.MergedSource != nil {
 		return mergeDriverResult{
 			OK:           true,
 			Diagnostics:  result.Diagnostics,
 			Output:       result.MergedSource,
+			Fallbacks:    fallbacks,
 			OwnedRegions: result.OwnedRegions,
 			RenderReport: &result.RenderReport,
 		}
@@ -632,6 +639,7 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 			OK:           false,
 			Diagnostics:  result.Diagnostics,
 			Output:       result.ConflictedSource,
+			Fallbacks:    fallbacks,
 			OwnedRegions: result.OwnedRegions,
 			RenderReport: &result.RenderReport,
 		}
@@ -639,9 +647,23 @@ func merge3Result(result astmergegit.Merge3Response) mergeDriverResult {
 	return mergeDriverResult{
 		OK:           false,
 		Diagnostics:  result.Diagnostics,
+		Fallbacks:    fallbacks,
 		OwnedRegions: result.OwnedRegions,
 		RenderReport: &result.RenderReport,
 	}
+}
+
+func merge3Fallbacks(fallbacks []string) []mergeDriverFallback {
+	records := make([]mergeDriverFallback, 0, len(fallbacks))
+	for _, fallback := range fallbacks {
+		records = append(records, mergeDriverFallback{
+			Mode:          fallback,
+			RequestedMode: fallback,
+			Reason:        "ast_merge_git_fallback",
+			Applied:       true,
+		})
+	}
+	return records
 }
 
 func normalizeLanguage(language string, pathName string) string {

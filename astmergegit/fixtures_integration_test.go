@@ -273,6 +273,9 @@ func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
 				ProfileID:          testCase["language"].(string) + ".source",
 				ConflictMarkerSize: 7,
 			}
+			if fallbackPolicy, ok := testCase["fallback_policy"].(string); ok {
+				request.FallbackPolicy = fallbackPolicy
+			}
 			if testCase["force_unsafe_region"] == true {
 				request.RenderPolicy = "force_unsafe_region"
 			}
@@ -292,6 +295,16 @@ func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
 			if rawRenderReport, ok := expected["render_report"].(map[string]any); ok {
 				if result.RenderReport.Strategy != rawRenderReport["strategy"].(string) {
 					t.Fatalf("unexpected render report: %+v expected %+v", result.RenderReport, rawRenderReport)
+				}
+			}
+			if rawFallbacks, ok := expected["fallbacks"].([]any); ok {
+				if len(result.Fallbacks) != len(rawFallbacks) {
+					t.Fatalf("unexpected fallbacks: %+v expected %+v", result.Fallbacks, rawFallbacks)
+				}
+				for index, rawFallback := range rawFallbacks {
+					if result.Fallbacks[index] != rawFallback.(string) {
+						t.Fatalf("unexpected fallback at %d: %+v expected %+v", index, result.Fallbacks, rawFallbacks)
+					}
 				}
 			}
 			if rawNeedles, ok := expected["diagnostics_contain"].([]any); ok {
@@ -320,6 +333,24 @@ func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
 						needle := rawNeedle.(string)
 						if strings.Contains(*result.ConflictedSource, needle) {
 							t.Fatalf("expected conflicted source not to contain %q:\n%s", needle, *result.ConflictedSource)
+						}
+					}
+				}
+			}
+			if result.MergedSource != nil {
+				if rawNeedles, ok := expected["merged_source_contains"].([]any); ok {
+					for _, rawNeedle := range rawNeedles {
+						needle := rawNeedle.(string)
+						if !strings.Contains(*result.MergedSource, needle) {
+							t.Fatalf("expected merged source to contain %q:\n%s", needle, *result.MergedSource)
+						}
+					}
+				}
+				if rawNeedles, ok := expected["merged_source_not_contains"].([]any); ok {
+					for _, rawNeedle := range rawNeedles {
+						needle := rawNeedle.(string)
+						if strings.Contains(*result.MergedSource, needle) {
+							t.Fatalf("expected merged source not to contain %q:\n%s", needle, *result.MergedSource)
 						}
 					}
 				}
@@ -366,6 +397,9 @@ func TestOwnedRegionConflictPlacementAcrossGoBackends(t *testing.T) {
 						Dialect:            "go",
 						ProfileID:          "go.source",
 						ConflictMarkerSize: 7,
+					}
+					if fallbackPolicy, ok := testCase["fallback_policy"].(string); ok {
+						request.FallbackPolicy = fallbackPolicy
 					}
 					result := merge(request)
 					expected := testCase["expected"].(map[string]any)

@@ -189,6 +189,28 @@ func merge3GoWithParserReport(
 				Message:  "unsafe owned region requested; using full-file conflict markers",
 			})
 		}
+		if normalizedFallbackPolicy(request.FallbackPolicy) == "line" && len(ownedRegions) > 0 {
+			if mergedSource, fallbackOK := lineMergeOwnedRegion(request, ownedRegions[0]); fallbackOK {
+				reparse := gomerge.ParseGo(mergedSource, gomerge.DialectGo).OK
+				if reparse {
+					renderReport := renderReportWithBackend(request, "local_fallback", backendID, parserIdentity)
+					return Merge3Response{
+						OK:                         true,
+						MergedSource:               &mergedSource,
+						Conflicts:                  []Merge3Conflict{},
+						Diagnostics:                []astmerge.Diagnostic{},
+						Fallbacks:                  []string{"line"},
+						Profile:                    profileReport(request),
+						RenderReport:               renderReport,
+						OwnedRegions:               ownedRegions,
+						ReparseAfterRender:         &reparse,
+						FormattingPreservation:     FormattingPreservationReport{LineDiffScore: 0.95, CharacterDiffScore: 0.95},
+						SecondaryFormattingMetrics: secondaryFormattingMetrics(true),
+						DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{LineDiffScore: 0.95, CharacterDiffScore: 0.95}, &reparse, renderReport),
+					}
+				}
+			}
+		}
 		conflictedSource := ""
 		renderStrategy := "full_file_conflict_markers"
 		if len(ownedRegions) > 0 {
@@ -581,6 +603,55 @@ func renderOwnedRegionConflictSource(request Merge3Request, region OwnedRegionRe
 		strings.Repeat(">", markerSize) + " theirs",
 	}, "\n")
 	return replaceLineRange(request.OursSource, oursRegion.lineRange, replacement), true
+}
+
+func lineMergeOwnedRegion(request Merge3Request, region OwnedRegionReport) (string, bool) {
+	if !region.CanLineMerge {
+		return "", false
+	}
+	oursRegion, ok := sourceRegionByOwnerPath(request.OursSource, region.OwnerPath, region.RegionKind == "owned_region")
+	if !ok {
+		return "", false
+	}
+	baseRegion, ok := sourceRegionByOwnerPath(request.BaseSource, region.OwnerPath, region.RegionKind == "owned_region")
+	if !ok {
+		return "", false
+	}
+	theirsRegion, ok := sourceRegionByOwnerPath(request.TheirsSource, region.OwnerPath, region.RegionKind == "owned_region")
+	if !ok {
+		return "", false
+	}
+	mergedRegion, ok := simpleAlignedLineMerge(baseRegion.text, oursRegion.text, theirsRegion.text)
+	if !ok {
+		return "", false
+	}
+	return replaceLineRange(request.OursSource, oursRegion.lineRange, mergedRegion), true
+}
+
+func simpleAlignedLineMerge(baseSource string, oursSource string, theirsSource string) (string, bool) {
+	baseLines := strings.Split(baseSource, "\n")
+	oursLines := strings.Split(oursSource, "\n")
+	theirsLines := strings.Split(theirsSource, "\n")
+	if len(baseLines) != len(oursLines) || len(baseLines) != len(theirsLines) {
+		return "", false
+	}
+	merged := make([]string, len(baseLines))
+	for index := range baseLines {
+		baseLine := baseLines[index]
+		oursLine := oursLines[index]
+		theirsLine := theirsLines[index]
+		switch {
+		case oursLine == theirsLine:
+			merged[index] = oursLine
+		case baseLine == oursLine:
+			merged[index] = theirsLine
+		case baseLine == theirsLine:
+			merged[index] = oursLine
+		default:
+			return "", false
+		}
+	}
+	return strings.Join(merged, "\n"), true
 }
 
 type sourceRegion struct {
@@ -1126,6 +1197,17 @@ func normalizedRenderPolicy(policy string) string {
 		return "canonical"
 	}
 	return strings.TrimSpace(policy)
+}
+
+func normalizedFallbackPolicy(policy string) string {
+	switch strings.TrimSpace(policy) {
+	case "", "none":
+		return "none"
+	case "line", "local", "full-file", "full_file":
+		return strings.ReplaceAll(strings.TrimSpace(policy), "-", "_")
+	default:
+		return strings.TrimSpace(policy)
+	}
 }
 
 func profileReport(request Merge3Request) map[string]string {
