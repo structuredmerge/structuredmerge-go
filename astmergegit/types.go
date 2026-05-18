@@ -189,7 +189,8 @@ func merge3GoWithParserReport(
 				Message:  "unsafe owned region requested; using full-file conflict markers",
 			})
 		}
-		if normalizedFallbackPolicy(request.FallbackPolicy) == "line" && len(ownedRegions) > 0 {
+		fallbackPolicy := normalizedFallbackPolicy(request.FallbackPolicy)
+		if (fallbackPolicy == "line" || fallbackPolicy == "local") && len(ownedRegions) > 0 {
 			if mergedSource, fallbackOK := lineMergeOwnedRegion(request, ownedRegions[0]); fallbackOK {
 				reparse := gomerge.ParseGo(mergedSource, gomerge.DialectGo).OK
 				if reparse {
@@ -200,7 +201,7 @@ func merge3GoWithParserReport(
 						MergedSource:               &mergedSource,
 						Conflicts:                  []Merge3Conflict{},
 						Diagnostics:                []astmerge.Diagnostic{},
-						Fallbacks:                  []string{"line"},
+						Fallbacks:                  []string{fallbackPolicy},
 						Profile:                    profileReport(request),
 						RenderReport:               renderReport,
 						OwnedRegions:               ownedRegions,
