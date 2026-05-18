@@ -32,6 +32,12 @@ type Merge3Conflict struct {
 	Message    string `json:"message"`
 }
 
+type ChangeClassification struct {
+	Path   string `json:"path"`
+	Ours   string `json:"ours"`
+	Theirs string `json:"theirs"`
+}
+
 type Merge3RenderReport struct {
 	Strategy       string `json:"strategy"`
 	BackendID      string `json:"backend_id,omitempty"`
@@ -96,6 +102,7 @@ type Merge3Response struct {
 	MergedSource               *string                          `json:"merged_source"`
 	ConflictedSource           *string                          `json:"conflicted_source"`
 	Conflicts                  []Merge3Conflict                 `json:"conflicts"`
+	ChangeClassifications      []ChangeClassification           `json:"change_classifications"`
 	Diagnostics                []astmerge.Diagnostic            `json:"diagnostics"`
 	Fallbacks                  []string                         `json:"fallbacks"`
 	Profile                    map[string]string                `json:"profile"`
@@ -132,6 +139,7 @@ func Merge3(request Merge3Request) Merge3Response {
 				Message:  "ast-merge-git currently supports only json merge3.",
 			}},
 			Conflicts:                  []Merge3Conflict{},
+			ChangeClassifications:      []ChangeClassification{},
 			Fallbacks:                  []string{},
 			Profile:                    profileReport(request),
 			RenderReport:               renderReport(request, ""),
@@ -200,6 +208,7 @@ func merge3GoWithParserReport(
 						OK:                         true,
 						MergedSource:               &mergedSource,
 						Conflicts:                  []Merge3Conflict{},
+						ChangeClassifications:      []ChangeClassification{},
 						Diagnostics:                []astmerge.Diagnostic{},
 						Fallbacks:                  []string{fallbackPolicy},
 						Profile:                    profileReport(request),
@@ -230,6 +239,7 @@ func merge3GoWithParserReport(
 			OK:                         false,
 			ConflictedSource:           &conflictedSource,
 			Conflicts:                  conflicts,
+			ChangeClassifications:      []ChangeClassification{},
 			Diagnostics:                diagnostics,
 			Fallbacks:                  []string{},
 			Profile:                    profileReport(request),
@@ -248,6 +258,7 @@ func merge3GoWithParserReport(
 		OK:                         true,
 		MergedSource:               &merged,
 		Conflicts:                  []Merge3Conflict{},
+		ChangeClassifications:      []ChangeClassification{},
 		Diagnostics:                []astmerge.Diagnostic{},
 		Fallbacks:                  []string{},
 		Profile:                    profileReport(request),
@@ -274,6 +285,7 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 	}
 
 	conflicts := []Merge3Conflict{}
+	changeClassifications := classifyJSONChanges(base, ours, theirs)
 	merged := mergeJSONValue(base, ours, theirs, "", &conflicts)
 	if len(conflicts) > 0 {
 		ownedRegions := jsonOwnedRegionsForConflicts(request, conflicts)
@@ -286,9 +298,10 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			}
 		}
 		return Merge3Response{
-			OK:               false,
-			ConflictedSource: &conflictedSource,
-			Conflicts:        conflicts,
+			OK:                    false,
+			ConflictedSource:      &conflictedSource,
+			Conflicts:             conflicts,
+			ChangeClassifications: changeClassifications,
 			Diagnostics: []astmerge.Diagnostic{{
 				Severity: astmerge.SeverityError,
 				Category: astmerge.DiagnosticCategory("merge_conflict"),
@@ -315,14 +328,15 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 	source := string(sourceBytes)
 	reparse := json.Valid(sourceBytes)
 	return Merge3Response{
-		OK:                 true,
-		MergedSource:       &source,
-		Conflicts:          []Merge3Conflict{},
-		Diagnostics:        []astmerge.Diagnostic{},
-		Fallbacks:          []string{},
-		Profile:            profileReport(request),
-		RenderReport:       renderReport(request, ""),
-		ReparseAfterRender: &reparse,
+		OK:                    true,
+		MergedSource:          &source,
+		Conflicts:             []Merge3Conflict{},
+		ChangeClassifications: changeClassifications,
+		Diagnostics:           []astmerge.Diagnostic{},
+		Fallbacks:             []string{},
+		Profile:               profileReport(request),
+		RenderReport:          renderReport(request, ""),
+		ReparseAfterRender:    &reparse,
 		FormattingPreservation: FormattingPreservationReport{
 			LineDiffScore:      1.0,
 			CharacterDiffScore: 1.0,
@@ -365,6 +379,7 @@ func parseFailureResponse(request Merge3Request, diagnostic astmerge.Diagnostic)
 	return Merge3Response{
 		OK:                         false,
 		Conflicts:                  []Merge3Conflict{},
+		ChangeClassifications:      []ChangeClassification{},
 		Diagnostics:                []astmerge.Diagnostic{diagnostic},
 		Fallbacks:                  []string{},
 		Profile:                    profileReport(request),
@@ -591,6 +606,68 @@ func jsonMemberSource(source string, key string) (jsonMemberRegion, bool) {
 		return jsonMemberRegion{}, false
 	}
 	return jsonMemberRegion{byteRange: byteRange, text: source[byteRange.Start:byteRange.End]}, true
+}
+
+func classifyJSONChanges(base any, ours any, theirs any) []ChangeClassification {
+	baseMap, baseIsMap := base.(map[string]any)
+	oursMap, oursIsMap := ours.(map[string]any)
+	theirsMap, theirsIsMap := theirs.(map[string]any)
+	if baseIsMap && oursIsMap && theirsIsMap {
+		keys := mapKeysAny(baseMap, oursMap, theirsMap)
+		changes := make([]ChangeClassification, 0, len(keys))
+		for _, key := range keys {
+			_, baseOK := baseMap[key]
+			_, oursOK := oursMap[key]
+			_, theirsOK := theirsMap[key]
+			oursChange := classifyJSONValueChange(baseMap[key], baseOK, oursMap[key], oursOK)
+			theirsChange := classifyJSONValueChange(baseMap[key], baseOK, theirsMap[key], theirsOK)
+			if oursChange == "unchanged" && theirsChange == "unchanged" {
+				continue
+			}
+			changes = append(changes, ChangeClassification{
+				Path:   "/" + key,
+				Ours:   oursChange,
+				Theirs: theirsChange,
+			})
+		}
+		return changes
+	}
+	oursChange := classifyJSONValueChange(base, true, ours, true)
+	theirsChange := classifyJSONValueChange(base, true, theirs, true)
+	if oursChange == "unchanged" && theirsChange == "unchanged" {
+		return []ChangeClassification{}
+	}
+	return []ChangeClassification{{Path: "/", Ours: oursChange, Theirs: theirsChange}}
+}
+
+func classifyJSONValueChange(base any, baseOK bool, value any, valueOK bool) string {
+	switch {
+	case !baseOK && !valueOK:
+		return "unchanged"
+	case !baseOK && valueOK:
+		return "added"
+	case baseOK && !valueOK:
+		return "deleted"
+	case reflect.DeepEqual(base, value):
+		return "unchanged"
+	default:
+		return "edited"
+	}
+}
+
+func mapKeysAny(maps ...map[string]any) []string {
+	seen := map[string]struct{}{}
+	for _, itemMap := range maps {
+		for key := range itemMap {
+			seen[key] = struct{}{}
+		}
+	}
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 func goOwnedRegionsForConflicts(request Merge3Request, baseSource string, conflicts []Merge3Conflict, backendID string, parserIdentity string) []OwnedRegionReport {

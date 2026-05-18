@@ -62,6 +62,12 @@ func TestGitMerge3ContractFixture(t *testing.T) {
 			if len(result.Conflicts) != int(expected["conflict_count"].(float64)) {
 				t.Fatalf("unexpected conflicts: %+v", result.Conflicts)
 			}
+			if rawClassifications, ok := expected["change_classifications"]; ok {
+				expectedClassifications := decodeFixtureValue[[]ChangeClassification](t, rawClassifications)
+				if !reflect.DeepEqual(result.ChangeClassifications, expectedClassifications) {
+					t.Fatalf("unexpected change classifications: got=%+v expected=%+v", result.ChangeClassifications, expectedClassifications)
+				}
+			}
 			if expected["reparse_after_render"] == nil {
 				if result.ReparseAfterRender != nil {
 					t.Fatalf("expected nil reparse result, got %+v", *result.ReparseAfterRender)
