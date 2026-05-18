@@ -333,51 +333,55 @@ func TestMergeDriverReportIncludesOwnedRegions(t *testing.T) {
 	}
 }
 
-func TestMergeDriverLineFallbackUsesOwnedRegion(t *testing.T) {
-	dir := t.TempDir()
-	ancestor := writeTestFile(t, dir, "ancestor.go", "package main\n\nfunc value() string {\n\tleft := \"base\"\n\tright := \"base\"\n\treturn left + right\n}\n\nfunc stable() {}\n")
-	current := writeTestFile(t, dir, "current.go", "package main\n\nfunc value() string {\n\tleft := \"ours\"\n\tright := \"base\"\n\treturn left + right\n}\n\nfunc stable() {}\n")
-	other := writeTestFile(t, dir, "other.go", "package main\n\nfunc value() string {\n\tleft := \"base\"\n\tright := \"theirs\"\n\treturn left + right\n}\n\nfunc stable() {}\n")
-	reportPath := filepath.Join(dir, "merge-report.json")
+func TestMergeDriverScopedFallbackUsesOwnedRegion(t *testing.T) {
+	for _, fallbackMode := range []string{"line", "local"} {
+		t.Run(fallbackMode, func(t *testing.T) {
+			dir := t.TempDir()
+			ancestor := writeTestFile(t, dir, "ancestor.go", "package main\n\nfunc value() string {\n\tleft := \"base\"\n\tright := \"base\"\n\treturn left + right\n}\n\nfunc stable() {}\n")
+			current := writeTestFile(t, dir, "current.go", "package main\n\nfunc value() string {\n\tleft := \"ours\"\n\tright := \"base\"\n\treturn left + right\n}\n\nfunc stable() {}\n")
+			other := writeTestFile(t, dir, "other.go", "package main\n\nfunc value() string {\n\tleft := \"base\"\n\tright := \"theirs\"\n\treturn left + right\n}\n\nfunc stable() {}\n")
+			reportPath := filepath.Join(dir, "merge-report.json")
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	exitCode := run([]string{"merge-driver", "--fallback", "line", "--report", reportPath, ancestor, current, other, "main.go"}, &stdout, &stderr)
-	if exitCode != exitSuccess {
-		t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
-	}
-	currentSource, err := os.ReadFile(current)
-	if err != nil {
-		t.Fatalf("read current: %v", err)
-	}
-	for _, needle := range []string{`left := "ours"`, `right := "theirs"`, "func stable() {}"} {
-		if !strings.Contains(string(currentSource), needle) {
-			t.Fatalf("expected merged source to contain %q:\n%s", needle, string(currentSource))
-		}
-	}
-	if strings.Contains(string(currentSource), "<<<<<<< ours") {
-		t.Fatalf("line fallback should not leave conflict markers:\n%s", string(currentSource))
-	}
-	source, err := os.ReadFile(reportPath)
-	if err != nil {
-		t.Fatalf("read report: %v", err)
-	}
-	var report struct {
-		Fallbacks    []mergeDriverFallback           `json:"fallbacks"`
-		OwnedRegions []astmergegit.OwnedRegionReport `json:"owned_regions"`
-		RenderReport astmergegit.Merge3RenderReport  `json:"render_report"`
-	}
-	if err := json.Unmarshal(source, &report); err != nil {
-		t.Fatalf("parse report: %v", err)
-	}
-	if len(report.Fallbacks) != 1 || report.Fallbacks[0].Mode != "line" {
-		t.Fatalf("unexpected fallbacks: %+v", report.Fallbacks)
-	}
-	if report.RenderReport.Strategy != "local_fallback" {
-		t.Fatalf("unexpected render report: %+v", report.RenderReport)
-	}
-	if len(report.OwnedRegions) != 1 || report.OwnedRegions[0].OwnerPath != "/decls/value" {
-		t.Fatalf("unexpected owned regions: %+v", report.OwnedRegions)
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			exitCode := run([]string{"merge-driver", "--fallback", fallbackMode, "--report", reportPath, ancestor, current, other, "main.go"}, &stdout, &stderr)
+			if exitCode != exitSuccess {
+				t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
+			}
+			currentSource, err := os.ReadFile(current)
+			if err != nil {
+				t.Fatalf("read current: %v", err)
+			}
+			for _, needle := range []string{`left := "ours"`, `right := "theirs"`, "func stable() {}"} {
+				if !strings.Contains(string(currentSource), needle) {
+					t.Fatalf("expected merged source to contain %q:\n%s", needle, string(currentSource))
+				}
+			}
+			if strings.Contains(string(currentSource), "<<<<<<< ours") {
+				t.Fatalf("%s fallback should not leave conflict markers:\n%s", fallbackMode, string(currentSource))
+			}
+			source, err := os.ReadFile(reportPath)
+			if err != nil {
+				t.Fatalf("read report: %v", err)
+			}
+			var report struct {
+				Fallbacks    []mergeDriverFallback           `json:"fallbacks"`
+				OwnedRegions []astmergegit.OwnedRegionReport `json:"owned_regions"`
+				RenderReport astmergegit.Merge3RenderReport  `json:"render_report"`
+			}
+			if err := json.Unmarshal(source, &report); err != nil {
+				t.Fatalf("parse report: %v", err)
+			}
+			if len(report.Fallbacks) != 1 || report.Fallbacks[0].Mode != fallbackMode {
+				t.Fatalf("unexpected fallbacks: %+v", report.Fallbacks)
+			}
+			if report.RenderReport.Strategy != "local_fallback" {
+				t.Fatalf("unexpected render report: %+v", report.RenderReport)
+			}
+			if len(report.OwnedRegions) != 1 || report.OwnedRegions[0].OwnerPath != "/decls/value" {
+				t.Fatalf("unexpected owned regions: %+v", report.OwnedRegions)
+			}
+		})
 	}
 }
 
