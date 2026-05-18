@@ -194,6 +194,7 @@ func merge3GoWithParserReport(
 				reparse := gomerge.ParseGo(mergedSource, gomerge.DialectGo).OK
 				if reparse {
 					renderReport := renderReportWithBackend(request, "local_fallback", backendID, parserIdentity)
+					formatting := sourceFragmentFormattingReport(request, mergedSource)
 					return Merge3Response{
 						OK:                         true,
 						MergedSource:               &mergedSource,
@@ -204,9 +205,9 @@ func merge3GoWithParserReport(
 						RenderReport:               renderReport,
 						OwnedRegions:               ownedRegions,
 						ReparseAfterRender:         &reparse,
-						FormattingPreservation:     FormattingPreservationReport{LineDiffScore: 0.95, CharacterDiffScore: 0.95},
-						SecondaryFormattingMetrics: secondaryFormattingMetrics(true),
-						DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{LineDiffScore: 0.95, CharacterDiffScore: 0.95}, &reparse, renderReport),
+						FormattingPreservation:     formatting,
+						SecondaryFormattingMetrics: secondaryFormattingMetricsForRetention(formatting.LineDiffScore),
+						DefaultDriverEvaluation:    defaultDriverEvaluation(formatting, &reparse, renderReport),
 					}
 				}
 			}
@@ -241,24 +242,19 @@ func merge3GoWithParserReport(
 
 	reparse := gomerge.ParseGo(merged, gomerge.DialectGo).OK
 	renderReport := renderReportWithBackend(request, "", backendID, parserIdentity)
+	formatting := sourceFragmentFormattingReport(request, merged)
 	return Merge3Response{
-		OK:                 true,
-		MergedSource:       &merged,
-		Conflicts:          []Merge3Conflict{},
-		Diagnostics:        []astmerge.Diagnostic{},
-		Fallbacks:          []string{},
-		Profile:            profileReport(request),
-		RenderReport:       renderReport,
-		ReparseAfterRender: &reparse,
-		FormattingPreservation: FormattingPreservationReport{
-			LineDiffScore:      0.95,
-			CharacterDiffScore: 0.95,
-		},
-		SecondaryFormattingMetrics: secondaryFormattingMetrics(true),
-		DefaultDriverEvaluation: defaultDriverEvaluation(FormattingPreservationReport{
-			LineDiffScore:      0.95,
-			CharacterDiffScore: 0.95,
-		}, &reparse, renderReport),
+		OK:                         true,
+		MergedSource:               &merged,
+		Conflicts:                  []Merge3Conflict{},
+		Diagnostics:                []astmerge.Diagnostic{},
+		Fallbacks:                  []string{},
+		Profile:                    profileReport(request),
+		RenderReport:               renderReport,
+		ReparseAfterRender:         &reparse,
+		FormattingPreservation:     formatting,
+		SecondaryFormattingMetrics: secondaryFormattingMetricsForRetention(formatting.LineDiffScore),
+		DefaultDriverEvaluation:    defaultDriverEvaluation(formatting, &reparse, renderReport),
 	}
 }
 
@@ -395,6 +391,65 @@ func secondaryFormattingMetrics(merged bool) SecondaryFormattingMetricsReport {
 		Weighted:                false,
 		Diagnostics:             []string{"unresolved conflict did not produce a merged source-fragment retention measurement"},
 	}
+}
+
+func secondaryFormattingMetricsForRetention(retention float64) SecondaryFormattingMetricsReport {
+	return SecondaryFormattingMetricsReport{
+		UnchangedLineChurn:      0,
+		OutputDiffSize:          0,
+		SourceFragmentRetention: retention,
+		Weighted:                false,
+		Diagnostics:             []string{"source-fragment retention measured by exact source-line reuse"},
+	}
+}
+
+func sourceFragmentFormattingReport(request Merge3Request, output string) FormattingPreservationReport {
+	sourceLines := retainedSourceLineSet(request.BaseSource, request.OursSource, request.TheirsSource)
+	outputLines := nonEmptyLines(output)
+	if len(outputLines) == 0 {
+		return FormattingPreservationReport{LineDiffScore: 1.0, CharacterDiffScore: 1.0}
+	}
+	retainedLines := 0
+	retainedChars := 0
+	totalChars := 0
+	for _, line := range outputLines {
+		totalChars += len(line)
+		if sourceLines[strings.TrimSpace(line)] {
+			retainedLines++
+			retainedChars += len(line)
+		}
+	}
+	lineScore := float64(retainedLines) / float64(len(outputLines))
+	characterScore := 1.0
+	if totalChars > 0 {
+		characterScore = float64(retainedChars) / float64(totalChars)
+	}
+	return FormattingPreservationReport{
+		LineDiffScore:      lineScore,
+		CharacterDiffScore: characterScore,
+	}
+}
+
+func retainedSourceLineSet(sources ...string) map[string]bool {
+	lines := map[string]bool{}
+	for _, source := range sources {
+		for _, line := range nonEmptyLines(source) {
+			lines[strings.TrimSpace(line)] = true
+		}
+	}
+	return lines
+}
+
+func nonEmptyLines(source string) []string {
+	rawLines := strings.Split(source, "\n")
+	lines := make([]string, 0, len(rawLines))
+	for _, line := range rawLines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 func defaultDriverEvaluation(formatting FormattingPreservationReport, reparse *bool, render Merge3RenderReport) DefaultDriverEvaluation {
