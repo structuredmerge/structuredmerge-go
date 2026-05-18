@@ -512,6 +512,7 @@ type gitDriverFallbackMachineReport struct {
 	ExitCode           int                            `json:"exit_code"`
 	Fallbacks          []gitDriverFallbackReportEntry `json:"fallbacks"`
 	DiagnosticsContain []string                       `json:"diagnostics_contain"`
+	RequiredFields     []string                       `json:"required_fields"`
 }
 
 type gitDriverFallbackReportEntry struct {
@@ -539,6 +540,15 @@ func assertFallbackMachineReport(t *testing.T, reportPath string, expected gitDr
 	source, err := os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read machine report: %v", err)
+	}
+	var reportFields map[string]json.RawMessage
+	if err := json.Unmarshal(source, &reportFields); err != nil {
+		t.Fatalf("parse machine report fields: %v", err)
+	}
+	for _, field := range expected.RequiredFields {
+		if _, ok := reportFields[field]; !ok {
+			t.Fatalf("machine report missing required field %q: %s", field, source)
+		}
 	}
 	var report struct {
 		OK          bool                           `json:"ok"`
