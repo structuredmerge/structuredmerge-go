@@ -248,6 +248,102 @@ func TestGoMerge3Fixture(t *testing.T) {
 	}
 }
 
+func TestOwnedRegionConflictPlacementFixture(t *testing.T) {
+	fixture := readFixture(t, "diagnostics", "slice-958-owned-region-conflict-placement", "owned-region-conflict-placement.json")
+	cases := fixture["cases"].([]any)
+	for _, rawCase := range cases {
+		testCase := rawCase.(map[string]any)
+		t.Run(testCase["case_id"].(string), func(t *testing.T) {
+			if testCase["force_unsafe_region"] == true {
+				t.Skip("unsafe-region forcing is a fixture target for the renderer policy layer")
+			}
+			request := Merge3Request{
+				BaseSource:         testCase["base_source"].(string),
+				OursSource:         testCase["ours_source"].(string),
+				TheirsSource:       testCase["theirs_source"].(string),
+				PathName:           testCase["path_name"].(string),
+				Language:           testCase["language"].(string),
+				Dialect:            testCase["language"].(string),
+				ProfileID:          testCase["language"].(string) + ".source",
+				ConflictMarkerSize: 7,
+			}
+			result := Merge3(request)
+			expected := testCase["expected"].(map[string]any)
+			if result.OK != expected["ok"].(bool) {
+				t.Fatalf("unexpected ok=%v diagnostics=%+v conflicts=%+v", result.OK, result.Diagnostics, result.Conflicts)
+			}
+			expectedRegions := expected["owned_regions"].([]any)
+			if len(result.OwnedRegions) != len(expectedRegions) {
+				t.Fatalf("unexpected owned regions: %+v expected %+v", result.OwnedRegions, expectedRegions)
+			}
+			for index, rawRegion := range expectedRegions {
+				expectedRegion := rawRegion.(map[string]any)
+				assertOwnedRegionMatches(t, result.OwnedRegions[index], expectedRegion)
+			}
+			if rawRenderReport, ok := expected["render_report"].(map[string]any); ok {
+				if result.RenderReport.Strategy != rawRenderReport["strategy"].(string) {
+					t.Fatalf("unexpected render report: %+v expected %+v", result.RenderReport, rawRenderReport)
+				}
+			}
+			if result.ConflictedSource != nil {
+				if rawNeedles, ok := expected["conflicted_source_contains"].([]any); ok {
+					for _, rawNeedle := range rawNeedles {
+						needle := rawNeedle.(string)
+						if !strings.Contains(*result.ConflictedSource, needle) {
+							t.Fatalf("expected conflicted source to contain %q:\n%s", needle, *result.ConflictedSource)
+						}
+					}
+				}
+				if rawNeedles, ok := expected["conflicted_source_not_contains"].([]any); ok {
+					for _, rawNeedle := range rawNeedles {
+						needle := rawNeedle.(string)
+						if strings.Contains(*result.ConflictedSource, needle) {
+							t.Fatalf("expected conflicted source not to contain %q:\n%s", needle, *result.ConflictedSource)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func assertOwnedRegionMatches(t *testing.T, region OwnedRegionReport, expected map[string]any) {
+	t.Helper()
+	if region.OwnerPath != expected["owner_path"].(string) ||
+		region.RegionKind != expected["region_kind"].(string) ||
+		region.CanReplace != expected["can_replace"].(bool) ||
+		region.CanLineMerge != expected["can_line_merge"].(bool) ||
+		region.RequiresReparse != expected["requires_reparse"].(bool) {
+		t.Fatalf("unexpected owned region: %+v expected %+v", region, expected)
+	}
+	expectedLineRange := expected["line_range"].([]any)
+	if region.LineRange.Start != int(expectedLineRange[0].(float64)) ||
+		region.LineRange.End != int(expectedLineRange[1].(float64)) {
+		t.Fatalf("unexpected line range: %+v expected %+v", region.LineRange, expectedLineRange)
+	}
+	expectedAttachedSpans := expected["attached_spans"].([]any)
+	if len(region.AttachedSpans) != len(expectedAttachedSpans) {
+		t.Fatalf("unexpected attached spans: %+v expected %+v", region.AttachedSpans, expectedAttachedSpans)
+	}
+	for index, rawSpan := range expectedAttachedSpans {
+		expectedSpan := rawSpan.(map[string]any)
+		if region.AttachedSpans[index].Kind != expectedSpan["kind"].(string) {
+			t.Fatalf("unexpected attached span: %+v expected %+v", region.AttachedSpans[index], expectedSpan)
+		}
+		expectedSpanLineRange := expectedSpan["line_range"].([]any)
+		if region.AttachedSpans[index].LineRange.Start != int(expectedSpanLineRange[0].(float64)) ||
+			region.AttachedSpans[index].LineRange.End != int(expectedSpanLineRange[1].(float64)) {
+			t.Fatalf("unexpected attached span line range: %+v expected %+v", region.AttachedSpans[index], expectedSpan)
+		}
+	}
+	if region.NodeID == "" || region.BackendID == "" || region.ParserIdentity == "" {
+		t.Fatalf("owned region is missing identity fields: %+v", region)
+	}
+	if region.ByteRange.Start < 0 || region.ByteRange.End <= region.ByteRange.Start {
+		t.Fatalf("owned region byte range is invalid: %+v", region)
+	}
+}
+
 func optionalString(raw any) *string {
 	if raw == nil {
 		return nil

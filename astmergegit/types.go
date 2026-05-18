@@ -38,6 +38,31 @@ type Merge3RenderReport struct {
 	ParserIdentity string `json:"parser_identity,omitempty"`
 }
 
+type SourceRange struct {
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+
+type AttachedSpan struct {
+	Kind      string       `json:"kind"`
+	LineRange SourceRange  `json:"line_range"`
+	ByteRange *SourceRange `json:"byte_range,omitempty"`
+}
+
+type OwnedRegionReport struct {
+	OwnerPath       string         `json:"owner_path"`
+	NodeID          string         `json:"node_id"`
+	RegionKind      string         `json:"region_kind"`
+	ByteRange       SourceRange    `json:"byte_range"`
+	LineRange       SourceRange    `json:"line_range"`
+	AttachedSpans   []AttachedSpan `json:"attached_spans"`
+	BackendID       string         `json:"backend_id"`
+	ParserIdentity  string         `json:"parser_identity"`
+	CanReplace      bool           `json:"can_replace"`
+	CanLineMerge    bool           `json:"can_line_merge"`
+	RequiresReparse bool           `json:"requires_reparse"`
+}
+
 type FormattingPreservationReport struct {
 	LineDiffScore      float64 `json:"line_diff_score"`
 	CharacterDiffScore float64 `json:"character_diff_score"`
@@ -75,6 +100,7 @@ type Merge3Response struct {
 	Fallbacks                  []string                         `json:"fallbacks"`
 	Profile                    map[string]string                `json:"profile"`
 	RenderReport               Merge3RenderReport               `json:"render_report"`
+	OwnedRegions               []OwnedRegionReport              `json:"owned_regions"`
 	FormattingPreservation     FormattingPreservationReport     `json:"formatting_preservation"`
 	SecondaryFormattingMetrics SecondaryFormattingMetricsReport `json:"secondary_formatting_metrics"`
 	DefaultDriverEvaluation    DefaultDriverEvaluation          `json:"default_driver_evaluation"`
@@ -149,8 +175,20 @@ func merge3GoWithParserReport(
 	conflicts := []Merge3Conflict{}
 	merged, ok := mergeGoAnalyses(*base.Analysis, *ours.Analysis, *theirs.Analysis, &conflicts)
 	if !ok {
-		conflictedSource := renderConflictSource(request, conflicts)
-		renderReport := renderReportWithBackend(request, "full_file_conflict_markers", backendID, parserIdentity)
+		ownedRegions := goOwnedRegionsForConflicts(request, base.Analysis.Source, conflicts, backendID, parserIdentity)
+		conflictedSource := ""
+		renderStrategy := "full_file_conflict_markers"
+		if len(ownedRegions) > 0 {
+			rendered, renderedOK := renderOwnedRegionConflictSource(request, ownedRegions[0])
+			if renderedOK {
+				conflictedSource = rendered
+				renderStrategy = "owned_region_conflict_markers"
+			}
+		}
+		if conflictedSource == "" {
+			conflictedSource = renderConflictSource(request, conflicts)
+		}
+		renderReport := renderReportWithBackend(request, renderStrategy, backendID, parserIdentity)
 		return Merge3Response{
 			OK:               false,
 			ConflictedSource: &conflictedSource,
@@ -163,6 +201,7 @@ func merge3GoWithParserReport(
 			Fallbacks:                  []string{},
 			Profile:                    profileReport(request),
 			RenderReport:               renderReport,
+			OwnedRegions:               ownedRegions,
 			FormattingPreservation:     FormattingPreservationReport{},
 			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
 			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport),
@@ -210,6 +249,11 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 	merged := mergeJSONValue(base, ours, theirs, "", &conflicts)
 	if len(conflicts) > 0 {
 		conflictedSource := renderConflictSource(request, conflicts)
+		ownedRegions := jsonOwnedRegionsForConflicts(request, conflicts)
+		report := renderReport(request, "full_file_conflict_markers")
+		if len(ownedRegions) > 0 {
+			report = renderReport(request, "owned_region_conflict_markers")
+		}
 		return Merge3Response{
 			OK:               false,
 			ConflictedSource: &conflictedSource,
@@ -221,10 +265,11 @@ func Merge3JSON(request Merge3Request) Merge3Response {
 			}},
 			Fallbacks:                  []string{},
 			Profile:                    profileReport(request),
-			RenderReport:               renderReport(request, "full_file_conflict_markers"),
+			RenderReport:               report,
+			OwnedRegions:               ownedRegions,
 			FormattingPreservation:     FormattingPreservationReport{},
 			SecondaryFormattingMetrics: secondaryFormattingMetrics(false),
-			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, renderReport(request, "full_file_conflict_markers")),
+			DefaultDriverEvaluation:    defaultDriverEvaluation(FormattingPreservationReport{}, nil, report),
 		}
 	}
 
@@ -407,6 +452,210 @@ func renderConflictSource(request Merge3Request, conflicts []Merge3Conflict) str
 		rightMarker + " theirs",
 		"",
 	}, "\n")
+}
+
+func goOwnedRegionsForConflicts(request Merge3Request, baseSource string, conflicts []Merge3Conflict, backendID string, parserIdentity string) []OwnedRegionReport {
+	regions := make([]OwnedRegionReport, 0, len(conflicts))
+	for _, conflict := range conflicts {
+		if !strings.HasPrefix(conflict.Path, "/decls/") {
+			continue
+		}
+		name := strings.TrimPrefix(conflict.Path, "/decls/")
+		includeComments := false
+		if strings.HasSuffix(name, "/comments") {
+			name = strings.TrimSuffix(name, "/comments")
+			includeComments = true
+		}
+		region, ok := goDeclarationRegion(baseSource, name, includeComments, backendID, parserIdentity)
+		if !ok {
+			continue
+		}
+		regions = append(regions, region)
+	}
+	return regions
+}
+
+func goDeclarationRegion(source string, name string, includeComments bool, backendID string, parserIdentity string) (OwnedRegionReport, bool) {
+	lines := strings.Split(source, "\n")
+	funcLine := -1
+	prefix := "func " + name + "("
+	for index, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			funcLine = index
+			break
+		}
+	}
+	if funcLine < 0 {
+		return OwnedRegionReport{}, false
+	}
+	start := funcLine
+	attachedSpans := []AttachedSpan{}
+	if includeComments {
+		for start > 0 {
+			previous := strings.TrimSpace(lines[start-1])
+			if strings.HasPrefix(previous, "//") {
+				start--
+				continue
+			}
+			break
+		}
+		for index := start; index < funcLine; index++ {
+			if strings.HasPrefix(strings.TrimSpace(lines[index]), "//") {
+				attachedSpans = append(attachedSpans, AttachedSpan{
+					Kind:      "leading_comment",
+					LineRange: SourceRange{Start: index + 1, End: index + 1},
+				})
+			}
+		}
+	}
+	end := goFunctionEndLine(lines, funcLine)
+	lineRange := SourceRange{Start: start + 1, End: end + 1}
+	return OwnedRegionReport{
+		OwnerPath:       "/decls/" + name,
+		NodeID:          "go:decl:" + name,
+		RegionKind:      mapBool(includeComments, "owned_region", "subtree"),
+		ByteRange:       byteRangeForLineRange(source, lineRange),
+		LineRange:       lineRange,
+		AttachedSpans:   attachedSpans,
+		BackendID:       backendID,
+		ParserIdentity:  parserIdentity,
+		CanReplace:      true,
+		CanLineMerge:    true,
+		RequiresReparse: true,
+	}, true
+}
+
+func goFunctionEndLine(lines []string, funcLine int) int {
+	balance := 0
+	seenBody := false
+	for index := funcLine; index < len(lines); index++ {
+		for _, char := range lines[index] {
+			switch char {
+			case '{':
+				balance++
+				seenBody = true
+			case '}':
+				balance--
+			}
+		}
+		if seenBody && balance <= 0 {
+			return index
+		}
+	}
+	return funcLine
+}
+
+func renderOwnedRegionConflictSource(request Merge3Request, region OwnedRegionReport) (string, bool) {
+	oursRegion, ok := sourceRegionByOwnerPath(request.OursSource, region.OwnerPath, region.RegionKind == "owned_region")
+	if !ok {
+		return "", false
+	}
+	baseRegion, ok := sourceRegionByOwnerPath(request.BaseSource, region.OwnerPath, region.RegionKind == "owned_region")
+	if !ok {
+		return "", false
+	}
+	theirsRegion, ok := sourceRegionByOwnerPath(request.TheirsSource, region.OwnerPath, region.RegionKind == "owned_region")
+	if !ok {
+		return "", false
+	}
+	markerSize := request.ConflictMarkerSize
+	if markerSize <= 0 {
+		markerSize = 7
+	}
+	replacement := strings.Join([]string{
+		strings.Repeat("<", markerSize) + " ours",
+		strings.TrimRight(oursRegion.text, "\n"),
+		strings.Repeat("|", markerSize) + " base",
+		strings.TrimRight(baseRegion.text, "\n"),
+		strings.Repeat("=", markerSize),
+		strings.TrimRight(theirsRegion.text, "\n"),
+		strings.Repeat(">", markerSize) + " theirs",
+	}, "\n")
+	return replaceLineRange(request.OursSource, oursRegion.lineRange, replacement), true
+}
+
+type sourceRegion struct {
+	lineRange SourceRange
+	text      string
+}
+
+func sourceRegionByOwnerPath(source string, ownerPath string, includeComments bool) (sourceRegion, bool) {
+	name := strings.TrimPrefix(ownerPath, "/decls/")
+	region, ok := goDeclarationRegion(source, name, includeComments, "", "")
+	if !ok {
+		return sourceRegion{}, false
+	}
+	lines := strings.Split(source, "\n")
+	text := strings.Join(lines[region.LineRange.Start-1:region.LineRange.End], "\n")
+	return sourceRegion{lineRange: region.LineRange, text: text}, true
+}
+
+func replaceLineRange(source string, lineRange SourceRange, replacement string) string {
+	lines := strings.Split(source, "\n")
+	start := max(lineRange.Start-1, 0)
+	end := min(lineRange.End, len(lines))
+	output := make([]string, 0, len(lines)+strings.Count(replacement, "\n"))
+	output = append(output, lines[:start]...)
+	output = append(output, strings.Split(replacement, "\n")...)
+	output = append(output, lines[end:]...)
+	return strings.Join(output, "\n")
+}
+
+func jsonOwnedRegionsForConflicts(request Merge3Request, conflicts []Merge3Conflict) []OwnedRegionReport {
+	regions := make([]OwnedRegionReport, 0, len(conflicts))
+	for _, conflict := range conflicts {
+		if !strings.HasPrefix(conflict.Path, "/") || strings.Count(conflict.Path, "/") != 1 {
+			continue
+		}
+		byteRange := jsonKeyByteRange(request.BaseSource, strings.TrimPrefix(conflict.Path, "/"))
+		regions = append(regions, OwnedRegionReport{
+			OwnerPath:       conflict.Path,
+			NodeID:          "json:key:" + strings.TrimPrefix(conflict.Path, "/"),
+			RegionKind:      "node",
+			ByteRange:       byteRange,
+			LineRange:       SourceRange{Start: 1, End: 1},
+			AttachedSpans:   []AttachedSpan{},
+			BackendID:       "native-json",
+			ParserIdentity:  "standard-json",
+			CanReplace:      true,
+			CanLineMerge:    false,
+			RequiresReparse: true,
+		})
+	}
+	return regions
+}
+
+func jsonKeyByteRange(source string, key string) SourceRange {
+	needle := `"` + key + `"`
+	start := strings.Index(source, needle)
+	if start < 0 {
+		return SourceRange{Start: 0, End: len(source)}
+	}
+	end := start + len(needle)
+	for end < len(source) && source[end] != ',' && source[end] != '}' {
+		end++
+	}
+	return SourceRange{Start: start, End: end}
+}
+
+func byteRangeForLineRange(source string, lineRange SourceRange) SourceRange {
+	lines := strings.SplitAfter(source, "\n")
+	start := 0
+	for index := 0; index < lineRange.Start-1 && index < len(lines); index++ {
+		start += len(lines[index])
+	}
+	end := start
+	for index := lineRange.Start - 1; index < lineRange.End && index < len(lines); index++ {
+		end += len(lines[index])
+	}
+	return SourceRange{Start: start, End: end}
+}
+
+func mapBool[T any](condition bool, whenTrue T, whenFalse T) T {
+	if condition {
+		return whenTrue
+	}
+	return whenFalse
 }
 
 func roleDiagnostic(role string, diagnostics []astmerge.Diagnostic) astmerge.Diagnostic {
