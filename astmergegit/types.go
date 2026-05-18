@@ -861,23 +861,22 @@ func mergeGoCommentOnlyChange(key string, baseText string, oursText string, thei
 	baseComments := leadingGoCommentBlock(baseText)
 	oursComments := leadingGoCommentBlock(oursText)
 	theirsComments := leadingGoCommentBlock(theirsText)
-	switch {
-	case oursComments == theirsComments:
-		return oursText, true
-	case oursComments == baseComments:
-		return theirsText, true
-	case theirsComments == baseComments:
-		return oursText, true
-	case oursComments == "" && theirsComments != "":
-		addConflict(conflicts, "delete_edit", "/decls/"+key+"/comments", "ours deleted comments that theirs edited")
-		return "", false
-	case theirsComments == "" && oursComments != "":
-		addConflict(conflicts, "delete_edit", "/decls/"+key+"/comments", "theirs deleted comments that ours edited")
-		return "", false
-	default:
-		addConflict(conflicts, "edit_edit", "/decls/"+key+"/comments", "comments changed differently in ours and theirs")
+
+	commentDelta := MergeCommentDelta(
+		goCommentPointer(baseComments),
+		goCommentPointer(oursComments),
+		goCommentPointer(theirsComments),
+		"/decls/"+key+"/comments",
+	)
+	if !commentDelta.OK {
+		*conflicts = append(*conflicts, commentDelta.Conflicts...)
 		return "", false
 	}
+	body := removeLeadingGoCommentBlock(oursText)
+	if commentDelta.MergedComment == nil || strings.TrimSpace(*commentDelta.MergedComment) == "" {
+		return body, true
+	}
+	return strings.TrimSpace(*commentDelta.MergedComment) + "\n" + body, true
 }
 
 func goDeclarationMap(analysis gomerge.GoAnalysis) map[string]string {
@@ -974,6 +973,31 @@ func leadingGoCommentBlock(source string) string {
 		break
 	}
 	return strings.Join(comments, "\n")
+}
+
+func goCommentPointer(comment string) *string {
+	if strings.TrimSpace(comment) == "" {
+		return nil
+	}
+	return &comment
+}
+
+func removeLeadingGoCommentBlock(source string) string {
+	lines := strings.Split(source, "\n")
+	index := 0
+	for index < len(lines) {
+		trimmed := strings.TrimSpace(lines[index])
+		if trimmed == "" {
+			index++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "//") {
+			index++
+			continue
+		}
+		break
+	}
+	return strings.TrimSpace(strings.Join(lines[index:], "\n"))
 }
 
 func attachLeadingGoComments(commentSource string, declarationSource string) string {
