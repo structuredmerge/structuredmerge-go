@@ -31,8 +31,8 @@ jobs:
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/structuredmerge/structuredmerge-fixtures ../fixtures
-          git clone https://github.com/structuredmerge/tree-sitter-language-pack ../tree-sitter-language-pack
-          git -C ../tree-sitter-language-pack checkout 32fc81ea8c7b86d61cdcf453022bcbebc9e9a1bf
+          git clone https://github.com/kreuzberg-dev/tree-sitter-language-pack ../tree-sitter-language-pack
+          git -C ../tree-sitter-language-pack checkout v1.8.1
       - name: Setup mise
         uses: jdx/mise-action@v4
       - name: Run checks
