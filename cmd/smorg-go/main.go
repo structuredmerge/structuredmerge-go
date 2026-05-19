@@ -127,19 +127,19 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		printUsage(stdout)
 		return exitSuccess
 	default:
-		fmt.Fprintf(stderr, "unknown command %q\n", args[0])
+		_, _ = fmt.Fprintf(stderr, "unknown command %q\n", args[0])
 		printUsage(stderr)
 		return exitUserError
 	}
 }
 
 func printUsage(out io.Writer) {
-	fmt.Fprintln(out, "usage: smorg-go merge-driver [--path-name PATH] [--output PATH] [--report PATH] [--strict] [--fallback=none|line|local|full-file] %O %A %B [%P]")
-	fmt.Fprintln(out, "       smorg-go merge-driver --ancestor %O --current %A --other %B --path-name %P")
-	fmt.Fprintln(out, "       smorg-go diff-driver [--path-name PATH] OLD NEW")
-	fmt.Fprintln(out, "       smorg-go diff-driver PATH OLD-FILE OLD-HEX OLD-MODE NEW-FILE NEW-HEX NEW-MODE [OLD-PREFIX NEW-PREFIX]")
-	fmt.Fprintln(out, "       smorg-go conflicts diff [--path-name PATH] [--exit-code] FILE")
-	fmt.Fprintln(out, "       smorg-go languages --gitattributes")
+	_, _ = fmt.Fprintln(out, "usage: smorg-go merge-driver [--path-name PATH] [--output PATH] [--report PATH] [--strict] [--fallback=none|line|local|full-file] %O %A %B [%P]")
+	_, _ = fmt.Fprintln(out, "       smorg-go merge-driver --ancestor %O --current %A --other %B --path-name %P")
+	_, _ = fmt.Fprintln(out, "       smorg-go diff-driver [--path-name PATH] OLD NEW")
+	_, _ = fmt.Fprintln(out, "       smorg-go diff-driver PATH OLD-FILE OLD-HEX OLD-MODE NEW-FILE NEW-HEX NEW-MODE [OLD-PREFIX NEW-PREFIX]")
+	_, _ = fmt.Fprintln(out, "       smorg-go conflicts diff [--path-name PATH] [--exit-code] FILE")
+	_, _ = fmt.Fprintln(out, "       smorg-go languages --gitattributes")
 }
 
 func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -149,19 +149,19 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	ancestorSource, err := os.ReadFile(options.ancestor)
 	if err != nil {
-		fmt.Fprintf(stderr, "read ancestor: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "read ancestor: %v\n", err)
 		return exitUserError
 	}
 	_ = ancestorSource
 
 	currentSource, err := os.ReadFile(options.current)
 	if err != nil {
-		fmt.Fprintf(stderr, "read current: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "read current: %v\n", err)
 		return exitUserError
 	}
 	otherSource, err := os.ReadFile(options.other)
 	if err != nil {
-		fmt.Fprintf(stderr, "read other: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "read other: %v\n", err)
 		return exitUserError
 	}
 
@@ -211,7 +211,7 @@ func runMergeDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUnresolvedConflict
 	}
 	if result.Output == nil {
-		fmt.Fprintln(stderr, "merge completed without output")
+		_, _ = fmt.Fprintln(stderr, "merge completed without output")
 		return exitInternalError
 	}
 
@@ -269,12 +269,12 @@ func writeMergeDriverMachineReport(reportPath string, pathName string, ok bool, 
 	}
 	source, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
-		fmt.Fprintf(stderr, "write report: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "write report: %v\n", err)
 		return exitInternalError
 	}
 	source = append(source, '\n')
 	if err := os.WriteFile(reportPath, source, 0o644); err != nil {
-		fmt.Fprintf(stderr, "write report: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "write report: %v\n", err)
 		return exitInternalError
 	}
 	return exitSuccess
@@ -309,7 +309,7 @@ func writeMergeOutput(options mergeDriverOptions, output string, stderr io.Write
 		outputPath = options.current
 	}
 	if err := os.WriteFile(outputPath, []byte(output), 0o644); err != nil {
-		fmt.Fprintf(stderr, "write output: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "write output: %v\n", err)
 		return exitInternalError
 	}
 	return exitSuccess
@@ -351,13 +351,13 @@ func parseMergeDriverOptions(args []string, stderr io.Writer) (mergeDriverOption
 	}
 
 	if options.ancestor == "" || options.current == "" || options.other == "" {
-		fmt.Fprintln(stderr, "merge-driver requires ancestor, current, and other paths")
+		_, _ = fmt.Fprintln(stderr, "merge-driver requires ancestor, current, and other paths")
 		return options, false
 	}
 	switch options.fallback {
 	case "none", "line", "local", "full-file":
 	default:
-		fmt.Fprintf(stderr, "unsupported fallback mode %q\n", options.fallback)
+		_, _ = fmt.Fprintf(stderr, "unsupported fallback mode %q\n", options.fallback)
 		return options, false
 	}
 
@@ -395,7 +395,7 @@ func reportAndEnforceProfile(profileID string, profileReport bool, requireStatus
 		_ = json.NewEncoder(stdout).Encode(decision)
 	}
 	if !decision.Allowed {
-		fmt.Fprintln(stderr, decision.BlockingReasons[0])
+		_, _ = fmt.Fprintln(stderr, decision.BlockingReasons[0])
 		return exitUserError
 	}
 	return exitSuccess
@@ -409,12 +409,12 @@ func runDiffDriver(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	oldSource, err := os.ReadFile(options.oldPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "read old file: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "read old file: %v\n", err)
 		return exitUserError
 	}
 	newSource, err := os.ReadFile(options.newPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "read new file: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "read new file: %v\n", err)
 		return exitUserError
 	}
 
@@ -441,7 +441,7 @@ func parseDiffDriverOptions(args []string, stderr io.Writer) (diffDriverOptions,
 		options.oldPath = positionals[1]
 		options.newPath = positionals[4]
 	default:
-		fmt.Fprintln(stderr, "diff-driver requires either 2, 7, or 9 positional arguments")
+		_, _ = fmt.Fprintln(stderr, "diff-driver requires either 2, 7, or 9 positional arguments")
 		return options, false
 	}
 
@@ -459,9 +459,9 @@ func (options diffDriverOptions) effectivePath() string {
 }
 
 func printStructuredDiff(stdout io.Writer, pathName string, oldSource string, newSource string) {
-	fmt.Fprintf(stdout, "structured-diff %s\n", pathName)
+	_, _ = fmt.Fprintf(stdout, "structured-diff %s\n", pathName)
 	if oldSource == newSource {
-		fmt.Fprintln(stdout, "status unchanged")
+		_, _ = fmt.Fprintln(stdout, "status unchanged")
 		return
 	}
 
@@ -473,9 +473,9 @@ func printStructuredDiff(stdout io.Writer, pathName string, oldSource string, ne
 	if newSource != "" && !strings.HasSuffix(newSource, "\n") {
 		newLines++
 	}
-	fmt.Fprintf(stdout, "status changed\n")
-	fmt.Fprintf(stdout, "old-lines %d\n", oldLines)
-	fmt.Fprintf(stdout, "new-lines %d\n", newLines)
+	_, _ = fmt.Fprintf(stdout, "status changed\n")
+	_, _ = fmt.Fprintf(stdout, "old-lines %d\n", oldLines)
+	_, _ = fmt.Fprintf(stdout, "new-lines %d\n", newLines)
 }
 
 func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -486,11 +486,11 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUserError
 	}
 	if !*gitattributes {
-		fmt.Fprintln(stderr, "languages currently requires --gitattributes")
+		_, _ = fmt.Fprintln(stderr, "languages currently requires --gitattributes")
 		return exitUserError
 	}
 	if len(flags.Args()) != 0 {
-		fmt.Fprintln(stderr, "languages does not accept positional arguments")
+		_, _ = fmt.Fprintln(stderr, "languages does not accept positional arguments")
 		return exitUserError
 	}
 
@@ -499,21 +499,21 @@ func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {
 		"*.json merge=smorg-go diff=smorg-go smorg.language=json",
 		"*.jsonc merge=smorg-go diff=smorg-go smorg.language=jsonc",
 	} {
-		fmt.Fprintln(stdout, line)
+		_, _ = fmt.Fprintln(stdout, line)
 	}
 	return exitSuccess
 }
 
 func runConflicts(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "conflicts requires a subcommand")
+		_, _ = fmt.Fprintln(stderr, "conflicts requires a subcommand")
 		return exitUserError
 	}
 	switch args[0] {
 	case "diff":
 		return runConflictsDiff(args[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown conflicts subcommand %q\n", args[0])
+		_, _ = fmt.Fprintf(stderr, "unknown conflicts subcommand %q\n", args[0])
 		return exitUserError
 	}
 }
@@ -526,7 +526,7 @@ func runConflictsDiff(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	source, err := os.ReadFile(options.filePath)
 	if err != nil {
-		fmt.Fprintf(stderr, "read conflicted file: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "read conflicted file: %v\n", err)
 		return exitUserError
 	}
 
@@ -551,7 +551,7 @@ func parseConflictsDiffOptions(args []string, stderr io.Writer) (conflictDiffOpt
 	}
 	positionals := flags.Args()
 	if len(positionals) != 1 {
-		fmt.Fprintln(stderr, "conflicts diff requires exactly one file path")
+		_, _ = fmt.Fprintln(stderr, "conflicts diff requires exactly one file path")
 		return options, false
 	}
 	options.filePath = positionals[0]
@@ -585,10 +585,10 @@ func findConflictRegions(source string, markerSize int) []conflictRegion {
 }
 
 func printConflictDiff(stdout io.Writer, pathName string, regions []conflictRegion) {
-	fmt.Fprintf(stdout, "conflicts %s\n", pathName)
-	fmt.Fprintf(stdout, "count %d\n", len(regions))
+	_, _ = fmt.Fprintf(stdout, "conflicts %s\n", pathName)
+	_, _ = fmt.Fprintf(stdout, "count %d\n", len(regions))
 	for index, region := range regions {
-		fmt.Fprintf(stdout, "conflict %d lines %d-%d separator %d\n", index+1, region.startLine, region.endLine, region.separatorLine)
+		_, _ = fmt.Fprintf(stdout, "conflict %d lines %d-%d separator %d\n", index+1, region.startLine, region.endLine, region.separatorLine)
 	}
 }
 
@@ -816,6 +816,6 @@ func firstNonEmpty(values ...string) string {
 
 func printDiagnostics(stderr io.Writer, diagnostics []astmerge.Diagnostic) {
 	for _, diagnostic := range diagnostics {
-		fmt.Fprintf(stderr, "%s: %s\n", diagnostic.Category, diagnostic.Message)
+		_, _ = fmt.Fprintf(stderr, "%s: %s\n", diagnostic.Category, diagnostic.Message)
 	}
 }

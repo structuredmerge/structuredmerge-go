@@ -2512,26 +2512,29 @@ func TestSharedFixtureNamedConformanceSuiteReport(t *testing.T) {
 		},
 	)
 
+	var namedSuiteReport ConformanceSuiteReport
 	if report == nil {
 		t.Fatalf("expected named suite report")
+	} else {
+		namedSuiteReport = *report
 	}
 
 	expectedSummary := expected["summary"].(map[string]any)
-	if report.Summary.Total != int(expectedSummary["total"].(float64)) ||
-		report.Summary.Passed != int(expectedSummary["passed"].(float64)) ||
-		report.Summary.Failed != int(expectedSummary["failed"].(float64)) ||
-		report.Summary.Skipped != int(expectedSummary["skipped"].(float64)) {
-		t.Fatalf("unexpected named suite report summary: %+v", report.Summary)
+	if namedSuiteReport.Summary.Total != int(expectedSummary["total"].(float64)) ||
+		namedSuiteReport.Summary.Passed != int(expectedSummary["passed"].(float64)) ||
+		namedSuiteReport.Summary.Failed != int(expectedSummary["failed"].(float64)) ||
+		namedSuiteReport.Summary.Skipped != int(expectedSummary["skipped"].(float64)) {
+		t.Fatalf("unexpected named suite report summary: %+v", namedSuiteReport.Summary)
 	}
 
 	expectedResults := expected["results"].([]any)
-	if len(report.Results) != len(expectedResults) {
-		t.Fatalf("unexpected named suite report results: %+v", report.Results)
+	if len(namedSuiteReport.Results) != len(expectedResults) {
+		t.Fatalf("unexpected named suite report results: %+v", namedSuiteReport.Results)
 	}
 	for index, item := range expectedResults {
 		expectedResult := parseConformanceCaseResult(item.(map[string]any))
-		if !reflect.DeepEqual(report.Results[index], expectedResult) {
-			t.Fatalf("unexpected named suite report result at %d: %+v", index, report.Results[index])
+		if !reflect.DeepEqual(namedSuiteReport.Results[index], expectedResult) {
+			t.Fatalf("unexpected named suite report result at %d: %+v", index, namedSuiteReport.Results[index])
 		}
 	}
 }
@@ -2648,30 +2651,33 @@ func TestSharedFixtureNamedConformanceSuiteEntry(t *testing.T) {
 		},
 	)
 
+	var namedSuiteEntry NamedConformanceSuiteReport
 	if entry == nil {
 		t.Fatalf("expected named suite entry")
+	} else {
+		namedSuiteEntry = *entry
 	}
-	if !reflect.DeepEqual(entry.Suite, parseConformanceSuiteDefinition(expectedRaw["suite"].(map[string]any))) {
+	if !reflect.DeepEqual(namedSuiteEntry.Suite, parseConformanceSuiteDefinition(expectedRaw["suite"].(map[string]any))) {
 		t.Fatalf("unexpected named suite entry suite: %+v", entry)
 	}
 
 	expectedReport := expectedRaw["report"].(map[string]any)
 	expectedSummary := expectedReport["summary"].(map[string]any)
-	if entry.Report.Summary.Total != int(expectedSummary["total"].(float64)) ||
-		entry.Report.Summary.Passed != int(expectedSummary["passed"].(float64)) ||
-		entry.Report.Summary.Failed != int(expectedSummary["failed"].(float64)) ||
-		entry.Report.Summary.Skipped != int(expectedSummary["skipped"].(float64)) {
-		t.Fatalf("unexpected named suite entry summary: %+v", entry.Report.Summary)
+	if namedSuiteEntry.Report.Summary.Total != int(expectedSummary["total"].(float64)) ||
+		namedSuiteEntry.Report.Summary.Passed != int(expectedSummary["passed"].(float64)) ||
+		namedSuiteEntry.Report.Summary.Failed != int(expectedSummary["failed"].(float64)) ||
+		namedSuiteEntry.Report.Summary.Skipped != int(expectedSummary["skipped"].(float64)) {
+		t.Fatalf("unexpected named suite entry summary: %+v", namedSuiteEntry.Report.Summary)
 	}
 
 	expectedResults := expectedReport["results"].([]any)
-	if len(entry.Report.Results) != len(expectedResults) {
-		t.Fatalf("unexpected named suite entry results: %+v", entry.Report.Results)
+	if len(namedSuiteEntry.Report.Results) != len(expectedResults) {
+		t.Fatalf("unexpected named suite entry results: %+v", namedSuiteEntry.Report.Results)
 	}
 	for index, item := range expectedResults {
 		expectedResult := parseConformanceCaseResult(item.(map[string]any))
-		if !reflect.DeepEqual(entry.Report.Results[index], expectedResult) {
-			t.Fatalf("unexpected named suite entry result at %d: %+v", index, entry.Report.Results[index])
+		if !reflect.DeepEqual(namedSuiteEntry.Report.Results[index], expectedResult) {
+			t.Fatalf("unexpected named suite entry result at %d: %+v", index, namedSuiteEntry.Report.Results[index])
 		}
 	}
 }
@@ -2683,12 +2689,15 @@ func TestSharedFixtureNamedConformanceSuitePlanEntry(t *testing.T) {
 
 	context := parseConformanceFamilyPlanContext(fixture["context"].(map[string]any))
 	entry := PlanNamedConformanceSuiteEntry(manifest, selector, context)
+	var namedSuiteEntry NamedConformanceSuitePlan
 	if entry == nil {
 		t.Fatalf("expected named suite plan entry")
+	} else {
+		namedSuiteEntry = *entry
 	}
 
 	expected := parseNamedConformanceSuitePlan(t, fixture["expected_entry"].(map[string]any))
-	if !fixtureJSONEqual(t, *entry, expected) {
+	if !fixtureJSONEqual(t, namedSuiteEntry, expected) {
 		t.Fatalf("unexpected named suite plan entry: %+v", entry)
 	}
 }
@@ -3606,12 +3615,15 @@ func TestSharedFixtureNamedConformanceSuiteResults(t *testing.T) {
 		},
 	)
 
+	var namedSuiteResults NamedConformanceSuiteResults
 	if entry == nil {
 		t.Fatalf("expected named suite results entry")
+	} else {
+		namedSuiteResults = *entry
 	}
 
 	expected := parseNamedConformanceSuiteResults(fixture["expected_entry"].(map[string]any))
-	if !fixtureJSONEqual(t, *entry, expected) {
+	if !fixtureJSONEqual(t, namedSuiteResults, expected) {
 		t.Fatalf("unexpected named suite results entry: %+v", entry)
 	}
 }
@@ -8706,11 +8718,14 @@ func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyD
 		if imported != nil {
 			t.Fatalf("expected no structured edit provider execution receipt replay workflow apply decision outcome for rejection %s", testCase["label"])
 		}
+		var importError StructuredEditTransportImportError
 		if importErr == nil {
 			t.Fatalf("expected structured edit provider execution receipt replay workflow apply decision outcome import error for %s", testCase["label"])
+		} else {
+			importError = *importErr
 		}
-		if !reflect.DeepEqual(*importErr, expectedErr) {
-			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision outcome rejection for %s: %+v", testCase["label"], *importErr)
+		if !reflect.DeepEqual(importError, expectedErr) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision outcome rejection for %s: %+v", testCase["label"], importError)
 		}
 	}
 }
@@ -8737,11 +8752,14 @@ func TestSharedFixtureStructuredEditProviderExecutionReceiptReplayWorkflowApplyD
 		if rejected != nil {
 			t.Fatalf("expected no structured edit provider execution receipt replay workflow apply decision outcome for application rejection %s", testCase["label"])
 		}
+		var rejectionError StructuredEditTransportImportError
 		if rejectionErr == nil {
 			t.Fatalf("expected structured edit provider execution receipt replay workflow apply decision outcome application import error for %s", testCase["label"])
+		} else {
+			rejectionError = *rejectionErr
 		}
-		if !reflect.DeepEqual(*rejectionErr, expectedErr) {
-			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision outcome application rejection for %s: %+v", testCase["label"], *rejectionErr)
+		if !reflect.DeepEqual(rejectionError, expectedErr) {
+			t.Fatalf("unexpected structured edit provider execution receipt replay workflow apply decision outcome application rejection for %s: %+v", testCase["label"], rejectionError)
 		}
 	}
 }

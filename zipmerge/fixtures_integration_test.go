@@ -228,7 +228,7 @@ func TestRawPreservationRejectsExtraFieldsAndMemberComments(t *testing.T) {
 			plan := PlanZipMerge(inventory, inventory, inventory)
 
 			_, err := RenderWithRawPreservation(RenderInput{Source: source, Plan: plan})
-			if err == nil || !(strings.Contains(err.Error(), "extra fields") || strings.Contains(err.Error(), "member comments")) {
+			if err == nil || (!strings.Contains(err.Error(), "extra fields") && !strings.Contains(err.Error(), "member comments")) {
 				t.Fatalf("expected metadata rejection, got %v", err)
 			}
 			if name == "extra" {

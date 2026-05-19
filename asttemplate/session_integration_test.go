@@ -492,11 +492,14 @@ func TestTemplateDirectorySessionStatusTransportEnvelopeFixture(t *testing.T) {
 		if importErr != nil {
 			t.Fatalf("%s status envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedStatus asttemplate.SessionStatusReport
 		if imported == nil {
 			t.Fatalf("%s status envelope import returned nil status", testCase["label"])
+		} else {
+			importedStatus = *imported
 		}
 
-		assertJSONEqual(t, status, *imported)
+		assertJSONEqual(t, status, importedStatus)
 	}
 }
 
@@ -530,10 +533,13 @@ func TestTemplateDirectorySessionStatusEnvelopeApplicationFixture(t *testing.T) 
 		if importErr != nil {
 			t.Fatalf("%s status envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedStatus asttemplate.SessionStatusReport
 		if imported == nil {
 			t.Fatalf("%s status envelope import returned nil status", testCase["label"])
+		} else {
+			importedStatus = *imported
 		}
-		assertJSONEqual(t, testCase["expected"], *imported)
+		assertJSONEqual(t, testCase["expected"], importedStatus)
 	}
 
 	for _, rawCase := range fixture["rejections"].([]any) {
@@ -566,11 +572,14 @@ func TestTemplateDirectorySessionDiagnosticsTransportEnvelopeFixture(t *testing.
 		if importErr != nil {
 			t.Fatalf("%s diagnostics envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedDiagnostics asttemplate.SessionDiagnosticsReport
 		if imported == nil {
 			t.Fatalf("%s diagnostics envelope import returned nil diagnostics", testCase["label"])
+		} else {
+			importedDiagnostics = *imported
 		}
 
-		assertJSONEqual(t, diagnostics, *imported)
+		assertJSONEqual(t, diagnostics, importedDiagnostics)
 	}
 }
 
@@ -637,11 +646,14 @@ func TestTemplateDirectorySessionOutcomeTransportEnvelopeFixture(t *testing.T) {
 		if importErr != nil {
 			t.Fatalf("%s outcome envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedOutcome asttemplate.SessionOutcomeReport
 		if imported == nil {
 			t.Fatalf("%s outcome envelope import returned nil outcome", testCase["label"])
+		} else {
+			importedOutcome = *imported
 		}
 
-		assertJSONEqual(t, outcome, *imported)
+		assertJSONEqual(t, outcome, importedOutcome)
 	}
 }
 
@@ -677,10 +689,13 @@ func TestTemplateDirectorySessionOutcomeEnvelopeApplicationFixture(t *testing.T)
 		if importErr != nil {
 			t.Fatalf("%s outcome envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedOutcome asttemplate.SessionOutcomeReport
 		if imported == nil {
 			t.Fatalf("%s outcome envelope import returned nil outcome", testCase["label"])
+		} else {
+			importedOutcome = *imported
 		}
-		assertJSONEqual(t, testCase["expected"], *imported)
+		assertJSONEqual(t, testCase["expected"], importedOutcome)
 	}
 
 	for _, rawCase := range fixture["rejections"].([]any) {
@@ -1075,11 +1090,14 @@ func TestTemplateDirectorySessionRequestTransportEnvelopeFixture(t *testing.T) {
 		if importErr != nil {
 			t.Fatalf("%s request envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedRequest asttemplate.SessionRequestReport
 		if imported == nil {
 			t.Fatalf("%s request envelope import returned nil request", testCase["label"])
+		} else {
+			importedRequest = *imported
 		}
 
-		assertJSONEqual(t, request, *imported)
+		assertJSONEqual(t, request, importedRequest)
 	}
 }
 
@@ -1250,11 +1268,14 @@ func TestTemplateDirectorySessionRunnerPayloadTransportEnvelopeFixture(t *testin
 		if importErr != nil {
 			t.Fatalf("%s runner payload envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedPayload asttemplate.SessionRunnerPayload
 		if imported == nil {
 			t.Fatalf("%s runner payload envelope import returned nil payload", testCase["label"])
+		} else {
+			importedPayload = *imported
 		}
 
-		assertJSONEqual(t, payload, *imported)
+		assertJSONEqual(t, payload, importedPayload)
 	}
 }
 
@@ -1478,11 +1499,14 @@ func TestTemplateDirectorySessionInspectionTransportEnvelopeFixture(t *testing.T
 		if importErr != nil {
 			t.Fatalf("%s inspection envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedInspection asttemplate.SessionInspectionReport
 		if imported == nil {
 			t.Fatalf("%s inspection envelope import returned nil inspection", testCase["label"])
+		} else {
+			importedInspection = *imported
 		}
 
-		assertJSONEqual(t, inspection, *imported)
+		assertJSONEqual(t, inspection, importedInspection)
 	}
 }
 
@@ -1518,10 +1542,13 @@ func TestTemplateDirectorySessionInspectionEnvelopeApplicationFixture(t *testing
 		if importErr != nil {
 			t.Fatalf("%s inspection envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedInspection asttemplate.SessionInspectionReport
 		if imported == nil {
 			t.Fatalf("%s inspection envelope import returned nil inspection", testCase["label"])
+		} else {
+			importedInspection = *imported
 		}
-		assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(testCase["expected"], fixtureRoot), *imported)
+		assertJSONEqual(t, resolveSessionInspectionExpectedFixturePaths(testCase["expected"], fixtureRoot), importedInspection)
 	}
 
 	for _, rawCase := range fixture["rejections"].([]any) {
@@ -1707,11 +1734,14 @@ func TestTemplateDirectorySessionCommandTransportEnvelopeFixture(t *testing.T) {
 		if importErr != nil {
 			t.Fatalf("%s command envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedCommand asttemplate.SessionCommand
 		if imported == nil {
 			t.Fatalf("%s command envelope import returned nil command", testCase["label"])
+		} else {
+			importedCommand = *imported
 		}
 
-		assertJSONEqual(t, command, *imported)
+		assertJSONEqual(t, command, importedCommand)
 	}
 }
 
@@ -1754,11 +1784,14 @@ func TestTemplateDirectorySessionCommandPayloadTransportEnvelopeFixture(t *testi
 		if importErr != nil {
 			t.Fatalf("%s command payload envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedPayload asttemplate.SessionCommandPayload
 		if imported == nil {
 			t.Fatalf("%s command payload envelope import returned nil payload", testCase["label"])
+		} else {
+			importedPayload = *imported
 		}
 
-		assertJSONEqual(t, payload, *imported)
+		assertJSONEqual(t, payload, importedPayload)
 	}
 }
 
@@ -1799,11 +1832,14 @@ func TestTemplateDirectorySessionEntrypointTransportEnvelopeFixture(t *testing.T
 		if importErr != nil {
 			t.Fatalf("%s entrypoint envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedEntrypoint asttemplate.SessionEntrypoint
 		if imported == nil {
 			t.Fatalf("%s entrypoint envelope import returned nil entrypoint", testCase["label"])
+		} else {
+			importedEntrypoint = *imported
 		}
 
-		assertJSONEqual(t, entrypoint, *imported)
+		assertJSONEqual(t, entrypoint, importedEntrypoint)
 	}
 }
 
@@ -1824,11 +1860,14 @@ func TestTemplateDirectorySessionRunnerRequestTransportEnvelopeFixture(t *testin
 		if importErr != nil {
 			t.Fatalf("%s runner request envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedRequest asttemplate.SessionRunnerRequest
 		if imported == nil {
 			t.Fatalf("%s runner request envelope import returned nil request", testCase["label"])
+		} else {
+			importedRequest = *imported
 		}
 
-		assertJSONEqual(t, request, *imported)
+		assertJSONEqual(t, request, importedRequest)
 	}
 }
 
@@ -2088,11 +2127,14 @@ func TestTemplateDirectorySessionInvocationTransportEnvelopeFixture(t *testing.T
 		if importErr != nil {
 			t.Fatalf("%s invocation envelope import failed: %+v", testCase["label"], importErr)
 		}
+		var importedInvocation asttemplate.SessionInvocation
 		if imported == nil {
 			t.Fatalf("%s invocation envelope import returned nil invocation", testCase["label"])
+		} else {
+			importedInvocation = *imported
 		}
 
-		assertJSONEqual(t, invocation, *imported)
+		assertJSONEqual(t, invocation, importedInvocation)
 	}
 }
 
