@@ -95,7 +95,7 @@ Provider and recipe libraries:
 The Go packages are developed against the shared StructuredMerge fixtures. Those
 fixtures define the cross-language behavior expected from the Go, TypeScript,
 Rust, and Ruby implementations. Conformance checks live in package tests and in
-the shared spec/fixture tooling rather than in a static launch-status document.
+the shared spec/fixture tooling rather than in a static status document.
 
 ## Development
 
