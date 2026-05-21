@@ -133,14 +133,11 @@ func ProcessWithLanguagePack(request ProcessRequest) ParseResult[LanguagePackPro
 		})
 	}
 	for _, item := range result.Imports {
-		if request.Language == "typescript" {
-			analysis.Imports = append(analysis.Imports, normalizeTypeScriptImport(item))
-			continue
-		}
 		analysis.Imports = append(analysis.Imports, ProcessImportInfo{
-			Source: item.Source,
-			Items:  slices.Clone(item.Items),
-			Span:   processSpanFromLanguagePack(item.Span),
+			Source:     item.Source,
+			SourceKind: ProcessImportSourceRawSource,
+			Items:      slices.Clone(item.Items),
+			Span:       processSpanFromLanguagePack(item.Span),
 		})
 	}
 	for _, item := range result.Diagnostics {
@@ -180,35 +177,5 @@ func processSpanFromLanguagePack(span tspack.Span) ProcessSpan {
 		StartCol:  int(span.StartColumn),
 		EndRow:    int(span.EndLine),
 		EndCol:    int(span.EndColumn),
-	}
-}
-
-func normalizeTypeScriptImport(item tspack.ImportInfo) ProcessImportInfo {
-	source := item.Source
-	if strings.Contains(source, "from") {
-		if quoteParts := strings.Split(source, "'"); len(quoteParts) >= 2 {
-			source = quoteParts[1]
-		} else if quoteParts := strings.Split(source, "\""); len(quoteParts) >= 2 {
-			source = quoteParts[1]
-		}
-	}
-
-	items := make([]string, 0)
-	if start := strings.Index(item.Source, "{"); start >= 0 {
-		if end := strings.Index(item.Source[start+1:], "}"); end >= 0 {
-			rawItems := item.Source[start+1 : start+1+end]
-			for _, part := range strings.Split(rawItems, ",") {
-				part = strings.TrimSpace(strings.ReplaceAll(part, "type", ""))
-				if part != "" {
-					items = append(items, part)
-				}
-			}
-		}
-	}
-
-	return ProcessImportInfo{
-		Source: source,
-		Items:  items,
-		Span:   processSpanFromLanguagePack(item.Span),
 	}
 }

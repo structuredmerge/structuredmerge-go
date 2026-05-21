@@ -155,10 +155,6 @@ func lineAnchoredSpan(source string, span treehaver.ProcessSpan) string {
 	return strings.TrimSpace(source[lineStart:span.EndByte])
 }
 
-func normalizeRustImportPath(importSource string) string {
-	return strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(importSource), "use "), ";"))
-}
-
 func ParseRust(source string, _dialect RustDialect) astmerge.ParseResult[RustAnalysis] {
 	parsed := treehaver.ParseWithLanguagePack(parseRequest(source))
 	if !parsed.OK {
@@ -169,12 +165,15 @@ func ParseRust(source string, _dialect RustDialect) astmerge.ParseResult[RustAna
 	if !processed.OK || processed.Analysis == nil {
 		return astmerge.ParseResult[RustAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
 	}
+	if diagnostics := treehaver.StructuredImportSourceDiagnostics("rust", processed.Analysis.Imports); len(diagnostics) > 0 {
+		return astmerge.ParseResult[RustAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(diagnostics)}
+	}
 
 	imports := make([]moduleImport, 0, len(processed.Analysis.Imports))
 	for index, item := range processed.Analysis.Imports {
 		imports = append(imports, moduleImport{
 			Path:     "/imports/" + strconv.Itoa(index),
-			MatchKey: normalizeRustImportPath(item.Source),
+			MatchKey: item.Source,
 			Text:     sliceSpan(source, item.Span) + "\n",
 		})
 	}

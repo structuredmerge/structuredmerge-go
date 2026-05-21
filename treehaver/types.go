@@ -607,9 +607,28 @@ type ProcessStructureItem struct {
 }
 
 type ProcessImportInfo struct {
-	Source string
-	Items  []string
-	Span   ProcessSpan
+	Source     string
+	SourceKind string
+	Items      []string
+	Span       ProcessSpan
+}
+
+const (
+	ProcessImportSourceModule    = "module"
+	ProcessImportSourceRawSource = "raw_source"
+)
+
+func StructuredImportSourceDiagnostics(language string, imports []ProcessImportInfo) []Diagnostic {
+	for _, item := range imports {
+		if item.SourceKind != ProcessImportSourceModule {
+			return []Diagnostic{{
+				Severity: SeverityError,
+				Category: CategoryUnsupportedFeature,
+				Message:  "tree-sitter-language-pack did not provide structured import module fields for " + language + "; report this as a backend import-record bug.",
+			}}
+		}
+	}
+	return nil
 }
 
 type ProcessDiagnostic struct {

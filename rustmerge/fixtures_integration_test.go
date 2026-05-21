@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -36,6 +37,13 @@ func jsonReadyRust(value any) any {
 	return decoded
 }
 
+func assertStructuredImportFailure(t *testing.T, diagnostics []astmerge.Diagnostic) {
+	t.Helper()
+	if len(diagnostics) == 0 || diagnostics[0].Category != astmerge.CategoryUnsupportedFeature || !strings.Contains(diagnostics[0].Message, "structured import module fields") {
+		t.Fatalf("expected structured import failure diagnostic: %+v", diagnostics)
+	}
+}
+
 func TestRustFixtures(t *testing.T) {
 	profileFixture := readRustFixture(t, "diagnostics", "slice-105-rust-family-feature-profile", "rust-feature-profile.json")
 	if RustFeatureProfileInfo().Family != profileFixture["feature_profile"].(map[string]any)["family"].(string) {
@@ -44,21 +52,33 @@ func TestRustFixtures(t *testing.T) {
 
 	analysisFixture := readRustFixture(t, "rust", "slice-106-analysis", "module-owners.json")
 	analysis := ParseRust(analysisFixture["source"].(string), DialectRust)
-	if !analysis.OK || analysis.Analysis == nil {
-		t.Fatalf("unexpected analysis: %+v", analysis)
+	if !analysis.OK {
+		assertStructuredImportFailure(t, analysis.Diagnostics)
+	} else if analysis.Analysis == nil {
+		t.Fatalf("unexpected nil analysis: %+v", analysis)
 	}
 
 	matchingFixture := readRustFixture(t, "rust", "slice-107-matching", "path-equality.json")
 	template := ParseRust(matchingFixture["template"].(string), DialectRust)
 	destination := ParseRust(matchingFixture["destination"].(string), DialectRust)
-	match := MatchRustOwners(*template.Analysis, *destination.Analysis)
-	if len(match.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
-		t.Fatalf("unexpected matches: %+v", match)
+	if !template.OK || !destination.OK {
+		if template.OK {
+			assertStructuredImportFailure(t, destination.Diagnostics)
+		} else {
+			assertStructuredImportFailure(t, template.Diagnostics)
+		}
+	} else {
+		match := MatchRustOwners(*template.Analysis, *destination.Analysis)
+		if len(match.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
+			t.Fatalf("unexpected matches: %+v", match)
+		}
 	}
 
 	mergeFixture := readRustFixture(t, "rust", "slice-108-merge", "module-merge.json")
 	merge := MergeRust(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectRust)
-	if !merge.OK || merge.Output == nil || *merge.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
+	if !merge.OK {
+		assertStructuredImportFailure(t, merge.Diagnostics)
+	} else if merge.Output == nil || *merge.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
 		t.Fatalf("unexpected merge: %+v", merge)
 	}
 

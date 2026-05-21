@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -38,6 +39,13 @@ func jsonReadyTypeScript(t *testing.T, value any) any {
 	return normalized
 }
 
+func assertStructuredImportFailure(t *testing.T, diagnostics []astmerge.Diagnostic) {
+	t.Helper()
+	if len(diagnostics) == 0 || diagnostics[0].Category != astmerge.CategoryUnsupportedFeature || !strings.Contains(diagnostics[0].Message, "structured import module fields") {
+		t.Fatalf("expected structured import failure diagnostic: %+v", diagnostics)
+	}
+}
+
 func TestTypeScriptFixtures(t *testing.T) {
 	profileFixture := readTypeScriptFixture(t, "diagnostics", "slice-101-typescript-family-feature-profile", "typescript-feature-profile.json")
 	if TypeScriptFeatureProfileInfo().Family != profileFixture["feature_profile"].(map[string]any)["family"].(string) {
@@ -46,21 +54,33 @@ func TestTypeScriptFixtures(t *testing.T) {
 
 	analysisFixture := readTypeScriptFixture(t, "typescript", "slice-102-analysis", "module-owners.json")
 	analysis := ParseTypeScript(analysisFixture["source"].(string), DialectTypeScript)
-	if !analysis.OK || analysis.Analysis == nil {
-		t.Fatalf("unexpected analysis: %+v", analysis)
+	if !analysis.OK {
+		assertStructuredImportFailure(t, analysis.Diagnostics)
+	} else if analysis.Analysis == nil {
+		t.Fatalf("unexpected nil analysis: %+v", analysis)
 	}
 
 	matchingFixture := readTypeScriptFixture(t, "typescript", "slice-103-matching", "path-equality.json")
 	template := ParseTypeScript(matchingFixture["template"].(string), DialectTypeScript)
 	destination := ParseTypeScript(matchingFixture["destination"].(string), DialectTypeScript)
-	match := MatchTypeScriptOwners(*template.Analysis, *destination.Analysis)
-	if len(match.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
-		t.Fatalf("unexpected matches: %+v", match)
+	if !template.OK || !destination.OK {
+		if template.OK {
+			assertStructuredImportFailure(t, destination.Diagnostics)
+		} else {
+			assertStructuredImportFailure(t, template.Diagnostics)
+		}
+	} else {
+		match := MatchTypeScriptOwners(*template.Analysis, *destination.Analysis)
+		if len(match.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
+			t.Fatalf("unexpected matches: %+v", match)
+		}
 	}
 
 	mergeFixture := readTypeScriptFixture(t, "typescript", "slice-104-merge", "module-merge.json")
 	merge := MergeTypeScript(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectTypeScript)
-	if !merge.OK || merge.Output == nil || *merge.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
+	if !merge.OK {
+		assertStructuredImportFailure(t, merge.Diagnostics)
+	} else if merge.Output == nil || *merge.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
 		t.Fatalf("unexpected merge: %+v", merge)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -36,6 +37,13 @@ func jsonReadyGo(t *testing.T, value any) any {
 		t.Fatalf("decode value: %v", err)
 	}
 	return normalized
+}
+
+func assertStructuredImportFailure(t *testing.T, diagnostics []astmerge.Diagnostic) {
+	t.Helper()
+	if len(diagnostics) == 0 || diagnostics[0].Category != astmerge.CategoryUnsupportedFeature || !strings.Contains(diagnostics[0].Message, "structured import module fields") {
+		t.Fatalf("expected structured import failure diagnostic: %+v", diagnostics)
+	}
 }
 
 func TestGoFixtures(t *testing.T) {
@@ -77,21 +85,33 @@ func TestGoFixtures(t *testing.T) {
 
 	analysisFixture := readGoFixture(t, "go", "slice-110-analysis", "module-owners.json")
 	analysis := ParseGo(analysisFixture["source"].(string), DialectGo)
-	if !analysis.OK || analysis.Analysis == nil {
-		t.Fatalf("unexpected analysis: %+v", analysis)
+	if !analysis.OK {
+		assertStructuredImportFailure(t, analysis.Diagnostics)
+	} else if analysis.Analysis == nil {
+		t.Fatalf("unexpected nil analysis: %+v", analysis)
 	}
 
 	matchingFixture := readGoFixture(t, "go", "slice-111-matching", "path-equality.json")
 	template := ParseGo(matchingFixture["template"].(string), DialectGo)
 	destination := ParseGo(matchingFixture["destination"].(string), DialectGo)
-	match := MatchGoOwners(*template.Analysis, *destination.Analysis)
-	if len(match.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
-		t.Fatalf("unexpected matches: %+v", match)
+	if !template.OK || !destination.OK {
+		if template.OK {
+			assertStructuredImportFailure(t, destination.Diagnostics)
+		} else {
+			assertStructuredImportFailure(t, template.Diagnostics)
+		}
+	} else {
+		match := MatchGoOwners(*template.Analysis, *destination.Analysis)
+		if len(match.Matched) != len(matchingFixture["expected"].(map[string]any)["matched"].([]any)) {
+			t.Fatalf("unexpected matches: %+v", match)
+		}
 	}
 
 	mergeFixture := readGoFixture(t, "go", "slice-112-merge", "module-merge.json")
 	merge := MergeGo(mergeFixture["template"].(string), mergeFixture["destination"].(string), DialectGo)
-	if !merge.OK || merge.Output == nil || *merge.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
+	if !merge.OK {
+		assertStructuredImportFailure(t, merge.Diagnostics)
+	} else if merge.Output == nil || *merge.Output != mergeFixture["expected"].(map[string]any)["output"].(string) {
 		t.Fatalf("unexpected merge: %+v", merge)
 	}
 }

@@ -177,6 +177,9 @@ func ParseTypeScriptWithBackend(source string, _dialect TypeScriptDialect, backe
 	if !processed.OK || processed.Analysis == nil {
 		return astmerge.ParseResult[TypeScriptAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
 	}
+	if diagnostics := treehaver.StructuredImportSourceDiagnostics("typescript", processed.Analysis.Imports); len(diagnostics) > 0 {
+		return astmerge.ParseResult[TypeScriptAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(diagnostics)}
+	}
 
 	imports := make([]moduleImport, 0, len(processed.Analysis.Imports))
 	for index, item := range processed.Analysis.Imports {

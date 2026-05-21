@@ -163,17 +163,6 @@ func lineAnchoredSpan(source string, span treehaver.ProcessSpan) string {
 	return strings.TrimSpace(source[lineStart:span.EndByte])
 }
 
-func normalizeGoImportPath(importSource string) string {
-	quoteMatchStart := strings.Index(importSource, "\"")
-	if quoteMatchStart >= 0 {
-		quoteMatchEnd := strings.Index(importSource[quoteMatchStart+1:], "\"")
-		if quoteMatchEnd >= 0 {
-			return importSource[quoteMatchStart+1 : quoteMatchStart+1+quoteMatchEnd]
-		}
-	}
-	return strings.TrimSpace(strings.TrimPrefix(importSource, "import "))
-}
-
 func ParseGo(source string, _dialect GoDialect) astmerge.ParseResult[GoAnalysis] {
 	return ParseGoWithBackend(source, DialectGo, BackendTreeSitter)
 }
@@ -202,11 +191,14 @@ func ParseGoWithBackend(source string, _dialect GoDialect, backend GoBackend) as
 	if !processed.OK || processed.Analysis == nil {
 		return astmerge.ParseResult[GoAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(processed.Diagnostics)}
 	}
+	if diagnostics := treehaver.StructuredImportSourceDiagnostics("go", processed.Analysis.Imports); len(diagnostics) > 0 {
+		return astmerge.ParseResult[GoAnalysis]{OK: false, Diagnostics: astmerge.DiagnosticsFromTreeHaver(diagnostics)}
+	}
 
 	dedupedImports := make(map[string]moduleImport)
 	importOrder := make([]string, 0)
 	for _, item := range processed.Analysis.Imports {
-		matchKey := normalizeGoImportPath(item.Source)
+		matchKey := item.Source
 		candidate := moduleImport{
 			Path:     "",
 			MatchKey: matchKey,
