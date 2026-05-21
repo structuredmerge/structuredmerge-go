@@ -26,27 +26,66 @@ Package README files in other implementations link to their root package-family
 guide. The Go implementation uses this root inventory because its packages live
 inside one module.
 
+The family is intentionally layered:
+
+- [`treehaver`][go-treehaver] provides parser portability, backend discovery, byte ranges, and runtime capability reporting.
+- [`astmerge`][go-astmerge] provides the cross-format merge substrate: shared contracts, diagnostics, review state, and execution reports.
+- Family packages such as [`markdownmerge`][go-markdownmerge], [`yamlmerge`][go-yamlmerge], and [`tomlmerge`][go-tomlmerge] own parser-neutral behavior for one format family.
+- Provider packages such as [`goldmarkmerge`][go-goldmarkmerge], [`goccygoyamlmerge`][go-goccygoyamlmerge], and [`pigeontomlmerge`][go-pigeontomlmerge] bind those families to concrete Go parser libraries.
+
 | Package | Layer | What it provides |
 | --- | --- | --- |
-| [`treehaver`](https://github.com/structuredmerge/structuredmerge-go/tree/main/treehaver) | Parser substrate | Parser backend registry, byte ranges, node wrappers, source locations, and binary tree contracts. |
-| [`astmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/astmerge) | Merge substrate | AST merge contracts, diagnostics, planning, review, replay, and nested merge vocabulary. |
-| [`asttemplate`](https://github.com/structuredmerge/structuredmerge-go/tree/main/asttemplate) | Template substrate | Template/session transport contracts. |
-| [`plainmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/plainmerge) | Text | Plain-text fallback contracts. |
-| [`jsonmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/jsonmerge) | JSON and JSONC | Object/array-aware JSON merge behavior. |
-| [`yamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/yamlmerge) | YAML | YAML-family merge contracts. |
-| [`tomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/tomlmerge) | TOML | TOML-family merge contracts. |
-| [`markdownmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/markdownmerge) | Markdown | Markdown-family merge contracts. |
-| [`rubymerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rubymerge) | Ruby source | Ruby source merge contracts. |
-| [`gomerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/gomerge) | Go source | Go source merge contracts. |
-| [`rustmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rustmerge) | Rust source | Rust source merge contracts. |
-| [`typescriptmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/typescriptmerge) | TypeScript source | TypeScript source merge contracts. |
-| [`binarymerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/binarymerge) | Binary | Binary tree planning contracts. |
-| [`zipmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/zipmerge) | Archives | ZIP archive planning helpers. |
-| [`goccygoyamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goccygoyamlmerge) | YAML provider | YAML parser/emitter provider path. |
-| [`pigeontomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/pigeontomlmerge) | TOML provider | Pigeon-backed TOML parser provider path. |
-| [`goldmarkmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goldmarkmerge) | Markdown provider | Goldmark-backed Markdown parser provider path. |
-| [`goparsermerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goparsermerge) | Go provider | Go parser provider path. |
-| [`kettlegomodder`](https://github.com/structuredmerge/structuredmerge-go/tree/main/kettlegomodder) | Recipe tooling | Go module maintenance and package recipe helpers. |
+| [`treehaver`][go-treehaver] | Parser substrate | Parser backend registry, byte ranges, node wrappers, source locations, and binary tree contracts. |
+| [`astmerge`][go-astmerge] | Merge substrate | AST merge contracts, diagnostics, planning, review, replay, and nested merge vocabulary. |
+| [`asttemplate`][go-asttemplate] | Template substrate | Template/session transport contracts. |
+| [`astcrispr`][go-astcrispr] | Structured edits | AST edit recipes for generated blocks and template-owned regions. |
+| [`astmergegit`][go-astmergegit] | Git integration | Merge-driver, diff-driver, conflict inspection, and language registry plumbing for `smorg-go`. |
+| [`plainmerge`][go-plainmerge] | Text | Plain-text fallback contracts. |
+| [`jsonmerge`][go-jsonmerge] | JSON and JSONC | Object/array-aware JSON merge behavior using [tree-sitter-language-pack][tree-sitter-language-pack] where selected. |
+| [`yamlmerge`][go-yamlmerge] | YAML | YAML-family merge contracts. |
+| [`tomlmerge`][go-tomlmerge] | TOML | TOML-family merge contracts. |
+| [`markdownmerge`][go-markdownmerge] | Markdown | Markdown-family merge contracts. |
+| [`rubymerge`][go-rubymerge] | Ruby source | Ruby source merge contracts. |
+| [`gomerge`][go-gomerge] | Go source | Go source merge contracts. |
+| [`rustmerge`][go-rustmerge] | Rust source | Rust source merge contracts. |
+| [`typescriptmerge`][go-typescriptmerge] | TypeScript source | TypeScript source merge contracts. |
+| [`binarymerge`][go-binarymerge] | Binary | Binary tree planning contracts. |
+| [`zipmerge`][go-zipmerge] | Archives | ZIP archive planning helpers. |
+| [`goccygoyamlmerge`][go-goccygoyamlmerge] | YAML provider | Uses [`goccy/go-yaml`][goccy-go-yaml] as the YAML parser/emitter provider path. |
+| [`pigeontomlmerge`][go-pigeontomlmerge] | TOML provider | Uses [Pigeon][pigeon] generated parser code as the TOML provider path. |
+| [`goldmarkmerge`][go-goldmarkmerge] | Markdown provider | Uses [Goldmark][goldmark] as the Markdown parser provider path. |
+| [`goparsermerge`][go-goparsermerge] | Go provider | Uses the Go standard library [`go/parser`][go-parser] provider path. |
+| [`godstmerge`][go-godstmerge] | Go provider | Uses [`go-dst`][go-dst] for decorator-preserving Go source edit projection. |
+| [`kettlegomodder`][go-kettlegomodder] | Recipe tooling | Go module maintenance and package recipe helpers. |
+
+[go-treehaver]: https://github.com/structuredmerge/structuredmerge-go/tree/main/treehaver
+[go-astmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/astmerge
+[go-asttemplate]: https://github.com/structuredmerge/structuredmerge-go/tree/main/asttemplate
+[go-astcrispr]: https://github.com/structuredmerge/structuredmerge-go/tree/main/astcrispr
+[go-astmergegit]: https://github.com/structuredmerge/structuredmerge-go/tree/main/astmergegit
+[go-plainmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/plainmerge
+[go-jsonmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/jsonmerge
+[go-yamlmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/yamlmerge
+[go-tomlmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/tomlmerge
+[go-markdownmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/markdownmerge
+[go-rubymerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/rubymerge
+[go-gomerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/gomerge
+[go-rustmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/rustmerge
+[go-typescriptmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/typescriptmerge
+[go-binarymerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/binarymerge
+[go-zipmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/zipmerge
+[go-goccygoyamlmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/goccygoyamlmerge
+[go-pigeontomlmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/pigeontomlmerge
+[go-goldmarkmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/goldmarkmerge
+[go-goparsermerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/goparsermerge
+[go-godstmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/godstmerge
+[go-kettlegomodder]: https://github.com/structuredmerge/structuredmerge-go/tree/main/kettlegomodder
+[tree-sitter-language-pack]: https://github.com/kreuzberg-dev/tree-sitter-language-pack
+[goccy-go-yaml]: https://github.com/goccy/go-yaml
+[pigeon]: https://github.com/mna/pigeon
+[goldmark]: https://github.com/yuin/goldmark
+[go-parser]: https://pkg.go.dev/go/parser
+[go-dst]: https://github.com/dave/dst
 
 ## Install
 
@@ -137,7 +176,7 @@ Common checks:
 - `mise run check`
 - `go test ./...`
 
-The current tree-sitter backend path uses the sibling
-`../tree-sitter-language-pack` checkout through a local `replace` in `go.mod`.
+The tree-sitter backend path uses the sibling
+[`tree-sitter-language-pack`][tree-sitter-language-pack] checkout through a local `replace` in `go.mod`.
 Repo tasks build its `ts-pack-core-ffi` crate first and compile with the
-`tspack_dev` build tag while the upstream packaging fix is pending.
+`tspack_dev` build tag.
