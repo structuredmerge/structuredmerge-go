@@ -14,6 +14,40 @@ Project links:
 - Specification: <https://github.com/structuredmerge/structuredmerge-spec>
 - Shared fixtures: <https://github.com/structuredmerge/structuredmerge-fixtures>
 
+## Package Family
+
+StructuredMerge Go is a layered package family. The lower layers provide parser,
+range, AST, merge, and template contracts; format packages apply those contracts
+to specific languages and data formats; provider packages bind a format family
+to a parser or serializer; workflow packages package Go module maintenance and
+Git-driver behavior.
+
+Package README files in other implementations link to their root package-family
+guide. The Go implementation uses this root inventory because its packages live
+inside one module.
+
+| Package | Layer | What it provides |
+| --- | --- | --- |
+| [`treehaver`](https://github.com/structuredmerge/structuredmerge-go/tree/main/treehaver) | Parser substrate | Parser backend registry, byte ranges, node wrappers, source locations, and binary tree contracts. |
+| [`astmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/astmerge) | Merge substrate | AST merge contracts, diagnostics, planning, review, replay, and nested merge vocabulary. |
+| [`asttemplate`](https://github.com/structuredmerge/structuredmerge-go/tree/main/asttemplate) | Template substrate | Template/session transport contracts. |
+| [`plainmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/plainmerge) | Text | Plain-text fallback contracts. |
+| [`jsonmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/jsonmerge) | JSON and JSONC | Object/array-aware JSON merge behavior. |
+| [`yamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/yamlmerge) | YAML | YAML-family merge contracts. |
+| [`tomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/tomlmerge) | TOML | TOML-family merge contracts. |
+| [`markdownmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/markdownmerge) | Markdown | Markdown-family merge contracts. |
+| [`rubymerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rubymerge) | Ruby source | Ruby source merge contracts. |
+| [`gomerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/gomerge) | Go source | Go source merge contracts. |
+| [`rustmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/rustmerge) | Rust source | Rust source merge contracts. |
+| [`typescriptmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/typescriptmerge) | TypeScript source | TypeScript source merge contracts. |
+| [`binarymerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/binarymerge) | Binary | Binary tree planning contracts. |
+| [`zipmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/zipmerge) | Archives | ZIP archive planning helpers. |
+| [`goccygoyamlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goccygoyamlmerge) | YAML provider | YAML parser/emitter provider path. |
+| [`pigeontomlmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/pigeontomlmerge) | TOML provider | Pigeon-backed TOML parser provider path. |
+| [`goldmarkmerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goldmarkmerge) | Markdown provider | Goldmark-backed Markdown parser provider path. |
+| [`goparsermerge`](https://github.com/structuredmerge/structuredmerge-go/tree/main/goparsermerge) | Go provider | Go parser provider path. |
+| [`kettlegomodder`](https://github.com/structuredmerge/structuredmerge-go/tree/main/kettlegomodder) | Recipe tooling | Go module maintenance and package recipe helpers. |
+
 ## Install
 
 ```sh
@@ -55,10 +89,9 @@ seven- or nine-argument forms Git passes to external diff commands.
 `conflicts diff` reports conflict-marker regions in a file that already contains
 Git conflict markers.
 
-Current semantic merge-driver coverage is fixture-backed for JSON and for the
-first Go source-language slice. Other language and format paths should be treated
-as git-compatible command surfaces until their `ast-merge-git` coverage is
-promoted.
+Semantic merge-driver coverage is fixture-backed for JSON and for the first Go
+source-language slice. Other language and format paths are git-compatible
+command surfaces without semantic driver coverage.
 
 ## Packages
 
