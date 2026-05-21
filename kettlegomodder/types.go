@@ -679,20 +679,38 @@ func replaceTextManagedBlock(content string, replacement string) string {
 }
 
 func replaceBetweenMarkers(content string, openMarker string, closeMarker string, replacement string, fallback func() string) string {
-	openIndex := strings.Index(content, openMarker)
-	if openIndex < 0 {
+	lines := strings.Split(content, "\n")
+	openLine := markerLineIndex(lines, openMarker, 0)
+	if openLine < 0 {
 		return fallback()
 	}
-	closeIndex := strings.Index(content[openIndex:], closeMarker)
-	if closeIndex < 0 {
+	closeLine := markerLineIndex(lines, closeMarker, openLine+1)
+	if closeLine < 0 {
 		return fallback()
 	}
-	closeIndex += openIndex
-	closeEnd := closeIndex + len(closeMarker)
-	if closeEnd < len(content) && content[closeEnd] == '\n' {
-		closeEnd++
+
+	result := make([]string, 0, len(lines)-closeLine+openLine+len(replacementLines(replacement)))
+	result = append(result, lines[:openLine]...)
+	result = append(result, replacementLines(replacement)...)
+	result = append(result, lines[closeLine+1:]...)
+	return strings.Join(result, "\n")
+}
+
+func markerLineIndex(lines []string, marker string, startLine int) int {
+	for index := startLine; index < len(lines); index++ {
+		if lines[index] == marker {
+			return index
+		}
 	}
-	return content[:openIndex] + replacement + "\n" + content[closeEnd:]
+	return -1
+}
+
+func replacementLines(replacement string) []string {
+	normalized := strings.TrimSuffix(replacement, "\n")
+	if normalized == "" {
+		return []string{""}
+	}
+	return strings.Split(normalized, "\n")
 }
 
 func runtimeContext(facts PackageFacts) map[string]any {
