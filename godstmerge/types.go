@@ -218,13 +218,27 @@ func parseGoDST(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		}
 	}
 
-	imports := make([]gomerge.GoModuleImport, 0, len(file.Imports))
-	for index, item := range file.Imports {
+	imports := make([]gomerge.GoModuleImport, 0, len(restoredFile.Imports))
+	for index, item := range restoredFile.Imports {
 		matchKey := strings.Trim(item.Path.Value, "\"")
+		start := restoredFset.Position(item.Pos()).Offset - offsetBytes
+		end := restoredFset.Position(item.End()).Offset - offsetBytes
+		if start < 0 || end > len(originalSource) || start > end {
+			return astmerge.ParseResult[gomerge.GoAnalysis]{
+				OK:          false,
+				Diagnostics: []astmerge.Diagnostic{unsupportedFeature("go-dst import span is outside source bounds")},
+			}
+		}
+		lineStart := strings.LastIndex(originalSource[:start], "\n")
+		if lineStart >= 0 {
+			lineStart++
+		} else {
+			lineStart = 0
+		}
 		imports = append(imports, gomerge.GoModuleImport{
 			Path:     "/imports/" + strconv.Itoa(index),
 			MatchKey: matchKey,
-			Text:     importLineText(originalSource, item.Path.Value),
+			Text:     strings.TrimSpace(originalSource[lineStart:end]) + "\n",
 		})
 	}
 
@@ -236,25 +250,23 @@ func parseGoDST(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		}
 		start := restoredFset.Position(funcDecl.Pos()).Offset - offsetBytes
 		end := restoredFset.Position(funcDecl.End()).Offset - offsetBytes
-		text := ""
 		if start < 0 || end > len(originalSource) || start > end {
-			text = extractFunctionText(originalSource, funcDecl.Name.Name)
-		} else {
-			lineStart := strings.LastIndex(originalSource[:start], "\n")
-			if lineStart >= 0 {
-				lineStart++
-			} else {
-				lineStart = 0
-			}
-			text = strings.TrimSpace(originalSource[lineStart:end]) + "\n"
-			if !hasBalancedBraces(text) {
-				text = extractFunctionText(originalSource, funcDecl.Name.Name)
-			}
-		}
-		if strings.TrimSpace(text) == "" {
 			return astmerge.ParseResult[gomerge.GoAnalysis]{
 				OK:          false,
-				Diagnostics: []astmerge.Diagnostic{parseError("restored dave/dst declaration span is outside source bounds")},
+				Diagnostics: []astmerge.Diagnostic{unsupportedFeature("go-dst declaration span is outside source bounds")},
+			}
+		}
+		lineStart := strings.LastIndex(originalSource[:start], "\n")
+		if lineStart >= 0 {
+			lineStart++
+		} else {
+			lineStart = 0
+		}
+		text := strings.TrimSpace(originalSource[lineStart:end]) + "\n"
+		if !hasBalancedBraces(text) {
+			return astmerge.ParseResult[gomerge.GoAnalysis]{
+				OK:          false,
+				Diagnostics: []astmerge.Diagnostic{unsupportedFeature("go-dst declaration span did not cover a balanced function body")},
 			}
 		}
 		declarations = append(declarations, gomerge.GoModuleDeclaration{
@@ -300,36 +312,6 @@ func hasBalancedBraces(source string) bool {
 		}
 	}
 	return seen && depth == 0
-}
-
-func extractFunctionText(source string, name string) string {
-	start := strings.Index(source, "func "+name+"(")
-	if start < 0 {
-		return ""
-	}
-	lineStart := strings.LastIndex(source[:start], "\n")
-	if lineStart >= 0 {
-		lineStart++
-	} else {
-		lineStart = 0
-	}
-	depth := 0
-	seenBody := false
-	for index := start; index < len(source); index++ {
-		switch source[index] {
-		case '{':
-			depth++
-			seenBody = true
-		case '}':
-			if depth > 0 {
-				depth--
-			}
-			if seenBody && depth == 0 {
-				return strings.TrimSpace(source[lineStart:index+1]) + "\n"
-			}
-		}
-	}
-	return ""
 }
 
 func applyGoDSTNodeOperation(source string, operation treehaver.EditProjectionOperationRequest) (string, error) {
@@ -400,13 +382,4 @@ func declIndex(targetNodePath string) (int, error) {
 		return 0, err
 	}
 	return index, nil
-}
-
-func importLineText(source string, quotedPath string) string {
-	for _, line := range strings.Split(source, "\n") {
-		if strings.Contains(line, quotedPath) {
-			return strings.TrimSpace(line) + "\n"
-		}
-	}
-	return "import " + quotedPath + "\n"
 }
