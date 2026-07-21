@@ -809,6 +809,11 @@ func TestDiffDriverTwoArgumentFormPrintsStructuredDiff(t *testing.T) {
 	if !strings.Contains(output, "structured-diff main.go") || !strings.Contains(output, "status changed") {
 		t.Fatalf("expected structured diff output, got %q", output)
 	}
+	for _, fragment := range []string{"review-diff unified", "@@ -1,3 +1,3 @@", "-func Old() {}", "+func New() {}"} {
+		if !strings.Contains(output, fragment) {
+			t.Fatalf("expected reviewable diff fragment %q in %q", fragment, output)
+		}
+	}
 }
 
 func TestDiffDriverGitExternalDiffForms(t *testing.T) {
@@ -829,8 +834,14 @@ func TestDiffDriverGitExternalDiffForms(t *testing.T) {
 			if exitCode != exitSuccess {
 				t.Fatalf("unexpected exit code %d stderr=%s", exitCode, stderr.String())
 			}
-			if !strings.Contains(stdout.String(), "structured-diff package.json") {
-				t.Fatalf("expected path-named structured diff output, got %q", stdout.String())
+			output := stdout.String()
+			if !strings.Contains(output, "structured-diff package.json") {
+				t.Fatalf("expected path-named structured diff output, got %q", output)
+			}
+			for _, fragment := range []string{"review-diff unified", "@@ -1,1 +1,1 @@", `-{"old":true}`, `+{"new":true}`} {
+				if !strings.Contains(output, fragment) {
+					t.Fatalf("expected reviewable diff fragment %q in %q", fragment, output)
+				}
 			}
 		})
 	}

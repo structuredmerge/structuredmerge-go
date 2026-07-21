@@ -476,6 +476,41 @@ func printStructuredDiff(stdout io.Writer, pathName string, oldSource string, ne
 	_, _ = fmt.Fprintf(stdout, "status changed\n")
 	_, _ = fmt.Fprintf(stdout, "old-lines %d\n", oldLines)
 	_, _ = fmt.Fprintf(stdout, "new-lines %d\n", newLines)
+	printStructuredDiffReviewHunk(stdout, pathName, oldSource, newSource)
+}
+
+func printStructuredDiffReviewHunk(stdout io.Writer, pathName string, oldSource string, newSource string) {
+	oldLines := diffSourceLines(oldSource)
+	newLines := diffSourceLines(newSource)
+	_, _ = fmt.Fprintln(stdout, "review-diff unified")
+	_, _ = fmt.Fprintf(stdout, "--- a/%s\n", pathName)
+	_, _ = fmt.Fprintf(stdout, "+++ b/%s\n", pathName)
+	_, _ = fmt.Fprintf(stdout, "@@ -1,%d +1,%d @@\n", len(oldLines), len(newLines))
+	for _, line := range oldLines {
+		writeDiffLine(stdout, "-", line)
+	}
+	for _, line := range newLines {
+		writeDiffLine(stdout, "+", line)
+	}
+}
+
+func diffSourceLines(source string) []string {
+	if source == "" {
+		return []string{}
+	}
+	lines := strings.SplitAfter(source, "\n")
+	if lines[len(lines)-1] == "" {
+		return lines[:len(lines)-1]
+	}
+	return lines
+}
+
+func writeDiffLine(stdout io.Writer, prefix string, line string) {
+	_, _ = fmt.Fprint(stdout, prefix)
+	_, _ = fmt.Fprint(stdout, line)
+	if !strings.HasSuffix(line, "\n") {
+		_, _ = fmt.Fprintln(stdout)
+	}
 }
 
 func runLanguages(args []string, stdout io.Writer, stderr io.Writer) int {

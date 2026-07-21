@@ -1595,11 +1595,12 @@ type GitDriverSmokeSuite struct {
 }
 
 type DiffDriverSmokeCase struct {
-	CaseID             string   `json:"case_id"`
-	ArgumentCount      int      `json:"argument_count"`
-	ArgumentRoles      []string `json:"argument_roles"`
-	ExpectedExitCode   int      `json:"expected_exit_code"`
-	ExpectedOutputKind string   `json:"expected_output_kind"`
+	CaseID                  string   `json:"case_id"`
+	ArgumentCount           int      `json:"argument_count"`
+	ArgumentRoles           []string `json:"argument_roles"`
+	ExpectedExitCode        int      `json:"expected_exit_code"`
+	ExpectedOutputKind      string   `json:"expected_output_kind"`
+	ExpectedOutputFragments []string `json:"expected_output_fragments"`
 }
 
 type DiffDriverSmokeSuite struct {
