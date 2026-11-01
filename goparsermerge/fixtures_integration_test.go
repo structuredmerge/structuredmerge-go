@@ -347,6 +347,38 @@ func TestGoParserFailsClosedOnRecoveredPartialASTsFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserPreservesGenericTypeAliasOwnerFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "generic-type-alias-owner.json")
+	expected := fixture["expected"].(map[string]any)
+	parsed := ParseGo(fixture["source"].(string), gomerge.GoDialect(fixture["dialect"].(string)))
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parser to accept generic aliases: %+v", parsed)
+	}
+	owners := make([]map[string]any, 0, len(parsed.Analysis.Owners))
+	for _, owner := range parsed.Analysis.Owners {
+		owners = append(owners, map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+			"match_key":  owner.MatchKey,
+		})
+	}
+	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, expected["go_owners"]) {
+		t.Fatalf("unexpected generic alias owners: %+v", actual)
+	}
+	paths := make([]string, 0, len(parsed.Analysis.Declarations))
+	texts := make([]string, 0, len(parsed.Analysis.Declarations))
+	for _, declaration := range parsed.Analysis.Declarations {
+		paths = append(paths, declaration.Path)
+		texts = append(texts, declaration.Text)
+	}
+	if actual := jsonReady(t, paths); !reflect.DeepEqual(actual, expected["declaration_paths"]) {
+		t.Fatalf("unexpected generic alias declaration paths: %+v", actual)
+	}
+	if actual := jsonReady(t, texts); !reflect.DeepEqual(actual, expected["declaration_texts"]) {
+		t.Fatalf("unexpected generic alias declaration text: %+v", actual)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])
