@@ -377,6 +377,22 @@ func TestGoParserPreservesGenericTypeAliasOwnerFixture(t *testing.T) {
 	if actual := jsonReady(t, texts); !reflect.DeepEqual(actual, expected["declaration_texts"]) {
 		t.Fatalf("unexpected generic alias declaration text: %+v", actual)
 	}
+
+	grouped := ParseGo(fixture["grouped_source"].(string), gomerge.GoDialect(fixture["dialect"].(string)))
+	if !grouped.OK || grouped.Analysis == nil {
+		t.Fatalf("expected grouped generic alias to parse: %+v", grouped)
+	}
+	groupedOwners := make([]map[string]any, 0, len(grouped.Analysis.Owners))
+	for _, owner := range grouped.Analysis.Owners {
+		groupedOwners = append(groupedOwners, map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+			"match_key":  owner.MatchKey,
+		})
+	}
+	if actual := jsonReady(t, groupedOwners); !reflect.DeepEqual(actual, expected["grouped_go_owners"]) {
+		t.Fatalf("unexpected grouped generic alias owners: %+v", actual)
+	}
 }
 
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
