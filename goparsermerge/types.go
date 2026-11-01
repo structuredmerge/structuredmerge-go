@@ -231,6 +231,27 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 
 	declarations := make([]gomerge.GoModuleDeclaration, 0)
 	for _, decl := range file.Decls {
+		if genDecl, ok := decl.(*ast.GenDecl); ok {
+			if ownerPath, matchKey, supported := nativeGenDeclOwner(genDecl); supported {
+				start := fset.Position(genDecl.Pos()).Offset
+				if genDecl.Doc != nil {
+					start = fset.Position(genDecl.Doc.Pos()).Offset
+				}
+				start -= offsetBytes
+				end := fset.Position(genDecl.End()).Offset - offsetBytes
+				lineStart := strings.LastIndex(originalSource[:start], "\n")
+				if lineStart >= 0 {
+					lineStart++
+				} else {
+					lineStart = 0
+				}
+				declarations = append(declarations, gomerge.GoModuleDeclaration{
+					Path: ownerPath, MatchKey: matchKey,
+					Text: strings.TrimSpace(originalSource[lineStart:end]) + "\n",
+				})
+			}
+			continue
+		}
 		funcDecl, ok := decl.(*ast.FuncDecl)
 		if !ok || funcDecl.Name == nil {
 			continue
@@ -281,6 +302,56 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func nativeGenDeclOwner(declaration *ast.GenDecl) (string, string, bool) {
+	var label string
+	switch declaration.Tok {
+	case token.TYPE:
+		label = "type"
+	case token.CONST:
+		label = "const"
+	case token.VAR:
+		label = "var"
+	default:
+		return "", "", false
+	}
+
+	groups := make([][]string, 0, len(declaration.Specs))
+	for _, spec := range declaration.Specs {
+		names := make([]string, 0)
+		switch value := spec.(type) {
+		case *ast.TypeSpec:
+			names = append(names, value.Name.Name)
+		case *ast.ValueSpec:
+			for _, name := range value.Names {
+				names = append(names, name.Name)
+			}
+		}
+		if len(names) == 0 {
+			return "", "", false
+		}
+		groups = append(groups, names)
+	}
+	if len(groups) == 0 {
+		return "", "", false
+	}
+
+	var identity string
+	if declaration.Lparen.IsValid() {
+		parts := make([]string, 0, len(groups))
+		for _, names := range groups {
+			parts = append(parts, strings.Join(names, ","))
+		}
+		identity = label + "_group:" + strings.Join(parts, ";")
+	} else {
+		names := make([]string, 0)
+		for _, group := range groups {
+			names = append(names, group...)
+		}
+		identity = label + ":" + strings.Join(names, ",")
+	}
+	return "/" + identity, identity, true
 }
 
 func receiverTypeName(expression ast.Expr) (string, bool) {
