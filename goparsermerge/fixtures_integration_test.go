@@ -313,6 +313,16 @@ func TestGoParserPreservesGroupedImportOwnerFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserRejectsMalformedSourceFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "malformed-source.json")
+	parsed := ParseGo(fixture["source"].(string), gomerge.GoDialect(fixture["dialect"].(string)))
+	expected := fixture["expected"].(map[string]any)
+	if parsed.OK || parsed.Analysis != nil || len(parsed.Diagnostics) != 1 ||
+		string(parsed.Diagnostics[0].Category) != expected["category"].(string) {
+		t.Fatalf("unexpected malformed source result: %+v", parsed)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])
