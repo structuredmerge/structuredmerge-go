@@ -323,11 +323,20 @@ func MergeGoWithParser(
 	}
 
 	sections := make([]string, 0, 2)
-	if len(destination.Analysis.Imports) > 0 {
-		importTexts := make([]string, 0, len(destination.Analysis.Imports))
-		for _, item := range destination.Analysis.Imports {
-			importTexts = append(importTexts, item.Text)
+	importTexts := make([]string, 0, len(destination.Analysis.Imports)+len(template.Analysis.Imports))
+	seenImportPaths := make(map[string]struct{}, len(destination.Analysis.Imports))
+	for _, item := range destination.Analysis.Imports {
+		seenImportPaths[item.Path] = struct{}{}
+		importTexts = append(importTexts, item.Text)
+	}
+	for _, item := range template.Analysis.Imports {
+		if _, exists := seenImportPaths[item.Path]; exists {
+			continue
 		}
+		seenImportPaths[item.Path] = struct{}{}
+		importTexts = append(importTexts, item.Text)
+	}
+	if len(importTexts) > 0 {
 		sections = append(sections, strings.TrimSpace(strings.Join(importTexts, "")))
 	}
 	if len(declarationTexts) > 0 {

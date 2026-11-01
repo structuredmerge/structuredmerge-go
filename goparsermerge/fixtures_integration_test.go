@@ -279,6 +279,40 @@ func TestGoParserPreservesSameLineTrailingCommentOwnershipFixture(t *testing.T) 
 	}
 }
 
+func TestGoParserPreservesGroupedImportOwnerFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "grouped-import-owner.json")
+	dialect := gomerge.GoDialect(fixture["dialect"].(string))
+	expected := fixture["expected"].(map[string]any)
+	parsed := ParseGo(fixture["source"].(string), dialect)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	owners := make([]map[string]any, 0, len(parsed.Analysis.Owners))
+	for _, owner := range parsed.Analysis.Owners {
+		owners = append(owners, map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+			"match_key":  owner.MatchKey,
+		})
+	}
+	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, expected["owners"]) {
+		t.Fatalf("unexpected grouped import owners: %+v", actual)
+	}
+	if len(parsed.Analysis.Imports) != 1 {
+		t.Fatalf("expected one grouped import declaration: %+v", parsed.Analysis.Imports)
+	}
+	importOwner := parsed.Analysis.Imports[0]
+	if importOwner.Path != expected["import_path"].(string) ||
+		importOwner.MatchKey != expected["import_match_key"].(string) ||
+		importOwner.Text != expected["import_text"].(string) {
+		t.Fatalf("unexpected grouped import text or identity: %+v", importOwner)
+	}
+	merged := MergeGo(expected["merge_template"].(string), expected["merge_destination"].(string), dialect)
+	if !merged.OK || merged.Output == nil || *merged.Output != expected["merge_output"].(string) {
+		t.Fatalf("native Go merge split a grouped import owner: %q", *merged.Output)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])

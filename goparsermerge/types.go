@@ -215,21 +215,17 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	}
 
 	imports := make([]gomerge.GoModuleImport, 0, len(file.Imports))
-	for index, item := range file.Imports {
-		matchKey := strings.Trim(item.Path.Value, "\"")
-		start := fset.Position(item.Pos()).Offset - offsetBytes
-		end := fset.Position(item.End()).Offset - offsetBytes
-		lineStart := strings.LastIndex(originalSource[:start], "\n")
-		if lineStart >= 0 {
-			lineStart++
-		} else {
-			lineStart = 0
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.IMPORT {
+			continue
 		}
-		imports = append(imports, gomerge.GoModuleImport{
-			Path:     "/imports/" + strconv.Itoa(index),
-			MatchKey: matchKey,
-			Text:     strings.TrimSpace(originalSource[lineStart:end]) + "\n",
-		})
+		ownerPath, matchKey, supported := nativeImportOwner(genDecl)
+		if !supported {
+			continue
+		}
+		text := nativeDeclarationText(source, originalSource, fset, genDecl, genDecl.Doc, file.Comments, offsetBytes)
+		imports = append(imports, gomerge.GoModuleImport{Path: ownerPath, MatchKey: matchKey, Text: text})
 	}
 
 	declarations := make([]gomerge.GoModuleDeclaration, 0)
@@ -374,6 +370,39 @@ func hasPackageClause(source string) bool {
 		}
 		return tokenKind == token.PACKAGE
 	}
+}
+
+func nativeImportOwner(declaration *ast.GenDecl) (string, string, bool) {
+	members := make([]string, 0, len(declaration.Specs))
+	paths := make([]string, 0, len(declaration.Specs))
+	for _, spec := range declaration.Specs {
+		item, ok := spec.(*ast.ImportSpec)
+		if !ok || item.Path == nil {
+			return "", "", false
+		}
+		path, err := strconv.Unquote(item.Path.Value)
+		if err != nil {
+			return "", "", false
+		}
+		alias := ""
+		if item.Name != nil {
+			alias = item.Name.Name
+		}
+		members = append(members, alias+"="+path)
+		paths = append(paths, path)
+	}
+	if len(members) == 0 {
+		return "", "", false
+	}
+	if declaration.Lparen.IsValid() {
+		slices.Sort(members)
+		identity := strings.Join(members, ";")
+		return "/import_group:" + identity, identity, true
+	}
+	if len(members) != 1 {
+		return "", "", false
+	}
+	return "/import:" + members[0], paths[0], true
 }
 
 func nativeGenDeclOwner(declaration *ast.GenDecl) (string, string, bool) {
