@@ -144,6 +144,40 @@ func TestGoParserPreservesNativeDocCommentOwnershipFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserPreservesMethodOwnerIdentityFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "method-owner-identity.json")
+	dialect := gomerge.GoDialect(fixture["dialect"].(string))
+	expected := fixture["expected"].(map[string]any)
+
+	parsed := ParseGo(fixture["source"].(string), dialect)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	owners := make([]map[string]any, 0, len(parsed.Analysis.Owners))
+	for _, owner := range parsed.Analysis.Owners {
+		owners = append(owners, map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+			"match_key":  owner.MatchKey,
+		})
+	}
+	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, expected["owners"]) {
+		t.Fatalf("unexpected method owners: %+v", actual)
+	}
+	texts := make([]string, 0, len(parsed.Analysis.Declarations))
+	for _, declaration := range parsed.Analysis.Declarations {
+		texts = append(texts, declaration.Text)
+	}
+	if actual := jsonReady(t, texts); !reflect.DeepEqual(actual, expected["declaration_texts"]) {
+		t.Fatalf("unexpected method declaration text: %+v", actual)
+	}
+
+	merged := MergeGo(expected["merge_template"].(string), expected["merge_destination"].(string), dialect)
+	if !merged.OK || merged.Output == nil || *merged.Output != expected["merge_output"].(string) {
+		t.Fatalf("unexpected native Go method merge: %+v", merged)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])

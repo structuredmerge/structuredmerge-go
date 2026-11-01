@@ -247,9 +247,17 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		} else {
 			lineStart = 0
 		}
+		ownerPath := "/declarations/" + funcDecl.Name.Name
+		matchKey := funcDecl.Name.Name
+		if funcDecl.Recv != nil && len(funcDecl.Recv.List) > 0 {
+			if receiver, ok := receiverTypeName(funcDecl.Recv.List[0].Type); ok {
+				ownerPath = "/method:" + receiver + "." + funcDecl.Name.Name
+				matchKey = receiver + "." + funcDecl.Name.Name
+			}
+		}
 		declarations = append(declarations, gomerge.GoModuleDeclaration{
-			Path:     "/declarations/" + funcDecl.Name.Name,
-			MatchKey: funcDecl.Name.Name,
+			Path:     ownerPath,
+			MatchKey: matchKey,
 			Text:     strings.TrimSpace(originalSource[lineStart:end]) + "\n",
 		})
 	}
@@ -273,6 +281,21 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func receiverTypeName(expression ast.Expr) (string, bool) {
+	switch value := expression.(type) {
+	case *ast.Ident:
+		return value.Name, true
+	case *ast.StarExpr:
+		return receiverTypeName(value.X)
+	case *ast.IndexExpr:
+		return receiverTypeName(value.X)
+	case *ast.IndexListExpr:
+		return receiverTypeName(value.X)
+	default:
+		return "", false
+	}
 }
 
 func applyGoParserNodeOperation(source string, operation treehaver.EditProjectionOperationRequest) (string, error) {
