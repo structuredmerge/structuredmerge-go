@@ -173,6 +173,15 @@ func TestGoParserPreservesMethodOwnerIdentityFixture(t *testing.T) {
 		t.Fatalf("unexpected method declaration text: %+v", actual)
 	}
 
+	reordered := ParseGo(fixture["reordered_source"].(string), dialect)
+	if !reordered.OK || reordered.Analysis == nil {
+		t.Fatalf("expected reordered native Go imports to parse: %+v", reordered)
+	}
+	matched := MatchGoOwners(*parsed.Analysis, *reordered.Analysis)
+	if len(matched.Matched) != 1 || matched.Matched[0].TemplatePath != expected["import_path"].(string) ||
+		matched.Matched[0].DestinationPath != expected["import_path"].(string) {
+		t.Fatalf("grouped import identity changed after spec reorder: %+v", matched)
+	}
 	merged := MergeGo(expected["merge_template"].(string), expected["merge_destination"].(string), dialect)
 	if !merged.OK || merged.Output == nil || *merged.Output != expected["merge_output"].(string) {
 		t.Fatalf("unexpected native Go method merge: %+v", merged)
