@@ -199,7 +199,14 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	offsetBytes := 0
 	if !hasPackageClause(source) {
 		prefix := syntheticPackagePrefix
-		source = prefix + source
+		const utf8BOM = "\uFEFF"
+		if strings.HasPrefix(source, utf8BOM) {
+			// Keep the BOM at byte zero, where go/parser permits it, while
+			// inserting the synthetic package before the snippet declarations.
+			source = utf8BOM + prefix + strings.TrimPrefix(source, utf8BOM)
+		} else {
+			source = prefix + source
+		}
 		offsetBytes = len(prefix)
 	}
 

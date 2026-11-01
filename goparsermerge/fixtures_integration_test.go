@@ -173,15 +173,6 @@ func TestGoParserPreservesMethodOwnerIdentityFixture(t *testing.T) {
 		t.Fatalf("unexpected method declaration text: %+v", actual)
 	}
 
-	reordered := ParseGo(fixture["reordered_source"].(string), dialect)
-	if !reordered.OK || reordered.Analysis == nil {
-		t.Fatalf("expected reordered native Go imports to parse: %+v", reordered)
-	}
-	matched := MatchGoOwners(*parsed.Analysis, *reordered.Analysis)
-	if len(matched.Matched) != 1 || matched.Matched[0].TemplatePath != expected["import_path"].(string) ||
-		matched.Matched[0].DestinationPath != expected["import_path"].(string) {
-		t.Fatalf("grouped import identity changed after spec reorder: %+v", matched)
-	}
 	merged := MergeGo(expected["merge_template"].(string), expected["merge_destination"].(string), dialect)
 	if !merged.OK || merged.Output == nil || *merged.Output != expected["merge_output"].(string) {
 		t.Fatalf("unexpected native Go method merge: %+v", merged)
@@ -316,6 +307,22 @@ func TestGoParserPreservesGroupedImportOwnerFixture(t *testing.T) {
 		importOwner.Text != expected["import_text"].(string) {
 		t.Fatalf("unexpected grouped import text or identity: %+v", importOwner)
 	}
+	reordered := ParseGo(fixture["reordered_source"].(string), dialect)
+	if !reordered.OK || reordered.Analysis == nil {
+		t.Fatalf("expected reordered native Go imports to parse: %+v", reordered)
+	}
+	matched := MatchGoOwners(*parsed.Analysis, *reordered.Analysis)
+	matchedImport := false
+	for _, ownerMatch := range matched.Matched {
+		if ownerMatch.TemplatePath == expected["import_path"].(string) &&
+			ownerMatch.DestinationPath == expected["import_path"].(string) {
+			matchedImport = true
+			break
+		}
+	}
+	if !matchedImport {
+		t.Fatalf("grouped import identity changed after spec reorder: %+v", matched)
+	}
 	merged := MergeGo(expected["merge_template"].(string), expected["merge_destination"].(string), dialect)
 	if !merged.OK || merged.Output == nil || *merged.Output != expected["merge_output"].(string) {
 		t.Fatalf("native Go merge split a grouped import owner: %q", *merged.Output)
@@ -329,6 +336,41 @@ func TestGoParserRejectsMalformedSourceFixture(t *testing.T) {
 	if parsed.OK || parsed.Analysis != nil || len(parsed.Diagnostics) != 1 ||
 		string(parsed.Diagnostics[0].Category) != expected["category"].(string) {
 		t.Fatalf("unexpected malformed source result: %+v", parsed)
+	}
+}
+
+func TestGoParserPreservesBOMSourceOwnershipFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "bom-source-ownership.json")
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		t.Run(testCase["name"].(string), func(t *testing.T) {
+			parsed := ParseGo(testCase["source"].(string), gomerge.GoDialect(fixture["dialect"].(string)))
+			if !parsed.OK || parsed.Analysis == nil {
+				t.Fatalf("expected go/parser to accept BOM source: %+v", parsed)
+			}
+			expected := testCase["expected"].(map[string]any)
+			foundDeclaration := false
+			for _, declaration := range parsed.Analysis.Declarations {
+				if declaration.Path == expected["declaration_path"].(string) {
+					foundDeclaration = true
+					if declaration.Text != expected["declaration_text"].(string) {
+						t.Fatalf("unexpected BOM declaration text: %q", declaration.Text)
+					}
+				}
+			}
+			if !foundDeclaration {
+				t.Fatalf("expected declaration owner %s: %+v", expected["declaration_path"], parsed.Analysis.Declarations)
+			}
+			if packagePath, ok := expected["package_owner_path"].(string); ok {
+				foundPackage := false
+				for _, owner := range parsed.Analysis.Owners {
+					foundPackage = foundPackage || owner.Path == packagePath
+				}
+				if !foundPackage {
+					t.Fatalf("expected package owner %s: %+v", packagePath, parsed.Analysis.Owners)
+				}
+			}
+		})
 	}
 }
 
