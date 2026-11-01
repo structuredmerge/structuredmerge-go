@@ -258,6 +258,27 @@ func TestGoParserRejectsDuplicateOwnerIdentityFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserPreservesSameLineTrailingCommentOwnershipFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "trailing-comment-ownership.json")
+	dialect := gomerge.GoDialect(fixture["dialect"].(string))
+	expected := fixture["expected"].(map[string]any)
+	parsed := ParseGo(fixture["source"].(string), dialect)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	texts := make([]string, 0, len(parsed.Analysis.Declarations))
+	for _, declaration := range parsed.Analysis.Declarations {
+		texts = append(texts, declaration.Text)
+	}
+	if actual := jsonReady(t, texts); !reflect.DeepEqual(actual, expected["declaration_texts"]) {
+		t.Fatalf("unexpected native trailing comment ownership: %+v", actual)
+	}
+	merged := MergeGo(expected["merge_template"].(string), expected["merge_destination"].(string), dialect)
+	if !merged.OK || merged.Output == nil || *merged.Output != expected["merge_output"].(string) {
+		t.Fatalf("native Go merge dropped an owned trailing comment: %+v", merged)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])

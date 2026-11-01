@@ -236,21 +236,9 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	for _, decl := range file.Decls {
 		if genDecl, ok := decl.(*ast.GenDecl); ok {
 			if ownerPath, matchKey, supported := nativeGenDeclOwner(genDecl); supported {
-				start := fset.Position(genDecl.Pos()).Offset
-				if genDecl.Doc != nil {
-					start = fset.Position(genDecl.Doc.Pos()).Offset
-				}
-				start -= offsetBytes
-				end := fset.Position(genDecl.End()).Offset - offsetBytes
-				lineStart := strings.LastIndex(originalSource[:start], "\n")
-				if lineStart >= 0 {
-					lineStart++
-				} else {
-					lineStart = 0
-				}
+				text := nativeDeclarationText(source, originalSource, fset, genDecl, genDecl.Doc, file.Comments, offsetBytes)
 				declarations = append(declarations, gomerge.GoModuleDeclaration{
-					Path: ownerPath, MatchKey: matchKey,
-					Text: strings.TrimSpace(originalSource[lineStart:end]) + "\n",
+					Path: ownerPath, MatchKey: matchKey, Text: text,
 				})
 			}
 			continue
@@ -259,18 +247,7 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		if !ok || funcDecl.Name == nil {
 			continue
 		}
-		start := fset.Position(funcDecl.Pos()).Offset
-		if funcDecl.Doc != nil {
-			start = fset.Position(funcDecl.Doc.Pos()).Offset
-		}
-		start -= offsetBytes
-		end := fset.Position(funcDecl.End()).Offset - offsetBytes
-		lineStart := strings.LastIndex(originalSource[:start], "\n")
-		if lineStart >= 0 {
-			lineStart++
-		} else {
-			lineStart = 0
-		}
+		text := nativeDeclarationText(source, originalSource, fset, funcDecl, funcDecl.Doc, file.Comments, offsetBytes)
 		ownerPath := "/declarations/" + funcDecl.Name.Name
 		matchKey := funcDecl.Name.Name
 		if funcDecl.Recv != nil && len(funcDecl.Recv.List) > 0 {
@@ -282,7 +259,7 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		declarations = append(declarations, gomerge.GoModuleDeclaration{
 			Path:     ownerPath,
 			MatchKey: matchKey,
-			Text:     strings.TrimSpace(originalSource[lineStart:end]) + "\n",
+			Text:     text,
 		})
 	}
 	slices.SortFunc(declarations, func(left, right gomerge.GoModuleDeclaration) int {
@@ -320,6 +297,45 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func nativeDeclarationText(
+	parsedSource string,
+	originalSource string,
+	fileSet *token.FileSet,
+	node ast.Node,
+	doc *ast.CommentGroup,
+	comments []*ast.CommentGroup,
+	syntheticPrefixBytes int,
+) string {
+	start := fileSet.Position(node.Pos()).Offset
+	if doc != nil {
+		start = fileSet.Position(doc.Pos()).Offset
+	}
+	end := fileSet.Position(node.End()).Offset
+	for _, group := range comments {
+		for _, comment := range group.List {
+			commentStart := fileSet.Position(comment.Pos()).Offset
+			if commentStart < end {
+				continue
+			}
+			gap := parsedSource[end:commentStart]
+			if strings.ContainsAny(gap, "\r\n") || strings.Trim(gap, "\t ") != "" {
+				break
+			}
+			end = fileSet.Position(comment.End()).Offset
+			break
+		}
+	}
+	start -= syntheticPrefixBytes
+	end -= syntheticPrefixBytes
+	lineStart := strings.LastIndex(originalSource[:start], "\n")
+	if lineStart >= 0 {
+		lineStart++
+	} else {
+		lineStart = 0
+	}
+	return strings.TrimSpace(originalSource[lineStart:end]) + "\n"
 }
 
 func normalizeGoParserError(err error, syntheticPrefixBytes int) string {
