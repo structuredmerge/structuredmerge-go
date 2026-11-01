@@ -145,6 +145,37 @@ func TestGoParserPreservesNativeDocCommentOwnershipFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserPreservesCommentDirectiveOwnershipFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "comment-directive-ownership.json")
+	parsed := ParseGo(fixture["source"].(string), gomerge.DialectGo)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	expected := fixture["expected"].(map[string]any)
+	for _, declaration := range parsed.Analysis.Declarations {
+		if declaration.Path == expected["declaration_path"].(string) {
+			if declaration.Text != expected["declaration_text"].(string) {
+				t.Fatalf("go:embed directive ownership mismatch: %q", declaration.Text)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing declaration owner %s: %+v", expected["declaration_path"], parsed.Analysis.Declarations)
+}
+
+func TestGoParserMergeKeepsCommentDirectiveWithItsOwner(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "comment-directive-ownership.json")
+	expected := fixture["expected"].(map[string]any)
+	merged := MergeGo(fixture["merge_template"].(string), fixture["merge_destination"].(string), gomerge.DialectGo)
+	if !merged.OK || merged.Output == nil || *merged.Output != expected["merge_output"].(string) {
+		actual := "<nil>"
+		if merged.Output != nil {
+			actual = *merged.Output
+		}
+		t.Fatalf("native merge changed go:embed ownership: %+v output=%q", merged, actual)
+	}
+}
+
 func TestGoParserPreservesMethodOwnerIdentityFixture(t *testing.T) {
 	fixture := readFixture(t, "go", "slice-114-native", "method-owner-identity.json")
 	dialect := gomerge.GoDialect(fixture["dialect"].(string))
