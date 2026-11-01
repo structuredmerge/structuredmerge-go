@@ -312,13 +312,14 @@ func MergeGoWithParser(
 
 	destinationDeclarationPaths := make(map[string]struct{}, len(destination.Analysis.Declarations))
 	declarationTexts := make([]string, 0, len(destination.Analysis.Declarations)+len(template.Analysis.Declarations))
+	const utf8BOM = "\uFEFF"
 	for _, item := range destination.Analysis.Declarations {
 		destinationDeclarationPaths[item.Path] = struct{}{}
-		declarationTexts = append(declarationTexts, item.Text)
+		declarationTexts = append(declarationTexts, strings.TrimPrefix(item.Text, utf8BOM))
 	}
 	for _, item := range template.Analysis.Declarations {
 		if _, ok := destinationDeclarationPaths[item.Path]; !ok {
-			declarationTexts = append(declarationTexts, item.Text)
+			declarationTexts = append(declarationTexts, strings.TrimPrefix(item.Text, utf8BOM))
 		}
 	}
 
@@ -327,14 +328,14 @@ func MergeGoWithParser(
 	seenImportPaths := make(map[string]struct{}, len(destination.Analysis.Imports))
 	for _, item := range destination.Analysis.Imports {
 		seenImportPaths[item.Path] = struct{}{}
-		importTexts = append(importTexts, item.Text)
+		importTexts = append(importTexts, strings.TrimPrefix(item.Text, utf8BOM))
 	}
 	for _, item := range template.Analysis.Imports {
 		if _, exists := seenImportPaths[item.Path]; exists {
 			continue
 		}
 		seenImportPaths[item.Path] = struct{}{}
-		importTexts = append(importTexts, item.Text)
+		importTexts = append(importTexts, strings.TrimPrefix(item.Text, utf8BOM))
 	}
 	if len(importTexts) > 0 {
 		sections = append(sections, strings.TrimSpace(strings.Join(importTexts, "")))
@@ -343,6 +344,9 @@ func MergeGoWithParser(
 		sections = append(sections, strings.TrimSpace(strings.Join(declarationTexts, "\n")))
 	}
 	output := strings.Join(sections, "\n\n") + "\n"
+	if strings.HasPrefix(destination.Analysis.Source, utf8BOM) {
+		output = utf8BOM + output
+	}
 	return astmerge.MergeResult[string]{
 		OK:          true,
 		Diagnostics: []astmerge.Diagnostic{},

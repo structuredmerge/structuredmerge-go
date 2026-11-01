@@ -370,6 +370,17 @@ func TestGoParserPreservesBOMSourceOwnershipFixture(t *testing.T) {
 					t.Fatalf("expected package owner %s: %+v", packagePath, parsed.Analysis.Owners)
 				}
 			}
+			if template, ok := testCase["merge_template"].(string); ok {
+				merged := MergeGo(template, testCase["merge_destination"].(string), gomerge.DialectGo)
+				actualOutput := "<nil>"
+				if merged.Output != nil {
+					actualOutput = *merged.Output
+				}
+				if !merged.OK || merged.Output == nil ||
+					actualOutput != expected["merge_output"].(string) {
+					t.Fatalf("unexpected BOM-preserving native merge: %+v output=%q", merged, actualOutput)
+				}
+			}
 		})
 	}
 }
