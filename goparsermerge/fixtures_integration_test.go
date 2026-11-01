@@ -176,6 +176,35 @@ func TestGoParserMergeKeepsCommentDirectiveWithItsOwner(t *testing.T) {
 	}
 }
 
+func TestGoParserKeepsBuildConstraintsOutsideDeclarationOwnersFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "build-constraint-comment-ownership.json")
+	parsed := ParseGo(fixture["source"].(string), gomerge.DialectGo)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	expected := fixture["expected"].(map[string]any)
+	foundPackage := false
+	for _, owner := range parsed.Analysis.Owners {
+		foundPackage = foundPackage || owner.Path == expected["package_owner_path"].(string)
+	}
+	if !foundPackage {
+		t.Fatalf("missing package owner %s: %+v", expected["package_owner_path"], parsed.Analysis.Owners)
+	}
+	if parsed.Analysis.Source != fixture["source"].(string) {
+		t.Fatal("native Go analysis did not retain the complete source, including build constraints")
+	}
+	for _, declaration := range parsed.Analysis.Declarations {
+		if declaration.Path != expected["function_path"].(string) {
+			continue
+		}
+		if declaration.Text != expected["function_text"].(string) {
+			t.Fatalf("unexpected Go function comment ownership: %q", declaration.Text)
+		}
+		return
+	}
+	t.Fatalf("missing function owner %s: %+v", expected["function_path"], parsed.Analysis.Declarations)
+}
+
 func TestGoParserPreservesMethodOwnerIdentityFixture(t *testing.T) {
 	fixture := readFixture(t, "go", "slice-114-native", "method-owner-identity.json")
 	dialect := gomerge.GoDialect(fixture["dialect"].(string))
