@@ -299,6 +299,18 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	for _, item := range declarations {
 		owners = append(owners, gomerge.GoOwner{Path: item.Path, OwnerKind: gomerge.OwnerDeclaration, MatchKey: item.MatchKey})
 	}
+	seenOwnerPaths := make(map[string]struct{}, len(owners))
+	for _, owner := range owners {
+		if _, exists := seenOwnerPaths[owner.Path]; exists {
+			return astmerge.ParseResult[gomerge.GoAnalysis]{
+				OK: false,
+				Diagnostics: []astmerge.Diagnostic{
+					parseError(fmt.Sprintf("duplicate top-level Go owner identity %q", owner.Path)),
+				},
+			}
+		}
+		seenOwnerPaths[owner.Path] = struct{}{}
+	}
 
 	analysis := gomerge.GoAnalysis{
 		Dialect:      gomerge.DialectGo,

@@ -245,6 +245,19 @@ func TestGoParserNormalizesSyntheticPackageParseErrorOffsets(t *testing.T) {
 	}
 }
 
+func TestGoParserRejectsDuplicateOwnerIdentityFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "duplicate-owner-identity.json")
+	parsed := ParseGo(fixture["source"].(string), gomerge.DialectGo)
+	if parsed.OK || parsed.Analysis != nil {
+		t.Fatalf("expected duplicate Go owner identities to fail closed: %+v", parsed)
+	}
+	expected := fixture["expected"].(map[string]any)
+	if len(parsed.Diagnostics) != 1 || string(parsed.Diagnostics[0].Category) != expected["category"].(string) ||
+		parsed.Diagnostics[0].Message != expected["message"].(string) {
+		t.Fatalf("unexpected duplicate Go owner diagnostics: %+v", parsed.Diagnostics)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])
