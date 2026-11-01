@@ -431,6 +431,21 @@ func TestGoParserFailsClosedOnRecoveredPartialASTsFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserRejectsMalformedOneSidedMerge3InputsFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "merge3-one-sided-parser-failure.json")
+	expected := fixture["expected"].(map[string]any)
+	for _, rawCase := range fixture["cases"].([]any) {
+		testCase := rawCase.(map[string]any)
+		t.Run(testCase["name"].(string), func(t *testing.T) {
+			parsed := ParseGo(testCase["malformed_source"].(string), gomerge.DialectGo)
+			if parsed.OK || parsed.Analysis != nil || len(parsed.Diagnostics) != 1 ||
+				string(parsed.Diagnostics[0].Category) != expected["category"].(string) {
+				t.Fatalf("expected malformed merge input to fail closed without analysis: %+v", parsed)
+			}
+		})
+	}
+}
+
 func TestGoParserPreservesGenericTypeAliasOwnerFixture(t *testing.T) {
 	fixture := readFixture(t, "go", "slice-114-native", "generic-type-alias-owner.json")
 	expected := fixture["expected"].(map[string]any)
