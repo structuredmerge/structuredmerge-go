@@ -111,6 +111,39 @@ func TestSharedFixtureGoProviderParseAndMerge(t *testing.T) {
 	}
 }
 
+func TestGoParserPreservesNativeDocCommentOwnershipFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "doc-comment-ownership.json")
+	dialect := gomerge.GoDialect(fixture["dialect"].(string))
+	expected := fixture["expected"].(map[string]any)
+
+	parsed := ParseGo(fixture["source"].(string), dialect)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	if len(parsed.Analysis.Declarations) != 1 {
+		t.Fatalf("expected one declaration, got %+v", parsed.Analysis.Declarations)
+	}
+	declaration := parsed.Analysis.Declarations[0]
+	if declaration.Path != expected["declaration_path"].(string) {
+		t.Fatalf("unexpected declaration path: %s", declaration.Path)
+	}
+	if declaration.Text != expected["declaration_text"].(string) {
+		t.Fatalf("native go/ast doc ownership mismatch:\n%q", declaration.Text)
+	}
+
+	merged := MergeGo(
+		expected["merge_template"].(string),
+		expected["merge_destination"].(string),
+		dialect,
+	)
+	if !merged.OK || merged.Output == nil {
+		t.Fatalf("expected native Go merge success: %+v", merged)
+	}
+	if *merged.Output != expected["merge_output"].(string) {
+		t.Fatalf("native go/ast merge dropped doc ownership:\n%q", *merged.Output)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])

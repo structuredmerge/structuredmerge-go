@@ -235,7 +235,11 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		if !ok || funcDecl.Name == nil {
 			continue
 		}
-		start := fset.Position(funcDecl.Pos()).Offset - offsetBytes
+		start := fset.Position(funcDecl.Pos()).Offset
+		if funcDecl.Doc != nil {
+			start = fset.Position(funcDecl.Doc.Pos()).Offset
+		}
+		start -= offsetBytes
 		end := fset.Position(funcDecl.End()).Offset - offsetBytes
 		lineStart := strings.LastIndex(originalSource[:start], "\n")
 		if lineStart >= 0 {
