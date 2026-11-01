@@ -210,6 +210,25 @@ func TestGoParserPreservesGroupedDeclarationOwnerIdentityFixture(t *testing.T) {
 	}
 }
 
+func TestGoParserFindsPackageClauseAfterPackageDocumentation(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "package-doc-owner.json")
+	parsed := ParseGo(fixture["source"].(string), gomerge.DialectGo)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	owners := make([]map[string]any, 0, len(parsed.Analysis.Owners))
+	for _, owner := range parsed.Analysis.Owners {
+		owners = append(owners, map[string]any{
+			"path":       owner.Path,
+			"owner_kind": owner.OwnerKind,
+			"match_key":  owner.MatchKey,
+		})
+	}
+	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, fixture["expected"].(map[string]any)["owners"]) {
+		t.Fatalf("unexpected package-document owners: %+v", actual)
+	}
+}
+
 func TestSharedFixtureGoProviderNamedSuitePlans(t *testing.T) {
 	fixture := readFixture(t, "diagnostics", "slice-283-go-provider-named-suite-plans", "go-go-provider-named-suite-plans.json")
 	source, err := json.Marshal(fixture["manifest"])

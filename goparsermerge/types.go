@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/format"
 	goparser "go/parser"
+	"go/scanner"
 	"go/token"
 	"regexp"
 	"slices"
@@ -194,7 +195,7 @@ func ApplyEditProjection(request treehaver.EditProjectionExecutionRequest) treeh
 func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	originalSource := source
 	offsetBytes := 0
-	if !strings.HasPrefix(strings.TrimSpace(source), "package ") {
+	if !hasPackageClause(source) {
 		prefix := "package main\n\n"
 		source = prefix + source
 		offsetBytes = len(prefix)
@@ -286,7 +287,10 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		return strings.Compare(left.Path, right.Path)
 	})
 
-	owners := make([]gomerge.GoOwner, 0, len(imports)+len(declarations))
+	owners := make([]gomerge.GoOwner, 0, len(imports)+len(declarations)+1)
+	if offsetBytes == 0 && file.Name != nil {
+		owners = append(owners, gomerge.GoOwner{Path: "/package:" + file.Name.Name, OwnerKind: gomerge.OwnerPackage, MatchKey: file.Name.Name})
+	}
 	for _, item := range imports {
 		owners = append(owners, gomerge.GoOwner{Path: item.Path, OwnerKind: gomerge.OwnerImport, MatchKey: item.MatchKey})
 	}
@@ -302,6 +306,20 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func hasPackageClause(source string) bool {
+	fileSet := token.NewFileSet()
+	file := fileSet.AddFile("input.go", fileSet.Base(), len(source))
+	var sourceScanner scanner.Scanner
+	sourceScanner.Init(file, []byte(source), nil, scanner.ScanComments)
+	for {
+		_, tokenKind, _ := sourceScanner.Scan()
+		if tokenKind == token.COMMENT || tokenKind == token.SEMICOLON {
+			continue
+		}
+		return tokenKind == token.PACKAGE
+	}
 }
 
 func nativeGenDeclOwner(declaration *ast.GenDecl) (string, string, bool) {

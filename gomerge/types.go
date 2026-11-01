@@ -22,6 +22,7 @@ type GoOwnerKind string
 
 const (
 	OwnerImport      GoOwnerKind = "import"
+	OwnerPackage     GoOwnerKind = "package"
 	OwnerDeclaration GoOwnerKind = "declaration"
 )
 
