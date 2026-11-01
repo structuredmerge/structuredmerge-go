@@ -20,6 +20,8 @@ import (
 
 const BackendGoParser = "go-parser"
 
+const syntheticPackagePrefix = "package main\n\n"
+
 type GoBackendFeatureProfile struct {
 	Family            string
 	SupportedDialects []gomerge.GoDialect
@@ -196,7 +198,7 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 	originalSource := source
 	offsetBytes := 0
 	if !hasPackageClause(source) {
-		prefix := "package main\n\n"
+		prefix := syntheticPackagePrefix
 		source = prefix + source
 		offsetBytes = len(prefix)
 	}
@@ -207,7 +209,7 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		return astmerge.ParseResult[gomerge.GoAnalysis]{
 			OK: false,
 			Diagnostics: []astmerge.Diagnostic{
-				parseError(strings.ReplaceAll(err.Error(), "input.go:3:", "input.go:1:")),
+				parseError(normalizeGoParserError(err, offsetBytes)),
 			},
 		}
 	}
@@ -306,6 +308,30 @@ func parseGoNative(source string) astmerge.ParseResult[gomerge.GoAnalysis] {
 		Declarations: declarations,
 	}
 	return astmerge.ParseResult[gomerge.GoAnalysis]{OK: true, Diagnostics: []astmerge.Diagnostic{}, Analysis: &analysis}
+}
+
+func normalizeGoParserError(err error, syntheticPrefixBytes int) string {
+	if syntheticPrefixBytes == 0 {
+		return err.Error()
+	}
+	errorList, ok := err.(scanner.ErrorList)
+	if !ok {
+		return err.Error()
+	}
+	for _, item := range errorList {
+		if item == nil || !item.Pos.IsValid() {
+			continue
+		}
+		item.Pos.Offset -= syntheticPrefixBytes
+		item.Pos.Line -= strings.Count(syntheticPackagePrefix, "\n")
+		if item.Pos.Offset < 0 {
+			item.Pos.Offset = 0
+		}
+		if item.Pos.Line < 1 {
+			item.Pos.Line = 1
+		}
+	}
+	return errorList.Error()
 }
 
 func hasPackageClause(source string) bool {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/structuredmerge/structuredmerge-go/astmerge"
@@ -226,6 +227,21 @@ func TestGoParserFindsPackageClauseAfterPackageDocumentation(t *testing.T) {
 	}
 	if actual := jsonReady(t, owners); !reflect.DeepEqual(actual, fixture["expected"].(map[string]any)["owners"]) {
 		t.Fatalf("unexpected package-document owners: %+v", actual)
+	}
+}
+
+func TestGoParserNormalizesSyntheticPackageParseErrorOffsets(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "parser-error-offset.json")
+	parsed := ParseGo(fixture["source"].(string), gomerge.DialectGo)
+	if parsed.OK || parsed.Analysis != nil {
+		t.Fatalf("expected malformed Go source to fail closed: %+v", parsed)
+	}
+	expected := fixture["expected"].(map[string]any)
+	if len(parsed.Diagnostics) != 1 || string(parsed.Diagnostics[0].Category) != expected["category"].(string) {
+		t.Fatalf("unexpected native Go parse diagnostics: %+v", parsed.Diagnostics)
+	}
+	if !strings.HasPrefix(parsed.Diagnostics[0].Message, expected["message_prefix"].(string)) {
+		t.Fatalf("synthetic package offset leaked into parse message: %q", parsed.Diagnostics[0].Message)
 	}
 }
 
