@@ -1108,3 +1108,12 @@ func collapseBlankLines(text string) string {
 	}
 	return strings.TrimRight(strings.Join(collapsed, "\n"), "\n")
 }
+
+func containsString(values []string, candidate string) bool {
+	for _, value := range values {
+		if value == candidate {
+			return true
+		}
+	}
+	return false
+}

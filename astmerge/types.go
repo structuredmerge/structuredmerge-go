@@ -7871,22 +7871,22 @@ func ReviewConformanceFamilyContext(
 	}
 
 	return nil, []Diagnostic{{
-			Severity: SeverityError,
-			Category: CategoryConfigurationError,
-			Message:  "missing explicit family context for " + family + ".",
-		}}, []ReviewRequest{{
-			ID:              ReviewRequestIDForFamilyContext(family),
-			Kind:            ReviewRequestFamilyContext,
-			Family:          family,
-			Message:         "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
-			Blocking:        true,
-			ProposedContext: &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
-			ActionOffers: []ReviewActionOffer{
-				{Action: ReviewDecisionAcceptDefaultContext, RequiresContext: false},
-				{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true, PayloadKind: "conformance_family_context"},
-			},
-			DefaultAction: ReviewDecisionAcceptDefaultContext,
-		}}, nil
+		Severity: SeverityError,
+		Category: CategoryConfigurationError,
+		Message:  "missing explicit family context for " + family + ".",
+	}}, []ReviewRequest{{
+		ID:              ReviewRequestIDForFamilyContext(family),
+		Kind:            ReviewRequestFamilyContext,
+		Family:          family,
+		Message:         "explicit family context is required for " + family + "; a synthesized default may be accepted by review.",
+		Blocking:        true,
+		ProposedContext: &ConformanceFamilyPlanContext{FamilyProfile: familyProfile},
+		ActionOffers: []ReviewActionOffer{
+			{Action: ReviewDecisionAcceptDefaultContext, RequiresContext: false},
+			{Action: ReviewDecisionProvideExplicitContext, RequiresContext: true, PayloadKind: "conformance_family_context"},
+		},
+		DefaultAction: ReviewDecisionAcceptDefaultContext,
+	}}, nil
 }
 
 func SummarizeConformanceResults(results []ConformanceCaseResult) ConformanceSuiteSummary {

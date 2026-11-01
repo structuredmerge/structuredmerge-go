@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strings"
 
-	tspack "github.com/kreuzberg-dev/tree-sitter-language-pack/packages/go"
+	tspack "github.com/xberg-io/tree-sitter-language-pack/packages/go"
 )
 
 func ensureLanguageAvailable(language string) error {
-	if boolValue(tspack.HasLanguage(language)) {
+	if tspack.HasLanguage(language) {
 		return nil
 	}
 
@@ -19,7 +19,7 @@ func ensureLanguageAvailable(language string) error {
 		return err
 	}
 
-	if boolValue(tspack.HasLanguage(language)) {
+	if tspack.HasLanguage(language) {
 		return nil
 	}
 
@@ -158,10 +158,6 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
-func boolValue(value *bool) bool {
-	return value != nil && *value
-}
-
 func derefStringPtr(value *string) string {
 	if value == nil {
 		return ""
@@ -169,7 +165,10 @@ func derefStringPtr(value *string) string {
 	return *value
 }
 
-func processSpanFromLanguagePack(span tspack.Span) ProcessSpan {
+func processSpanFromLanguagePack(span *tspack.Span) ProcessSpan {
+	if span == nil {
+		return ProcessSpan{}
+	}
 	return ProcessSpan{
 		StartByte: int(span.StartByte),
 		EndByte:   int(span.EndByte),

@@ -92,7 +92,7 @@ The family is intentionally layered:
 [go-goparsermerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/goparsermerge
 [go-godstmerge]: https://github.com/structuredmerge/structuredmerge-go/tree/main/godstmerge
 [go-kettlegomodder]: https://github.com/structuredmerge/structuredmerge-go/tree/main/kettlegomodder
-[tree-sitter-language-pack]: https://github.com/kreuzberg-dev/tree-sitter-language-pack
+[tree-sitter-language-pack]: https://github.com/xberg-io/tree-sitter-language-pack
 [goccy-go-yaml]: https://github.com/goccy/go-yaml
 [pigeon]: https://github.com/mna/pigeon
 [goldmark]: https://github.com/yuin/goldmark

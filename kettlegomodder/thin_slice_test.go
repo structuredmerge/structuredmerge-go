@@ -366,12 +366,3 @@ func uniqueReportKinds(reports []RecipeRunReport) []string {
 	}
 	return kinds
 }
-
-func containsString(values []string, candidate string) bool {
-	for _, value := range values {
-		if value == candidate {
-			return true
-		}
-	}
-	return false
-}

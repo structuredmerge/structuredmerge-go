@@ -8,10 +8,6 @@ require "shellwords"
 
 GO_REPO = File.expand_path("..", __dir__)
 STRUCTUREDMERGE_ROOT = File.expand_path("..", GO_REPO)
-TREE_SITTER_LANGUAGE_PACK_REPO = File.join(STRUCTUREDMERGE_ROOT, "tree-sitter-language-pack")
-TREE_SITTER_LANGUAGE_PACK_GO_REPO = File.join(TREE_SITTER_LANGUAGE_PACK_REPO, "packages", "go")
-TREE_SITTER_LANGUAGE_PACK_RELEASE_LIB = File.join(TREE_SITTER_LANGUAGE_PACK_REPO, "target", "release")
-TREE_SITTER_LANGUAGE_PACK_GO_PACKAGE = "github.com/kreuzberg-dev/tree-sitter-language-pack/packages/go"
 GO_MODULE = "github.com/structuredmerge/structuredmerge-go"
 
 PACKAGES = [
@@ -147,27 +143,6 @@ def go_proxy_version_exists?(tag_name)
   status.success? && output.include?(tag_name)
 end
 
-def go_test_env
-  existing = ENV.fetch("LD_LIBRARY_PATH", "")
-  paths = [TREE_SITTER_LANGUAGE_PACK_RELEASE_LIB]
-  paths << existing unless existing.empty?
-  { "LD_LIBRARY_PATH" => paths.join(":") }
-end
-
-def release_modfile
-  tmp_dir = File.join(GO_REPO, "tmp", "release-go-module")
-  FileUtils.mkdir_p(tmp_dir)
-  modfile = File.join(tmp_dir, "go.mod")
-  sumfile = File.join(tmp_dir, "go.sum")
-  File.write(modfile, File.read(File.join(GO_REPO, "go.mod")))
-  FileUtils.cp(File.join(GO_REPO, "go.sum"), sumfile)
-  File.open(modfile, "a") do |file|
-    file.puts
-    file.puts "replace #{TREE_SITTER_LANGUAGE_PACK_GO_PACKAGE} => #{TREE_SITTER_LANGUAGE_PACK_GO_REPO}"
-  end
-  modfile
-end
-
 raise "Could not find Go repo at #{GO_REPO}" unless Dir.exist?(GO_REPO)
 
 tag_name = normalize_version(options[:version])
@@ -203,17 +178,11 @@ unless options[:skip_tests]
   end
   run!(["go", "test", "./...", "-run", "^$"], chdir: GO_REPO) if selected_packages == PACKAGES
 
-  if Dir.exist?(TREE_SITTER_LANGUAGE_PACK_REPO)
-    run!(%w[cargo build -p ts-pack-core-ffi --release], chdir: TREE_SITTER_LANGUAGE_PACK_REPO)
-  else
-    raise "Missing tree-sitter-language-pack repo at #{TREE_SITTER_LANGUAGE_PACK_REPO}"
-  end
-
-  modfile = release_modfile
+  # The published language-pack Go module ships its native library; no sibling checkout is needed.
   selected_packages.each do |package_name|
-    run!(["go", "test", "-tags", "tspack", "-modfile", modfile, "./#{package_name}"], chdir: GO_REPO, env: go_test_env)
+    run!(["go", "test", "-tags", "tspack", "./#{package_name}"], chdir: GO_REPO)
   end
-  run!(["go", "test", "-tags", "tspack", "-modfile", modfile, "./..."], chdir: GO_REPO, env: go_test_env) if selected_packages == PACKAGES
+  run!(["go", "test", "-tags", "tspack", "./..."], chdir: GO_REPO) if selected_packages == PACKAGES
 end
 
 if tag_exists?(tag_name)
