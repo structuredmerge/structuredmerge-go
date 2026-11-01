@@ -176,6 +176,25 @@ func TestGoParserMergeKeepsCommentDirectiveWithItsOwner(t *testing.T) {
 	}
 }
 
+func TestGoParserPreservesLinknameCommentOwnershipFixture(t *testing.T) {
+	fixture := readFixture(t, "go", "slice-114-native", "linkname-comment-ownership.json")
+	parsed := ParseGo(fixture["source"].(string), gomerge.DialectGo)
+	if !parsed.OK || parsed.Analysis == nil {
+		t.Fatalf("expected native Go parse success: %+v", parsed)
+	}
+	expected := fixture["expected"].(map[string]any)
+	for _, declaration := range parsed.Analysis.Declarations {
+		if declaration.Path != expected["function_path"].(string) {
+			continue
+		}
+		if declaration.Text != expected["function_text"].(string) {
+			t.Fatalf("go:linkname directive ownership mismatch: %q", declaration.Text)
+		}
+		return
+	}
+	t.Fatalf("missing function owner %s: %+v", expected["function_path"], parsed.Analysis.Declarations)
+}
+
 func TestGoParserKeepsBuildConstraintsOutsideDeclarationOwnersFixture(t *testing.T) {
 	fixture := readFixture(t, "go", "slice-114-native", "build-constraint-comment-ownership.json")
 	parsed := ParseGo(fixture["source"].(string), gomerge.DialectGo)
